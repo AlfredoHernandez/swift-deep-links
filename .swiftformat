@@ -1,0 +1,55 @@
+# Project's SwiftFormat configuration file
+
+# ───────────────────────────────
+# General Format Options
+# ───────────────────────────────
+--maxwidth 160
+--allman false
+--someany true
+
+# ───────────────────────────────
+# Wrapping & Indentation
+# ───────────────────────────────
+--wraparguments before-first
+--wrapparameters before-first
+--ifdef no-indent
+--elseposition same-line
+
+# ───────────────────────────────
+# Imports & Acronyms
+# ───────────────────────────────
+--acronyms ID,URL,UUID
+--importgrouping testable-first
+
+# ───────────────────────────────
+# Switch / Blank Lines
+# ───────────────────────────────
+--blank-line-after-switch-case always
+
+# ───────────────────────────────
+# File Header
+# ───────────────────────────────
+--header "//\n//  Copyright © {year} Jesús Alfredo Hernández Alarcón. All rights reserved.\n//"
+
+# ───────────────────────────────
+# MARK Options
+# ───────────────────────────────
+--marktypes always
+--typemark "MARK: - %t"
+--markextensions always
+--extensionmark "MARK: - %t + %c"
+--groupedextension "MARK: %c"
+
+# ───────────────────────────────
+# Rules
+# ───────────────────────────────
+--disable enumNamespaces
+
+--enable acronyms
+--enable blankLinesBetweenImports
+--enable blankLineAfterSwitchCase
+--enable isEmpty
+--enable initCoderUnavailable
+--enable redundantOptionalBinding
+--enable redundantRawValues
+--enable spaceInsideBraces
