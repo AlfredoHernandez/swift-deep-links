@@ -24,7 +24,7 @@ The library requires iOS 16.0+ and Swift 6.2+.
 ## Implementation Questions
 
 ### How do I register my app's URL scheme?
-
+¬
 Add your URL scheme to your app's `Info.plist`:
 
 ```xml

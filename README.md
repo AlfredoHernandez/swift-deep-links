@@ -200,6 +200,13 @@ Responsible for converting URLs into route objects. The `DefaultDeepLinkRouting`
 ### DeepLinkHandler
 Handles the actual actions for each route. Implement this protocol to define what happens when a specific route is triggered.
 
+### 📊 Architecture Diagrams
+
+For comprehensive visual overviews of the system architecture:
+
+- **[Complete Architecture Diagram](./docs/architecture-diagram.md)** - Shows the complete flow from URL entry through middleware processing, parsing, routing, and navigation
+- **[Core Package Architecture](./docs/core-architecture-diagram.md)** - Detailed view of the core package components and their internal interactions
+
 ## 📱 Sample App
 
 Check out the [Sample App](./DeepLinkSample/) for a complete implementation example that demonstrates:
