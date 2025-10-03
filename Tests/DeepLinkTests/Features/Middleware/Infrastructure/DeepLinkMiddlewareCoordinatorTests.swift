@@ -16,7 +16,7 @@ struct DeepLinkMiddlewareCoordinatorTests {
         let testURL = URL(string: "testapp://test")!
 
         // Add a simple middleware that returns the URL
-        coordinator.add(MiddlewareSpy())
+        await coordinator.add(MiddlewareSpy())
 
         let result = try await coordinator.process(testURL)
 
@@ -29,7 +29,7 @@ struct DeepLinkMiddlewareCoordinatorTests {
         let testURL = URL(string: "testapp://test")!
 
         // Add middleware that returns nil
-        coordinator.add(MiddlewareStub(result: nil))
+        await coordinator.add(MiddlewareStub(result: nil))
 
         let result = try await coordinator.process(testURL)
 
@@ -45,8 +45,8 @@ struct DeepLinkMiddlewareCoordinatorTests {
         let firstMiddleware = OrderTrackingSpy(id: "first")
         let secondMiddleware = OrderTrackingSpy(id: "second")
 
-        coordinator.add(firstMiddleware)
-        coordinator.add(secondMiddleware)
+        await coordinator.add(firstMiddleware)
+        await coordinator.add(secondMiddleware)
 
         _ = try await coordinator.process(testURL)
 
@@ -64,7 +64,7 @@ struct DeepLinkMiddlewareCoordinatorTests {
         let transformedURL = URL(string: "testapp://transformed")!
 
         // Add middleware that transforms URL
-        coordinator.add(URLTransformingStub(transformedURL: transformedURL))
+        await coordinator.add(URLTransformingStub(transformedURL: transformedURL))
 
         let result = try await coordinator.process(testURL)
 
@@ -77,7 +77,7 @@ struct DeepLinkMiddlewareCoordinatorTests {
         let testURL = URL(string: "testapp://test")!
 
         // Add middleware that throws error
-        coordinator.add(ErrorThrowingStub())
+        await coordinator.add(ErrorThrowingStub())
 
         do {
             _ = try await coordinator.process(testURL)
@@ -94,10 +94,10 @@ struct DeepLinkMiddlewareCoordinatorTests {
 
         // Add middleware
         let middleware = MiddlewareSpy()
-        coordinator.add(middleware)
+        await coordinator.add(middleware)
 
         // Remove middleware
-        coordinator.remove(MiddlewareSpy.self)
+        await coordinator.remove(MiddlewareSpy.self)
 
         // Should not process through middleware
         let result = try await coordinator.process(testURL)
@@ -114,11 +114,11 @@ struct DeepLinkMiddlewareCoordinatorTests {
         // Add multiple middleware
         let middleware1 = MiddlewareSpy()
         let middleware2 = MiddlewareSpy()
-        coordinator.add(middleware1)
-        coordinator.add(middleware2)
+        await coordinator.add(middleware1)
+        await coordinator.add(middleware2)
 
         // Remove all middleware
-        coordinator.removeAll()
+        await coordinator.removeAll()
 
         // Should not process through middleware
         let result = try await coordinator.process(testURL)
@@ -364,7 +364,7 @@ struct DeepLinkMiddlewareCoordinatorTests {
 
         // Add advanced middleware that transforms URL
         let advancedMiddleware = AdvancedMiddlewareSpy(transformedURL: URL(string: "testapp://advanced")!)
-        coordinator.add(advancedMiddleware)
+        await coordinator.add(advancedMiddleware)
 
         let result = try await coordinator.process(testURL)
 

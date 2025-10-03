@@ -319,26 +319,26 @@ public extension DeepLinkCoordinator {
     /// will be the first to intercept URLs.
     ///
     /// - Parameter middleware: The middleware to add
-    func add(_ middleware: any DeepLinkMiddleware) {
-        middlewareCoordinator.add(middleware)
+    func add(_ middleware: any DeepLinkMiddleware) async {
+        await middlewareCoordinator.add(middleware)
     }
 
     /// Adds advanced middleware to the coordinator.
     ///
     /// - Parameter middleware: The advanced middleware to add
-    func add(_ middleware: any AdvancedDeepLinkMiddleware) {
-        middlewareCoordinator.add(middleware)
+    func add(_ middleware: any AdvancedDeepLinkMiddleware) async {
+        await middlewareCoordinator.add(middleware)
     }
 
     /// Removes all middleware from the coordinator.
-    func removeAllMiddleware() {
-        middlewareCoordinator.removeAll()
+    func removeAllMiddleware() async {
+        await middlewareCoordinator.removeAll()
     }
 
     /// Removes middleware of a specific type.
     ///
     /// - Parameter type: The type of middleware to remove
-    func removeMiddleware(_ type: (some DeepLinkMiddleware).Type) {
-        middlewareCoordinator.remove(type)
+    func removeMiddleware(_ type: (some DeepLinkMiddleware).Type) async {
+        await middlewareCoordinator.remove(type)
     }
 }

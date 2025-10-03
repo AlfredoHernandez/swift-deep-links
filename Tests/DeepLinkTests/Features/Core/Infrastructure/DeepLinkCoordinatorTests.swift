@@ -136,7 +136,7 @@ struct DeepLinkCoordinatorTests {
         let url = try #require(URL(string: "test://middleware-stop"))
 
         // Add middleware that returns nil (stops processing)
-        middlewareCoordinator.add(StoppingMiddleware())
+        await middlewareCoordinator.add(StoppingMiddleware())
 
         let result = await coordinator.handle(url: url)
 

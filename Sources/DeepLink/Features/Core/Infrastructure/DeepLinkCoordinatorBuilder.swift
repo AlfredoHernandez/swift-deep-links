@@ -46,7 +46,7 @@ import Foundation
 /// ```
 ///
 /// - Parameter Route: The type of route that the coordinator will handle
-public final class DeepLinkCoordinatorBuilder<Route: DeepLinkRoute> {
+public final class DeepLinkCoordinatorBuilder<Route: DeepLinkRoute>: @unchecked Sendable {
     private var routing: (any DeepLinkRouting<Route>)?
     private var handler: (any DeepLinkHandler<Route>)?
     private var middlewareCoordinator: DeepLinkMiddlewareCoordinator?
@@ -172,7 +172,7 @@ public final class DeepLinkCoordinatorBuilder<Route: DeepLinkRoute> {
     ///
     /// - Returns: A fully configured `DeepLinkCoordinator` instance
     /// - Throws: `DeepLinkError.missingRequiredConfiguration` if required components are missing
-    public func build() throws -> DeepLinkCoordinator<Route> {
+    public func build() async throws -> DeepLinkCoordinator<Route> {
         // Validate required components
         guard let routing else {
             throw DeepLinkError.missingRequiredConfiguration("routing")
@@ -195,9 +195,9 @@ public final class DeepLinkCoordinatorBuilder<Route: DeepLinkRoute> {
         // Add all middleware
         for middleware in middleware {
             if let anyMiddleware = middleware as? AnyMiddleware {
-                deepLinkCoordinator.add(anyMiddleware.advancedMiddleware)
+                await deepLinkCoordinator.add(anyMiddleware.advancedMiddleware)
             } else {
-                deepLinkCoordinator.add(middleware)
+                await deepLinkCoordinator.add(middleware)
             }
         }
 

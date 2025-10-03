@@ -14,34 +14,28 @@ import Foundation
 ///
 /// ```swift
 /// let coordinator = DeepLinkMiddlewareCoordinator()
-/// coordinator.add(AnalyticsMiddleware())
-/// coordinator.add(AuthenticationMiddleware())
-/// coordinator.add(RateLimitMiddleware())
+/// await coordinator.add(AnalyticsMiddleware())
+/// await coordinator.add(AuthenticationMiddleware())
+/// await coordinator.add(RateLimitMiddleware())
 ///
 /// let processedURL = try await coordinator.process(url)
 /// ```
-public final class DeepLinkMiddlewareCoordinator: @unchecked Sendable {
+///
+/// ## Thread Safety
+///
+/// This actor provides thread-safe access to middleware operations using Swift's
+/// actor isolation model, eliminating data races and ensuring safe concurrent access.
+public actor DeepLinkMiddlewareCoordinator {
     private var middleware: [any DeepLinkMiddleware] = []
-    private let queue: DispatchQueue
 
     /// Creates a new middleware coordinator.
-    ///
-    /// - Parameter queue: DispatchQueue for thread-safe operations (defaults to a new concurrent queue
-    ///   with label "io.alfredodhz.deeplink.middleware-coordinator")
     ///
     /// ## Examples
     ///
     /// ```swift
-    /// // Use default queue
     /// let coordinator = DeepLinkMiddlewareCoordinator()
-    ///
-    /// // Use custom queue
-    /// let customQueue = DispatchQueue(label: "com.myapp.middleware", attributes: .concurrent)
-    /// let coordinator = DeepLinkMiddlewareCoordinator(queue: customQueue)
     /// ```
-    public init(queue: DispatchQueue = DispatchQueue(label: "io.alfredodhz.deeplink.middleware-coordinator", attributes: .concurrent)) {
-        self.queue = queue
-    }
+    public init() {}
 
     /// Adds middleware to the coordinator.
     ///
@@ -50,25 +44,19 @@ public final class DeepLinkMiddlewareCoordinator: @unchecked Sendable {
     ///
     /// - Parameter middleware: The middleware to add
     public func add(_ middleware: any DeepLinkMiddleware) {
-        queue.async(flags: .barrier) {
-            self.middleware.append(middleware)
-        }
+        self.middleware.append(middleware)
     }
 
     /// Removes all middleware from the coordinator.
     public func removeAll() {
-        queue.async(flags: .barrier) {
-            self.middleware.removeAll()
-        }
+        middleware.removeAll()
     }
 
     /// Removes middleware of a specific type.
     ///
     /// - Parameter type: The type of middleware to remove
     public func remove<T: DeepLinkMiddleware>(_: T.Type) {
-        queue.async(flags: .barrier) {
-            self.middleware.removeAll { $0 is T }
-        }
+        middleware.removeAll { $0 is T }
     }
 
     /// Processes a URL through all middleware in sequence.
@@ -83,10 +71,9 @@ public final class DeepLinkMiddlewareCoordinator: @unchecked Sendable {
     /// - Returns: The processed URL, or `nil` if processing was stopped
     /// - Throws: An error if any middleware throws an error
     public func process(_ url: URL) async throws -> URL? {
-        let currentMiddleware = await getCurrentMiddleware()
         var currentURL = url
 
-        for middleware in currentMiddleware {
+        for middleware in middleware {
             let result = try await middleware.intercept(currentURL)
 
             // If middleware returns nil, stop processing
@@ -98,15 +85,6 @@ public final class DeepLinkMiddlewareCoordinator: @unchecked Sendable {
         }
 
         return currentURL
-    }
-
-    /// Gets the current list of middleware in a thread-safe manner.
-    private func getCurrentMiddleware() async -> [any DeepLinkMiddleware] {
-        await withCheckedContinuation { continuation in
-            queue.async {
-                continuation.resume(returning: self.middleware)
-            }
-        }
     }
 }
 

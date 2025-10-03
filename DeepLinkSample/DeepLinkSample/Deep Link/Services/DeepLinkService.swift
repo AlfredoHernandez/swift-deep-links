@@ -54,7 +54,7 @@ final class DeepLinkService {
         let delegates = createDelegates()
 
         // Create coordinator using builder pattern
-        let coordinator = try DeepLinkCoordinatorBuilder<AppRoute>()
+        let coordinator = try await DeepLinkCoordinatorBuilder<AppRoute>()
             .addingRouting(DefaultDeepLinkRouting<AppRoute>(parsers: parsers))
             .addingHandler(AppDeepLinkHandler(navigationRouter: navigationRouter))
             .addingMiddleware(middleware)

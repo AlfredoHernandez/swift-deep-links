@@ -11,11 +11,11 @@ struct DeepLinkCoordinatorBuilderTests {
     // MARK: - Basic Configuration Tests
 
     @Test("DeepLinkCoordinatorBuilder build creates coordinator with required components")
-    func deepLinkCoordinatorBuilder_build_createsCoordinatorWithRequiredComponents() throws {
+    func deepLinkCoordinatorBuilder_build_createsCoordinatorWithRequiredComponents() async throws {
         let routingStub = DeepLinkRoutingStub<TestRoute>()
         let handlerSpy = DeepLinkHandlerSpy<TestRoute>()
 
-        let coordinator = try DeepLinkCoordinatorBuilder<TestRoute>()
+        let coordinator = try await DeepLinkCoordinatorBuilder<TestRoute>()
             .addingRouting(routingStub)
             .addingHandler(handlerSpy)
             .build()
@@ -24,22 +24,22 @@ struct DeepLinkCoordinatorBuilderTests {
     }
 
     @Test("DeepLinkCoordinatorBuilder build throws error when routing is missing")
-    func deepLinkCoordinatorBuilder_build_throwsErrorWhenRoutingIsMissing() {
+    func deepLinkCoordinatorBuilder_build_throwsErrorWhenRoutingIsMissing() async {
         let handlerSpy = DeepLinkHandlerSpy<TestRoute>()
 
-        #expect(throws: DeepLinkError.missingRequiredConfiguration("routing")) {
-            try DeepLinkCoordinatorBuilder<TestRoute>()
+        await #expect(throws: DeepLinkError.missingRequiredConfiguration("routing")) {
+            try await DeepLinkCoordinatorBuilder<TestRoute>()
                 .addingHandler(handlerSpy)
                 .build()
         }
     }
 
     @Test("DeepLinkCoordinatorBuilder build throws error when handler is missing")
-    func deepLinkCoordinatorBuilder_build_throwsErrorWhenHandlerIsMissing() {
+    func deepLinkCoordinatorBuilder_build_throwsErrorWhenHandlerIsMissing() async {
         let routingStub = DeepLinkRoutingStub<TestRoute>()
 
-        #expect(throws: DeepLinkError.missingRequiredConfiguration("handler")) {
-            try DeepLinkCoordinatorBuilder<TestRoute>()
+        await #expect(throws: DeepLinkError.missingRequiredConfiguration("handler")) {
+            try await DeepLinkCoordinatorBuilder<TestRoute>()
                 .addingRouting(routingStub)
                 .build()
         }
@@ -53,7 +53,7 @@ struct DeepLinkCoordinatorBuilderTests {
         let handlerSpy = DeepLinkHandlerSpy<TestRoute>()
         let middlewareSpy = MiddlewareSpy()
 
-        let coordinator = try DeepLinkCoordinatorBuilder<TestRoute>()
+        let coordinator = try await DeepLinkCoordinatorBuilder<TestRoute>()
             .addingRouting(routingStub)
             .addingHandler(handlerSpy)
             .addingMiddleware(middlewareSpy)
@@ -73,7 +73,7 @@ struct DeepLinkCoordinatorBuilderTests {
         let handlerSpy = DeepLinkHandlerSpy<TestRoute>()
         let middlewareSpy = MiddlewareSpy()
 
-        let coordinator = try DeepLinkCoordinatorBuilder<TestRoute>()
+        let coordinator = try await DeepLinkCoordinatorBuilder<TestRoute>()
             .addingRouting(routingStub)
             .addingHandler(handlerSpy)
             .addingMiddleware { middlewareSpy }
@@ -93,7 +93,7 @@ struct DeepLinkCoordinatorBuilderTests {
         let handlerSpy = DeepLinkHandlerSpy<TestRoute>()
         let advancedMiddlewareSpy = AdvancedMiddlewareSpy()
 
-        let coordinator = try DeepLinkCoordinatorBuilder<TestRoute>()
+        let coordinator = try await DeepLinkCoordinatorBuilder<TestRoute>()
             .addingRouting(routingStub)
             .addingHandler(handlerSpy)
             .addingAdvancedMiddleware(advancedMiddlewareSpy)
@@ -114,7 +114,7 @@ struct DeepLinkCoordinatorBuilderTests {
         let middleware1 = MiddlewareSpy()
         let middleware2 = MiddlewareSpy()
 
-        let coordinator = try DeepLinkCoordinatorBuilder<TestRoute>()
+        let coordinator = try await DeepLinkCoordinatorBuilder<TestRoute>()
             .addingRouting(routingStub)
             .addingHandler(handlerSpy)
             .addingMiddleware([middleware1, middleware2])
@@ -137,7 +137,7 @@ struct DeepLinkCoordinatorBuilderTests {
         let handlerSpy = DeepLinkHandlerSpy<TestRoute>()
         let delegateSpy = DelegateSpy()
 
-        let coordinator = try DeepLinkCoordinatorBuilder<TestRoute>()
+        let coordinator = try await DeepLinkCoordinatorBuilder<TestRoute>()
             .addingRouting(routingStub)
             .addingHandler(handlerSpy)
             .addingDelegate(delegateSpy)
@@ -158,7 +158,7 @@ struct DeepLinkCoordinatorBuilderTests {
         let handlerSpy = DeepLinkHandlerSpy<TestRoute>()
         let delegateSpy = DelegateSpy()
 
-        let coordinator = try DeepLinkCoordinatorBuilder<TestRoute>()
+        let coordinator = try await DeepLinkCoordinatorBuilder<TestRoute>()
             .addingRouting(routingStub)
             .addingHandler(handlerSpy)
             .addingDelegate { delegateSpy }
@@ -180,7 +180,7 @@ struct DeepLinkCoordinatorBuilderTests {
         let delegate1 = DelegateSpy()
 
         // Test individual delegate addition first
-        let coordinator1 = try DeepLinkCoordinatorBuilder<TestRoute>()
+        let coordinator1 = try await DeepLinkCoordinatorBuilder<TestRoute>()
             .addingRouting(routingStub1)
             .addingHandler(handlerSpy1)
             .addingDelegate(delegate1)
@@ -194,7 +194,7 @@ struct DeepLinkCoordinatorBuilderTests {
         let delegate2 = DelegateSpy()
         let delegate3 = DelegateSpy()
 
-        let coordinator2 = try DeepLinkCoordinatorBuilder<TestRoute>()
+        let coordinator2 = try await DeepLinkCoordinatorBuilder<TestRoute>()
             .addingRouting(routingStub2)
             .addingHandler(handlerSpy2)
             .addingDelegate(delegate2)
@@ -226,7 +226,7 @@ struct DeepLinkCoordinatorBuilderTests {
         let delegate2 = DelegateSpy()
 
         // Test the addingDelegates method specifically
-        let coordinator = try DeepLinkCoordinatorBuilder<TestRoute>()
+        let coordinator = try await DeepLinkCoordinatorBuilder<TestRoute>()
             .addingRouting(routingStub)
             .addingHandler(handlerSpy)
             .addingDelegates([delegate1, delegate2])
@@ -246,9 +246,9 @@ struct DeepLinkCoordinatorBuilderTests {
         let customCoordinator = DeepLinkMiddlewareCoordinator()
         let middlewareSpy = MiddlewareSpy()
 
-        customCoordinator.add(middlewareSpy)
+        await customCoordinator.add(middlewareSpy)
 
-        let coordinator = try DeepLinkCoordinatorBuilder<TestRoute>()
+        let coordinator = try await DeepLinkCoordinatorBuilder<TestRoute>()
             .addingRouting(routingStub)
             .addingHandler(handlerSpy)
             .addingCustomMiddlewareCoordinator(customCoordinator)
@@ -272,7 +272,7 @@ struct DeepLinkCoordinatorBuilderTests {
         let middleware2 = MiddlewareSpy()
         let delegate = DelegateSpy()
 
-        let coordinator = try DeepLinkCoordinatorBuilder<TestRoute>()
+        let coordinator = try await DeepLinkCoordinatorBuilder<TestRoute>()
             .addingRouting(routingStub)
             .addingHandler(handlerSpy)
             .addingMiddleware(middleware1)
@@ -298,7 +298,7 @@ struct DeepLinkCoordinatorBuilderTests {
         let handlerSpy = DeepLinkHandlerSpy<TestRoute>()
         let errorMiddleware = ErrorMiddleware()
 
-        let coordinator = try DeepLinkCoordinatorBuilder<TestRoute>()
+        let coordinator = try await DeepLinkCoordinatorBuilder<TestRoute>()
             .addingRouting(routingStub)
             .addingHandler(handlerSpy)
             .addingMiddleware(errorMiddleware)
