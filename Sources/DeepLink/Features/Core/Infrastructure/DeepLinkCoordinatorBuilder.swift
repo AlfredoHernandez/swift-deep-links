@@ -207,10 +207,7 @@ public final class DeepLinkCoordinatorBuilder<Route: DeepLinkRoute>: @unchecked 
             deepLinkCoordinator.delegate = delegates.first
         } else if delegates.count > 1 {
             // Multiple delegates - use composite pattern
-            let compositeDelegate = CompositeDeepLinkDelegate()
-            for delegate in delegates {
-                compositeDelegate.add(delegate)
-            }
+            let compositeDelegate = CompositeDeepLinkDelegate(delegates: delegates)
             deepLinkCoordinator.delegate = compositeDelegate
         }
 
@@ -249,11 +246,16 @@ private final class AnyMiddleware: DeepLinkMiddleware, @unchecked Sendable {
 /// A composite delegate that combines multiple `DeepLinkCoordinatorDelegate` implementations.
 ///
 /// This class is used internally by the builder when multiple delegates are provided.
-private final class CompositeDeepLinkDelegate: DeepLinkCoordinatorDelegate, @unchecked Sendable {
-    private var delegates: [DeepLinkCoordinatorDelegate] = []
+/// Thread safety is guaranteed by making the delegates array immutable after initialization.
+/// The array is set once during init and never modified, making it safe for concurrent access.
+private final class CompositeDeepLinkDelegate: DeepLinkCoordinatorDelegate {
+    private let delegates: [DeepLinkCoordinatorDelegate]
 
-    func add(_ delegate: DeepLinkCoordinatorDelegate) {
-        delegates.append(delegate)
+    /// Creates a composite delegate with the provided delegates.
+    ///
+    /// - Parameter delegates: Array of delegates to combine
+    init(delegates: [DeepLinkCoordinatorDelegate]) {
+        self.delegates = delegates
     }
 
     func coordinator(_ coordinator: AnyObject, willProcess url: URL) {
