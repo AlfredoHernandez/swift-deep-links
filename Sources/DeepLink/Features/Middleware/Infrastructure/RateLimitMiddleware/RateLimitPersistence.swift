@@ -8,23 +8,28 @@ import Foundation
 ///
 /// This protocol allows different storage mechanisms to be used for rate limiting,
 /// making the middleware more flexible and testable.
+///
+/// All methods are async to support actor-based implementations for thread safety.
 public protocol RateLimitPersistence: Sendable {
     /// Loads stored request timestamps.
     ///
     /// - Returns: Array of timestamps representing when requests were made
-    func loadRequests() -> [TimeInterval]
+    func loadRequests() async -> [TimeInterval]
 
     /// Saves request timestamps.
     ///
     /// - Parameter timestamps: Array of timestamps to store
-    func saveRequests(_ timestamps: [TimeInterval])
+    func saveRequests(_ timestamps: [TimeInterval]) /// Clears all stored request data.
+        async
 
-    /// Clears all stored request data.
-    func clearRequests()
+    func clearRequests() async
 }
 
 /// Default implementation using UserDefaults for persistence.
-public final class UserDefaultsRateLimitPersistence: RateLimitPersistence, @unchecked Sendable {
+///
+/// This actor provides thread-safe access to UserDefaults for rate limit data persistence.
+/// All operations are serialized through actor isolation, preventing data races.
+public actor UserDefaultsRateLimitPersistence: RateLimitPersistence {
     private let userDefaults: UserDefaults
     private let key: String
 

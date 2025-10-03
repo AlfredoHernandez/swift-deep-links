@@ -71,7 +71,6 @@ public final class RateLimitMiddleware: DeepLinkMiddleware {
     private let maxRequests: Int
     private let timeWindow: TimeInterval
     private let persistence: RateLimitPersistence
-    private let queue: DispatchQueue
     private let strategy: RateLimitStrategy
 
     /// Creates a new rate limit middleware.
@@ -80,7 +79,6 @@ public final class RateLimitMiddleware: DeepLinkMiddleware {
     ///   - maxRequests: Maximum number of requests allowed in the time window. Must be greater than 0.
     ///   - timeWindow: Time window in seconds. Must be greater than 0.
     ///   - persistence: Persistence mechanism for storing request data (defaults to UserDefaults-based persistence)
-    ///   - queue: DispatchQueue for thread-safe operations (defaults to a new concurrent queue)
     ///   - strategy: The rate limiting strategy to use (defaults to .slidingWindow)
     ///
     /// ## Examples
@@ -103,13 +101,11 @@ public final class RateLimitMiddleware: DeepLinkMiddleware {
         maxRequests: Int = 100,
         timeWindow: TimeInterval = 60.0,
         persistence: RateLimitPersistence = UserDefaultsRateLimitPersistence(),
-        queue: DispatchQueue = DispatchQueue(label: "io.alfredodhz.deeplink.rate-limit", attributes: .concurrent),
         strategy: RateLimitStrategy = .slidingWindow,
     ) {
         self.maxRequests = maxRequests
         self.timeWindow = timeWindow
         self.persistence = persistence
-        self.queue = queue
         self.strategy = strategy
     }
 
@@ -128,7 +124,6 @@ public final class RateLimitMiddleware: DeepLinkMiddleware {
             maxRequests: maxRequests,
             timeWindow: timeWindow,
             persistence: persistence,
-            queue: queue,
             dateProvider: Date.init,
         )
     }

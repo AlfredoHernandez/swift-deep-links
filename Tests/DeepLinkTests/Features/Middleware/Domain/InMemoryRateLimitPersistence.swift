@@ -8,9 +8,9 @@ import Foundation
 /// In-memory implementation of RateLimitPersistence for testing.
 ///
 /// This implementation stores request timestamps in memory without any persistence.
-/// It's designed for testing scenarios where immediate, synchronous operations are needed.
-/// Since all operations are performed immediately in memory, no queue is required.
-final class InMemoryRateLimitPersistence: RateLimitPersistence, @unchecked Sendable {
+/// It's designed for testing scenarios where immediate, async operations are needed.
+/// Thread safety is guaranteed by actor isolation.
+actor InMemoryRateLimitPersistence: RateLimitPersistence {
     private var timestamps: [TimeInterval] = []
 
     func loadRequests() -> [TimeInterval] {

@@ -113,20 +113,18 @@ struct RateLimitMiddlewareTests {
         }
 
         // Clean up
-        persistence.clearRequests()
+        await persistence.clearRequests()
     }
 
     @Test("RateLimitMiddleware accepts custom queue")
     func rateLimitMiddleware_acceptsCustomQueue() async throws {
         let testURL = URL(string: "testapp://test")!
         let persistence = InMemoryRateLimitPersistence()
-        let customQueue = DispatchQueue(label: "custom.ratelimit.queue", attributes: .concurrent)
 
         let middleware = RateLimitMiddleware(
             maxRequests: 1,
             timeWindow: 60.0,
             persistence: persistence,
-            queue: customQueue,
         )
 
         // First request should succeed
@@ -167,7 +165,7 @@ struct RateLimitMiddlewareTests {
         }
 
         // Verify persistence was used
-        let storedTimestamps = customPersistence.loadRequests()
+        let storedTimestamps = await customPersistence.loadRequests()
         #expect(storedTimestamps.count == 2)
     }
 
@@ -310,7 +308,7 @@ struct RateLimitMiddlewareTests {
         }
 
         // Verify no persistence operations were performed
-        let storedTimestamps = persistence.loadRequests()
+        let storedTimestamps = await persistence.loadRequests()
         #expect(storedTimestamps.isEmpty)
     }
 

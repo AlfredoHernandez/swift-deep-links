@@ -53,9 +53,9 @@ import Foundation
 /// | `.fixedWindow` | Fixed | At boundaries | Medium | Predictable limits |
 /// | `.permissive` | N/A | Unlimited | N/A | Testing/Development |
 public struct RateLimitStrategy: Sendable {
-    private let checkFunction: @Sendable (URL, Int, TimeInterval, RateLimitPersistence, DispatchQueue, () -> Date) async throws -> URL?
+    private let checkFunction: @Sendable (URL, Int, TimeInterval, RateLimitPersistence, () -> Date) async throws -> URL?
 
-    init(_ checkFunction: @escaping @Sendable (URL, Int, TimeInterval, RateLimitPersistence, DispatchQueue, () -> Date) async throws -> URL?) {
+    init(_ checkFunction: @escaping @Sendable (URL, Int, TimeInterval, RateLimitPersistence, () -> Date) async throws -> URL?) {
         self.checkFunction = checkFunction
     }
 
@@ -65,10 +65,9 @@ public struct RateLimitStrategy: Sendable {
         maxRequests: Int,
         timeWindow: TimeInterval,
         persistence: RateLimitPersistence,
-        queue: DispatchQueue,
         dateProvider: @escaping () -> Date = Date.init,
     ) async throws -> URL? {
-        try await checkFunction(url, maxRequests, timeWindow, persistence, queue, dateProvider)
+        try await checkFunction(url, maxRequests, timeWindow, persistence, dateProvider)
     }
 }
 
@@ -100,30 +99,26 @@ public extension RateLimitStrategy {
     /// - Tracks all requests in the last `timeWindow` seconds
     /// - Removes expired requests automatically
     /// - Provides consistent rate limiting without burst allowances
-    static let slidingWindow = RateLimitStrategy { url, maxRequests, timeWindow, persistence, queue, dateProvider in
+    static let slidingWindow = RateLimitStrategy { url, maxRequests, timeWindow, persistence, dateProvider in
         let now = dateProvider()
 
-        return try await withCheckedThrowingContinuation { continuation in
-            queue.async(flags: .barrier) {
-                // Load existing requests from persistence
-                let timestamps = persistence.loadRequests()
-                let requests = timestamps.map { Date(timeIntervalSince1970: $0) }
+        // Load existing requests from persistence
+        let timestamps = await persistence.loadRequests()
+        let requests = timestamps.map { Date(timeIntervalSince1970: $0) }
 
-                // Remove old requests outside the time window
-                let validRequests = requests.filter { now.timeIntervalSince($0) <= timeWindow }
+        // Remove old requests outside the time window
+        let validRequests = requests.filter { now.timeIntervalSince($0) <= timeWindow }
 
-                // Check if we're within the rate limit
-                if validRequests.count >= maxRequests {
-                    continuation.resume(throwing: DeepLinkError.rateLimitExceeded(maxRequests, timeWindow))
-                    return
-                }
-
-                // Add current request
-                let updatedTimestamps = validRequests.map(\.timeIntervalSince1970) + [now.timeIntervalSince1970]
-                persistence.saveRequests(updatedTimestamps)
-                continuation.resume(returning: url)
-            }
+        // Check if we're within the rate limit
+        if validRequests.count >= maxRequests {
+            throw DeepLinkError.rateLimitExceeded(maxRequests, timeWindow)
         }
+
+        // Add current request
+        let updatedTimestamps = validRequests.map(\.timeIntervalSince1970) + [now.timeIntervalSince1970]
+        await persistence.saveRequests(updatedTimestamps)
+
+        return url
     }
 
     /// Fixed window rate limiting strategy.
@@ -151,31 +146,27 @@ public extension RateLimitStrategy {
     /// - Creates fixed time windows aligned to the timeWindow interval
     /// - Rate limit resets at window boundaries (e.g., 12:00, 12:01, 12:02...)
     /// - May allow bursts of requests at window transitions
-    static let fixedWindow = RateLimitStrategy { url, maxRequests, timeWindow, persistence, queue, dateProvider in
+    static let fixedWindow = RateLimitStrategy { url, maxRequests, timeWindow, persistence, dateProvider in
         let now = dateProvider()
         let windowStart = Date(timeIntervalSince1970: floor(now.timeIntervalSince1970 / timeWindow) * timeWindow)
 
-        return try await withCheckedThrowingContinuation { continuation in
-            queue.async(flags: .barrier) {
-                // Load existing requests from persistence
-                let timestamps = persistence.loadRequests()
-                let requests = timestamps.map { Date(timeIntervalSince1970: $0) }
+        // Load existing requests from persistence
+        let timestamps = await persistence.loadRequests()
+        let requests = timestamps.map { Date(timeIntervalSince1970: $0) }
 
-                // Filter requests within the current window
-                let windowRequests = requests.filter { $0 >= windowStart }
+        // Filter requests within the current window
+        let windowRequests = requests.filter { $0 >= windowStart }
 
-                // Check if we're within the rate limit
-                if windowRequests.count >= maxRequests {
-                    continuation.resume(throwing: DeepLinkError.rateLimitExceeded(maxRequests, timeWindow))
-                    return
-                }
-
-                // Add current request
-                let updatedTimestamps = windowRequests.map(\.timeIntervalSince1970) + [now.timeIntervalSince1970]
-                persistence.saveRequests(updatedTimestamps)
-                continuation.resume(returning: url)
-            }
+        // Check if we're within the rate limit
+        if windowRequests.count >= maxRequests {
+            throw DeepLinkError.rateLimitExceeded(maxRequests, timeWindow)
         }
+
+        // Add current request
+        let updatedTimestamps = windowRequests.map(\.timeIntervalSince1970) + [now.timeIntervalSince1970]
+        await persistence.saveRequests(updatedTimestamps)
+
+        return url
     }
 
     /// Permissive rate limiting strategy.
@@ -209,7 +200,7 @@ public extension RateLimitStrategy {
     /// - No persistence operations are performed
     /// - No performance overhead from rate limiting logic
     /// - Thread-safe (no concurrent access needed)
-    static let permissive = RateLimitStrategy { url, _, _, _, _, _ in
+    static let permissive = RateLimitStrategy { url, _, _, _, _ in
         url
     }
 }
