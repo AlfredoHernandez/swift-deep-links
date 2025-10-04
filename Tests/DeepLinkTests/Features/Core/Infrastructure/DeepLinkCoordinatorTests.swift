@@ -154,9 +154,8 @@ struct DeepLinkCoordinatorTests {
     func deepLinkCoordinator_notifiesDelegateWhenProcessingStarts() async throws {
         let routingStub = DeepLinkRoutingStub<TestRoute>()
         let handlerSpy = DeepLinkHandlerSpy<TestRoute>()
-        let coordinator = DeepLinkCoordinator(routing: routingStub, handler: handlerSpy)
         let delegate = DelegateSpy()
-        coordinator.delegate = delegate
+        let coordinator = DeepLinkCoordinator(routing: routingStub, handler: handlerSpy, delegate: delegate)
         let url = try #require(URL(string: "test://delegate"))
 
         routingStub.routesToReturn = [.route1]
@@ -171,9 +170,8 @@ struct DeepLinkCoordinatorTests {
     func deepLinkCoordinator_notifiesDelegateWhenProcessingCompletesSuccessfully() async throws {
         let routingStub = DeepLinkRoutingStub<TestRoute>()
         let handlerSpy = DeepLinkHandlerSpy<TestRoute>()
-        let coordinator = DeepLinkCoordinator(routing: routingStub, handler: handlerSpy)
         let delegate = DelegateSpy()
-        coordinator.delegate = delegate
+        let coordinator = DeepLinkCoordinator(routing: routingStub, handler: handlerSpy, delegate: delegate)
         let url = try #require(URL(string: "test://delegate"))
 
         routingStub.routesToReturn = [.route1]
@@ -189,9 +187,8 @@ struct DeepLinkCoordinatorTests {
     func deepLinkCoordinator_notifiesDelegateWhenProcessingFails() async throws {
         let routingStub = DeepLinkRoutingStub<TestRoute>()
         let handlerSpy = DeepLinkHandlerSpy<TestRoute>()
-        let coordinator = DeepLinkCoordinator(routing: routingStub, handler: handlerSpy)
         let delegate = DelegateSpy()
-        coordinator.delegate = delegate
+        let coordinator = DeepLinkCoordinator(routing: routingStub, handler: handlerSpy, delegate: delegate)
         let url = try #require(URL(string: "test://delegate"))
         routingStub.shouldThrowError = true
 
@@ -236,7 +233,7 @@ struct DeepLinkCoordinatorTests {
         }
     }
 
-    final class DeepLinkRoutingStub<Route: DeepLinkRoute>: DeepLinkRouting {
+    final class DeepLinkRoutingStub<Route: DeepLinkRoute>: DeepLinkRouting, @unchecked Sendable {
         var routesToReturn: [Route] = []
         var shouldThrowError = false
 
@@ -249,7 +246,7 @@ struct DeepLinkCoordinatorTests {
         }
     }
 
-    final class DeepLinkHandlerSpy<Route: DeepLinkRoute & Equatable>: DeepLinkHandler {
+    final class DeepLinkHandlerSpy<Route: DeepLinkRoute & Equatable>: DeepLinkHandler, @unchecked Sendable {
         private(set) var handledRoutes: [Route] = []
         var shouldThrowError = false
         var errorRoute: Route?
@@ -276,7 +273,7 @@ struct DeepLinkCoordinatorTests {
     }
 
     /// Test delegate that tracks all delegate method calls
-    final class DelegateSpy: DeepLinkCoordinatorDelegate {
+    final class DelegateSpy: DeepLinkCoordinatorDelegate, @unchecked Sendable {
         private(set) var willProcessCalls: [URL] = []
         private(set) var didProcessCalls: [(url: URL, result: DeepLinkResultProtocol)] = []
         private(set) var didFailCalls: [(url: URL, error: Error)] = []

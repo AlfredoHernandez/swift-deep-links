@@ -331,7 +331,7 @@ private enum TestRoute: DeepLinkRoute, Equatable {
     }
 }
 
-private final class DeepLinkRoutingStub<Route: DeepLinkRoute>: DeepLinkRouting {
+private final class DeepLinkRoutingStub<Route: DeepLinkRoute>: DeepLinkRouting, @unchecked Sendable {
     var routesToReturn: [Route] = []
     var shouldThrowError = false
 
@@ -343,7 +343,7 @@ private final class DeepLinkRoutingStub<Route: DeepLinkRoute>: DeepLinkRouting {
     }
 }
 
-private final class DeepLinkHandlerSpy<Route: DeepLinkRoute & Equatable>: DeepLinkHandler {
+private final class DeepLinkHandlerSpy<Route: DeepLinkRoute & Equatable>: DeepLinkHandler, @unchecked Sendable {
     private(set) var handledRoutes: [Route] = []
     var shouldThrowError = false
     var errorRoute: Route?
@@ -374,7 +374,7 @@ private final class AdvancedMiddlewareSpy: AdvancedDeepLinkMiddleware, @unchecke
     }
 }
 
-private final class DelegateSpy: DeepLinkCoordinatorDelegate {
+private final class DelegateSpy: DeepLinkCoordinatorDelegate, @unchecked Sendable {
     private(set) var willProcessCalls: [URL] = []
     private(set) var didProcessCalls: [(url: URL, result: DeepLinkResultProtocol)] = []
     private(set) var didFailCalls: [(url: URL, error: Error)] = []

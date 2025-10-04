@@ -32,8 +32,17 @@ import OSLog
 ///
 /// ## Thread Safety
 ///
-/// This class is marked as `@unchecked Sendable` and is designed to be safely
-/// used across different execution contexts. All operations are performed asynchronously.
+/// Thread-safe coordinator for handling deep links.
+///
+/// This class uses `@unchecked Sendable` because:
+/// - Core stored properties (routing, handler, middlewareCoordinator) are immutable (`let`)
+/// - The `delegate` property is mutable (`var`) but all delegate calls are dispatched to MainActor for UI safety
+/// - No other mutable state is shared across threads
+///
+/// The `@unchecked` annotation is used because protocol types (`DeepLinkRouting`,
+/// `DeepLinkHandler`, `DeepLinkCoordinatorDelegate`) don't conform to `Sendable`,
+/// allowing implementers flexibility in their concurrency approaches while maintaining
+/// thread safety through MainActor isolation for delegate calls.
 ///
 /// - Parameter Route: The type of route that this coordinator handles
 public final class DeepLinkCoordinator<Route: DeepLinkRoute>: @unchecked Sendable {
@@ -66,16 +75,27 @@ public final class DeepLinkCoordinator<Route: DeepLinkRoute>: @unchecked Sendabl
     ///   - handler: The handler implementation responsible for executing route actions
     ///   - middlewareCoordinator: The middleware coordinator for processing URLs through middleware
     ///   - routeExecutionDelay: The delay between route executions for better UX (default: 500ms)
+    ///   - delegate: The delegate that receives notifications about deep link processing events (optional)
+    ///
+    /// ## Delegate Notifications
+    ///
+    /// The delegate (if provided) is called on the main thread to ensure thread safety and proper UI updates.
+    /// It receives notifications about:
+    /// - Deep link processing start (`willProcess`)
+    /// - Deep link processing completion (`didProcess`)
+    /// - Deep link processing failures (`didFailProcessing`)
     public init(
         routing: any DeepLinkRouting<Route>,
         handler: any DeepLinkHandler<Route>,
         middlewareCoordinator: DeepLinkMiddlewareCoordinator = DeepLinkMiddlewareCoordinator(),
         routeExecutionDelay: Duration = .milliseconds(500),
+        delegate: (any DeepLinkCoordinatorDelegate)? = nil,
     ) {
         self.routing = routing
         self.handler = handler
         self.middlewareCoordinator = middlewareCoordinator
         self.routeExecutionDelay = routeExecutionDelay
+        self.delegate = delegate
     }
 
     // MARK: - Public Interface

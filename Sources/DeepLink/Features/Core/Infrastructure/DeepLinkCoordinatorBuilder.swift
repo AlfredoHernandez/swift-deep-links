@@ -185,31 +185,32 @@ public final class DeepLinkCoordinatorBuilder<Route: DeepLinkRoute>: @unchecked 
         // Create middleware coordinator if not provided
         let coordinator = middlewareCoordinator ?? DeepLinkMiddlewareCoordinator()
 
-        // Create the deep link coordinator
+        // Add all middleware
+        for middleware in middleware {
+            if let anyMiddleware = middleware as? AnyMiddleware {
+                await coordinator.add(anyMiddleware.advancedMiddleware)
+            } else {
+                await coordinator.add(middleware)
+            }
+        }
+
+        // Determine the delegate to use
+        let finalDelegate: (any DeepLinkCoordinatorDelegate)? = {
+            if delegates.count == 1 {
+                return delegates.first
+            } else if delegates.count > 1 {
+                return CompositeDeepLinkDelegate(delegates: delegates)
+            }
+            return nil
+        }()
+
+        // Create the deep link coordinator with all components
         let deepLinkCoordinator = DeepLinkCoordinator(
             routing: routing,
             handler: handler,
             middlewareCoordinator: coordinator,
+            delegate: finalDelegate,
         )
-
-        // Add all middleware
-        for middleware in middleware {
-            if let anyMiddleware = middleware as? AnyMiddleware {
-                await deepLinkCoordinator.add(anyMiddleware.advancedMiddleware)
-            } else {
-                await deepLinkCoordinator.add(middleware)
-            }
-        }
-
-        // Set up delegates
-        if delegates.count == 1 {
-            // Single delegate - set directly
-            deepLinkCoordinator.delegate = delegates.first
-        } else if delegates.count > 1 {
-            // Multiple delegates - use composite pattern
-            let compositeDelegate = CompositeDeepLinkDelegate(delegates: delegates)
-            deepLinkCoordinator.delegate = compositeDelegate
-        }
 
         return deepLinkCoordinator
     }
