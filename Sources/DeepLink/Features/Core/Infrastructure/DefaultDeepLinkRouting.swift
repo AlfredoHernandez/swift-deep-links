@@ -56,14 +56,32 @@ public final class DefaultDeepLinkRouting<Route: DeepLinkRoute>: DeepLinkRouting
     public func route(from url: URL) async throws -> [Route] {
         let deepLinkURL = try DeepLinkURL(url: url)
 
+        guard !parsers.isEmpty else {
+            logger.error("No parsers available for URL: \(url.absoluteString)")
+            throw DeepLinkError.routeNotFound(deepLinkURL.host)
+        }
+
+        var lastError: Error?
+
         for parser in parsers {
             do {
                 let routes = try parser.parse(from: url)
+                logger.debug("Parser \(String(describing: type(of: parser))) successfully parsed URL: \(url.absoluteString)")
                 return routes
             } catch {
+                logger.debug("Parser \(String(describing: type(of: parser))) failed to parse URL: \(url.absoluteString) - Error: \(error.localizedDescription)")
+                lastError = error
                 continue
             }
         }
+
+        let parsersCount = parsers.count
+        if let lastError {
+            logger.error("All \(parsersCount) parsers failed for URL: \(url.absoluteString) - Last error: \(lastError.localizedDescription)")
+        } else {
+            logger.error("All \(parsersCount) parsers failed for URL: \(url.absoluteString)")
+        }
+
         throw DeepLinkError.routeNotFound(deepLinkURL.host)
     }
 }
