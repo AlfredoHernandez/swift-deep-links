@@ -46,7 +46,21 @@ public struct DeepLinkURL {
     public let path: String
 
     /// Query parameters as a dictionary of key-value pairs
+    ///
+    /// When multiple values exist for the same key, only the last value is retained.
+    /// For array support, use `allQueryParameters` instead.
     public let queryParameters: [String: String]
+
+    /// All query parameters including multiple values for the same key
+    ///
+    /// This property supports array parameters in URLs like:
+    /// `myapp://products?tags=electronics&tags=new&tags=sale`
+    ///
+    /// Which would produce:
+    /// ```
+    /// ["tags": ["electronics", "new", "sale"]]
+    /// ```
+    public let allQueryParameters: [String: [String]]
 
     /// Creates a new `DeepLinkURL` from a standard `URL`.
     ///
@@ -66,9 +80,20 @@ public struct DeepLinkURL {
         self.host = host
         path = components.path
 
-        queryParameters = Dictionary(uniqueKeysWithValues: components.queryItems?.compactMap { item in
-            guard let value = item.value else { return nil }
-            return (item.name, value)
-        } ?? [])
+        // Parse query parameters (single values only - last value wins)
+        var singleParams: [String: String] = [:]
+        for item in components.queryItems ?? [] {
+            guard let value = item.value else { continue }
+            singleParams[item.name] = value // Last value wins for duplicates
+        }
+        queryParameters = singleParams
+
+        // Parse all query parameters (supports arrays)
+        var allParams: [String: [String]] = [:]
+        for item in components.queryItems ?? [] {
+            guard let value = item.value else { continue }
+            allParams[item.name, default: []].append(value)
+        }
+        allQueryParameters = allParams
     }
 }

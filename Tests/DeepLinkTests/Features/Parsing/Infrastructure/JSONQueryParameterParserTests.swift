@@ -299,4 +299,121 @@ struct JSONQueryParameterParserTests {
         #expect(result.both == "  value  ")
         #expect(result.tabs == "\tvalue\t")
     }
+
+    // MARK: - Array Parameters Tests
+
+    @Test("JSONQueryParameterParser parse with fromAll handles array parameters")
+    func jsonQueryParameterParser_parseFromAll_handlesArrayParameters() throws {
+        let parser = JSONQueryParameterParser()
+        let parameters = ["tags": ["electronics", "new", "sale"]]
+
+        struct ArrayParameters: Decodable {
+            let tags: [String]
+        }
+
+        let result = try parser.parse(ArrayParameters.self, fromAll: parameters)
+
+        #expect(result.tags == ["electronics", "new", "sale"])
+    }
+
+    @Test("JSONQueryParameterParser parse with fromAll handles single value as string")
+    func jsonQueryParameterParser_parseFromAll_handlesSingleValueAsString() throws {
+        let parser = JSONQueryParameterParser()
+        let parameters = ["category": ["phones"]]
+
+        struct SingleValueParameters: Decodable {
+            let category: String
+        }
+
+        let result = try parser.parse(SingleValueParameters.self, fromAll: parameters)
+
+        #expect(result.category == "phones")
+    }
+
+    @Test("JSONQueryParameterParser parse with fromAll handles mixed array and single values")
+    func jsonQueryParameterParser_parseFromAll_handlesMixedArrayAndSingleValues() throws {
+        let parser = JSONQueryParameterParser()
+        let parameters = [
+            "category": ["phones"],
+            "tags": ["electronics", "new", "sale"],
+            "brand": ["Apple"],
+        ]
+
+        struct MixedParameters: Decodable {
+            let category: String
+            let tags: [String]
+            let brand: String
+        }
+
+        let result = try parser.parse(MixedParameters.self, fromAll: parameters)
+
+        #expect(result.category == "phones")
+        #expect(result.tags == ["electronics", "new", "sale"])
+        #expect(result.brand == "Apple")
+    }
+
+    @Test("JSONQueryParameterParser parse with fromAll handles optional array parameters")
+    func jsonQueryParameterParser_parseFromAll_handlesOptionalArrayParameters() throws {
+        let parser = JSONQueryParameterParser()
+        let parameters = [
+            "category": ["phones"],
+        ]
+
+        struct OptionalArrayParameters: Decodable {
+            let category: String
+            let tags: [String]?
+        }
+
+        let result = try parser.parse(OptionalArrayParameters.self, fromAll: parameters)
+
+        #expect(result.category == "phones")
+        #expect(result.tags == nil)
+    }
+
+    @Test("JSONQueryParameterParser parse with fromAll handles empty array")
+    func jsonQueryParameterParser_parseFromAll_handlesEmptyArray() throws {
+        let parser = JSONQueryParameterParser()
+        let parameters = [
+            "category": ["phones"],
+            "tags": [],
+        ]
+
+        struct EmptyArrayParameters: Decodable {
+            let category: String
+            let tags: [String]?
+        }
+
+        let result = try parser.parse(EmptyArrayParameters.self, fromAll: parameters)
+
+        #expect(result.category == "phones")
+        #expect(result.tags == [])
+    }
+
+    @Test("JSONQueryParameterParser parse with fromAll handles URL encoded array values")
+    func jsonQueryParameterParser_parseFromAll_handlesURLEncodedArrayValues() throws {
+        let parser = JSONQueryParameterParser()
+        let parameters = ["tags": ["new arrivals", "best sellers", "on sale"]]
+
+        struct URLEncodedArrayParameters: Decodable {
+            let tags: [String]
+        }
+
+        let result = try parser.parse(URLEncodedArrayParameters.self, fromAll: parameters)
+
+        #expect(result.tags == ["new arrivals", "best sellers", "on sale"])
+    }
+
+    @Test("JSONQueryParameterParser parse with fromAll handles numeric array values")
+    func jsonQueryParameterParser_parseFromAll_handlesNumericArrayValues() throws {
+        let parser = JSONQueryParameterParser()
+        let parameters = ["ids": ["1", "2", "3", "42"]]
+
+        struct NumericArrayParameters: Decodable {
+            let ids: [String]
+        }
+
+        let result = try parser.parse(NumericArrayParameters.self, fromAll: parameters)
+
+        #expect(result.ids == ["1", "2", "3", "42"])
+    }
 }

@@ -167,4 +167,68 @@ struct DeepLinkURLTests {
             try DeepLinkURL(url: emptyURL)
         }
     }
+
+    // MARK: - Array Query Parameters Tests
+
+    @Test("DeepLinkURL allQueryParameters handles single value parameters")
+    func deepLinkURL_allQueryParameters_handlesSingleValueParameters() throws {
+        let urlString = "myapp://profile?userId=123&name=John"
+        let url = try #require(URL(string: urlString))
+        let deepLinkURL = try DeepLinkURL(url: url)
+
+        #expect(deepLinkURL.allQueryParameters["userId"] == ["123"])
+        #expect(deepLinkURL.allQueryParameters["name"] == ["John"])
+        #expect(deepLinkURL.allQueryParameters.count == 2)
+    }
+
+    @Test("DeepLinkURL allQueryParameters handles multiple values for same key")
+    func deepLinkURL_allQueryParameters_handlesMultipleValuesForSameKey() throws {
+        let urlString = "myapp://products?tags=electronics&tags=new&tags=sale"
+        let url = try #require(URL(string: urlString))
+        let deepLinkURL = try DeepLinkURL(url: url)
+
+        #expect(deepLinkURL.allQueryParameters["tags"] == ["electronics", "new", "sale"])
+        #expect(deepLinkURL.allQueryParameters.count == 1)
+    }
+
+    @Test("DeepLinkURL allQueryParameters handles mixed single and multiple values")
+    func deepLinkURL_allQueryParameters_handlesMixedSingleAndMultipleValues() throws {
+        let urlString = "myapp://products?category=phones&tags=electronics&tags=new&brand=Apple"
+        let url = try #require(URL(string: urlString))
+        let deepLinkURL = try DeepLinkURL(url: url)
+
+        #expect(deepLinkURL.allQueryParameters["category"] == ["phones"])
+        #expect(deepLinkURL.allQueryParameters["tags"] == ["electronics", "new"])
+        #expect(deepLinkURL.allQueryParameters["brand"] == ["Apple"])
+        #expect(deepLinkURL.allQueryParameters.count == 3)
+    }
+
+    @Test("DeepLinkURL queryParameters returns last value when multiple values exist")
+    func deepLinkURL_queryParameters_returnsLastValueWhenMultipleValuesExist() throws {
+        let urlString = "myapp://products?tags=electronics&tags=new&tags=sale"
+        let url = try #require(URL(string: urlString))
+        let deepLinkURL = try DeepLinkURL(url: url)
+
+        // queryParameters should only have the last value
+        #expect(deepLinkURL.queryParameters["tags"] == "sale")
+        #expect(deepLinkURL.queryParameters.count == 1)
+    }
+
+    @Test("DeepLinkURL allQueryParameters handles empty parameters")
+    func deepLinkURL_allQueryParameters_handlesEmptyParameters() throws {
+        let urlString = "myapp://settings"
+        let url = try #require(URL(string: urlString))
+        let deepLinkURL = try DeepLinkURL(url: url)
+
+        #expect(deepLinkURL.allQueryParameters.isEmpty)
+    }
+
+    @Test("DeepLinkURL allQueryParameters handles URL encoded array values")
+    func deepLinkURL_allQueryParameters_handlesURLEncodedArrayValues() throws {
+        let urlString = "myapp://products?tags=new%20arrivals&tags=best%20sellers&tags=on%20sale"
+        let url = try #require(URL(string: urlString))
+        let deepLinkURL = try DeepLinkURL(url: url)
+
+        #expect(deepLinkURL.allQueryParameters["tags"] == ["new arrivals", "best sellers", "on sale"])
+    }
 }
