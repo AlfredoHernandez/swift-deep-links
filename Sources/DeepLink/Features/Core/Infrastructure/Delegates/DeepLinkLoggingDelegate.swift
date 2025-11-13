@@ -37,7 +37,7 @@ public final class DeepLinkLoggingDelegate: DeepLinkCoordinatorDelegate, @unchec
         _: AnyObject,
         willProcess url: URL,
     ) {
-        logger.info("🔄 Starting deep link processing: \(url.absoluteString)")
+        logger.info("Starting deep link processing: \(url.absoluteString)")
 
         if enableDebugLogging {
             logger.debug("Deep link details - Scheme: \(url.scheme ?? "nil"), Host: \(url.host() ?? "nil"), Path: \(url.path), Query: \(url.query ?? "nil")")
@@ -50,13 +50,13 @@ public final class DeepLinkLoggingDelegate: DeepLinkCoordinatorDelegate, @unchec
         result: DeepLinkResultProtocol,
     ) {
         if result.wasSuccessful {
-            logger.info("✅ Deep link processed successfully: \(url.absoluteString)")
+            logger.info("Deep link processed successfully: \(url.absoluteString)")
 
             if enableDebugLogging {
                 logger.debug("Processing details - Execution time: \(String(format: "%.3f", result.executionTime))s")
             }
         } else {
-            logger.error("❌ Deep link processing failed: \(url.absoluteString)")
+            logger.error("Deep link processing failed: \(url.absoluteString)")
 
             if !result.errors.isEmpty {
                 for (index, error) in result.errors.enumerated() {
@@ -73,7 +73,7 @@ public final class DeepLinkLoggingDelegate: DeepLinkCoordinatorDelegate, @unchec
         }
 
         if result.wasStoppedByMiddleware {
-            logger.info("⚠️ Deep link processing stopped by middleware: \(url.absoluteString)")
+            logger.info("Deep link processing stopped by middleware: \(url.absoluteString)")
         }
     }
 
@@ -82,7 +82,7 @@ public final class DeepLinkLoggingDelegate: DeepLinkCoordinatorDelegate, @unchec
         didFailProcessing url: URL,
         error: Error,
     ) {
-        logger.error("💥 Deep link processing failed with critical error: \(url.absoluteString)")
+        logger.error("Deep link processing failed with critical error: \(url.absoluteString)")
         logger.error("Critical error: \(error.localizedDescription)")
 
         if enableDebugLogging {
