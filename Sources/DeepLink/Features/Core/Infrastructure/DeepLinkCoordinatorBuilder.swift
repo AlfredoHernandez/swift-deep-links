@@ -58,6 +58,24 @@ import Foundation
 ///     .build()
 /// ```
 ///
+/// ## Functional Composition Style
+///
+/// ```swift
+/// let coordinator = DeepLinkCoordinatorBuilder<AppRoute>()
+///     .addingRouting(DefaultDeepLinkRouting(parsers: parsers))
+///     .addingHandler(AppDeepLinkHandler(navigationRouter: router))
+///     .addingMiddleware(compose(
+///         .analytics(provider: provider, strategy: .detailed),
+///         .rateLimit(maxRequests: 10, timeWindow: 60),
+///         .security(allowedSchemes: ["https", "myapp"])
+///     ))
+///     .addingDelegate(compose(
+///         .logging(enableDebugLogging: true),
+///         .analytics(provider: provider)
+///     ))
+///     .build()
+/// ```
+///
 /// - Parameter Route: The type of route that the coordinator will handle
 public final class DeepLinkCoordinatorBuilder<Route: DeepLinkRoute>: @unchecked Sendable {
     private var routing: (any DeepLinkRouting<Route>)?
@@ -260,31 +278,33 @@ private final class AnyMiddleware: DeepLinkMiddleware, @unchecked Sendable {
 /// A composite delegate that combines multiple `DeepLinkCoordinatorDelegate` implementations.
 ///
 /// This class is used internally by the builder when multiple delegates are provided.
+/// It can also be created directly using the `compose` function.
+///
 /// Thread safety is guaranteed by making the delegates array immutable after initialization.
 /// The array is set once during init and never modified, making it safe for concurrent access.
-private final class CompositeDeepLinkDelegate: DeepLinkCoordinatorDelegate {
+public final class CompositeDeepLinkDelegate: DeepLinkCoordinatorDelegate, @unchecked Sendable {
     private let delegates: [DeepLinkCoordinatorDelegate]
 
     /// Creates a composite delegate with the provided delegates.
     ///
     /// - Parameter delegates: Array of delegates to combine
-    init(delegates: [DeepLinkCoordinatorDelegate]) {
+    public init(delegates: [DeepLinkCoordinatorDelegate]) {
         self.delegates = delegates
     }
 
-    func coordinator(_ coordinator: AnyObject, willProcess url: URL) {
+    public func coordinator(_ coordinator: AnyObject, willProcess url: URL) {
         for delegate in delegates {
             delegate.coordinator(coordinator, willProcess: url)
         }
     }
 
-    func coordinator(_ coordinator: AnyObject, didProcess url: URL, result: DeepLinkResultProtocol) {
+    public func coordinator(_ coordinator: AnyObject, didProcess url: URL, result: DeepLinkResultProtocol) {
         for delegate in delegates {
             delegate.coordinator(coordinator, didProcess: url, result: result)
         }
     }
 
-    func coordinator(_ coordinator: AnyObject, didFailProcessing url: URL, error: Error) {
+    public func coordinator(_ coordinator: AnyObject, didFailProcessing url: URL, error: Error) {
         for delegate in delegates {
             delegate.coordinator(coordinator, didFailProcessing: url, error: error)
         }
