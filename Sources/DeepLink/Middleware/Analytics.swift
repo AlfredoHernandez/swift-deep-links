@@ -4,6 +4,295 @@
 
 import Foundation
 
+/// Middleware for deep link analytics tracking.
+///
+/// This middleware intercepts all deep link URLs and sends them to an analytics provider
+/// using a configurable strategy. It allows tracking deep link usage for user behavior
+/// analysis and engagement metrics.
+///
+/// ## Features
+/// - **Automatic interception**: Automatically tracks all processed URLs
+/// - **Configurable strategies**: Different levels of detail in tracking
+/// - **Flexible providers**: Compatible with any analytics provider
+/// - **Non-blocking flow**: The middleware doesn't interrupt normal deep link processing
+///
+/// ## Use Cases
+/// - Track which deep links are most used
+/// - Analyze user navigation patterns
+/// - Measure marketing campaign effectiveness
+/// - Monitor deep link performance
+///
+/// ## Usage Examples
+///
+/// ### Basic Usage
+/// ```swift
+/// // Create an analytics provider
+/// let analyticsProvider = DefaultAnalyticsProvider(
+///     logger: Logger(subsystem: "MyApp", category: "DeepLinks")
+/// )
+///
+/// // Create middleware with standard strategy
+/// let analyticsMiddleware = AnalyticsMiddleware(
+///     analyticsProvider: analyticsProvider,
+///     strategy: .standard
+/// )
+///
+/// // Add to deep link coordinator
+/// let coordinator = DeepLinkCoordinator.builder()
+///     .addMiddleware(analyticsMiddleware)
+///     .build()
+/// ```
+///
+/// ### Custom Strategy
+/// ```swift
+/// // For deeper analysis, use detailed strategy
+/// let detailedAnalyticsMiddleware = AnalyticsMiddleware(
+///     analyticsProvider: analyticsProvider,
+///     strategy: .detailed
+/// )
+/// ```
+///
+/// ### Custom Provider
+/// ```swift
+/// struct MyAnalyticsProvider: AnalyticsProvider {
+///     func track(_ event: String, parameters: [String: Any]) async {
+///         // Send to Firebase Analytics, Mixpanel, etc.
+///         await FirebaseAnalytics.track(event: event, parameters: parameters)
+///     }
+/// }
+///
+/// let customAnalyticsMiddleware = AnalyticsMiddleware(
+///     analyticsProvider: MyAnalyticsProvider(),
+///     strategy: .performance
+/// )
+/// ```
+///
+/// ## Available Strategies
+/// - `.standard`: Tracks basic information (URL, scheme, host, timestamp)
+/// - `.detailed`: Includes path and query parameters
+/// - `.minimal`: Only essential information (scheme, host, timestamp)
+/// - `.performance`: Includes processing time metrics
+///
+/// ## Thread Safety
+/// This middleware is thread-safe and can be used concurrently.
+///
+/// - SeeAlso: ``AnalyticsStrategy`` for more information about available strategies
+/// - SeeAlso: ``AnalyticsProvider`` for implementing custom providers
+public final class AnalyticsMiddleware: DeepLinkMiddleware {
+    private let analyticsProvider: AnalyticsProvider
+    private let strategy: AnalyticsStrategy
+
+    /// Creates a new analytics middleware.
+    ///
+    /// - Parameters:
+    ///   - analyticsProvider: The analytics provider to use for sending events.
+    ///     Can be a custom provider or the included `DefaultAnalyticsProvider`.
+    ///   - strategy: The tracking strategy to use. Defaults to `.standard`.
+    ///     See ``AnalyticsStrategy`` for available options.
+    public init(
+        analyticsProvider: AnalyticsProvider,
+        strategy: AnalyticsStrategy = .standard,
+    ) {
+        self.analyticsProvider = analyticsProvider
+        self.strategy = strategy
+    }
+
+    /// Intercepts a deep link URL for analytics tracking.
+    ///
+    /// This method is automatically called by the deep link coordinator when processing
+    /// a URL. It tracks the URL using the configured strategy and then allows normal
+    /// processing to continue.
+    ///
+    /// - Parameter url: The deep link URL to track
+    /// - Returns: The same URL to allow continued processing, or `nil` if it should be cancelled
+    /// - Throws: Does not throw errors in the current implementation
+    public func intercept(_ url: URL) async throws -> URL? {
+        await strategy.track(url: url, provider: analyticsProvider)
+        return url
+    }
+}
+
+//
+//  Copyright © 2025 Jesús Alfredo Hernández Alarcón. All rights reserved.
+//
+
+import os.log
+
+/// Protocol for analytics providers.
+///
+/// This protocol defines the interface that analytics providers must implement
+/// to send deep link events to different analytics services.
+///
+/// ## Included Implementations
+/// - `DefaultAnalyticsProvider`: Basic implementation that logs to system logs
+///
+/// ## Common Custom Implementations
+/// - Firebase Analytics
+/// - Mixpanel
+/// - Amplitude
+/// - Custom analytics backend
+///
+/// ## Basic Implementation Example
+/// ```swift
+/// struct MyAnalyticsProvider: AnalyticsProvider {
+///     func track(_ event: String, parameters: [String: Any]) async {
+///         // Send to your analytics service
+///         await MyAnalyticsService.track(event: event, parameters: parameters)
+///     }
+/// }
+/// ```
+///
+/// ## Firebase Analytics Example
+/// ```swift
+/// import FirebaseAnalytics
+///
+/// struct FirebaseAnalyticsProvider: AnalyticsProvider {
+///     func track(_ event: String, parameters: [String: Any]) async {
+///         await withCheckedContinuation { continuation in
+///             Analytics.logEvent(event, parameters: parameters)
+///             continuation.resume()
+///         }
+///     }
+/// }
+/// ```
+///
+/// ## Implementation Considerations
+/// - The method must be thread-safe and can be called from any thread
+/// - Implementations should handle errors internally
+/// - For better performance, consider implementing event batching
+/// - Ensure compliance with privacy policies in your implementation
+///
+/// - SeeAlso: ``AnalyticsMiddleware`` to use this protocol
+/// - SeeAlso: ``DefaultAnalyticsProvider`` for a basic implementation
+public protocol AnalyticsProvider: Sendable {
+    /// Sends an analytics event with parameters.
+    ///
+    /// - Parameters:
+    ///   - event: The name of the event to track (e.g., "deep_link_opened")
+    ///   - parameters: Dictionary with the event parameters
+    func track(_ event: String, parameters: [String: Any]) async
+}
+
+/// Default analytics provider that logs events to system logs.
+///
+/// This basic implementation of `AnalyticsProvider` logs all analytics events
+/// to system logs using `os.log`. It's ideal for development, debugging, and cases
+/// where data doesn't need to be sent to external analytics services.
+///
+/// ## Features
+/// - **Integrated logging**: Uses `os.log` for efficient logging
+/// - **Configurable**: Allows customizing the logger
+/// - **Thread-safe**: Safe for concurrent use
+/// - **No external dependencies**: Doesn't require third-party services
+///
+/// ## Use Cases
+/// - **Development and debugging**: See analytics events in real-time
+/// - **Simple applications**: When complex analytics isn't needed
+/// - **Prototyping**: To quickly test the deep link system
+/// - **Local logging**: For log analysis without external services
+///
+/// ## Basic Usage Example
+/// ```swift
+/// // Use with default configuration
+/// let analyticsProvider = DefaultAnalyticsProvider()
+///
+/// let middleware = AnalyticsMiddleware(
+///     analyticsProvider: analyticsProvider,
+///     strategy: .standard
+/// )
+/// ```
+///
+/// ## Custom Logger Example
+/// ```swift
+/// import os.log
+///
+/// // Create custom logger for your app
+/// let customLogger = Logger(subsystem: "com.myapp.analytics", category: "DeepLinks")
+///
+/// let customProvider = DefaultAnalyticsProvider(logger: customLogger)
+///
+/// let middleware = AnalyticsMiddleware(
+///     analyticsProvider: customProvider,
+///     strategy: .detailed
+/// )
+/// ```
+///
+/// ## Log Format
+/// Events are logged with the following format:
+/// ```
+/// Analytics: deep_link_opened - url: myApp://product/123, scheme: myApp, host: product, timestamp: 1640995200.0
+/// ```
+///
+/// ## Viewing Logs in Development
+/// To view logs in Xcode:
+/// 1. Open Xcode console
+/// 2. Filter by "DeepLink" or your custom subsystem
+/// 3. Run deep links in the simulator
+///
+/// To view logs on device:
+/// ```bash
+/// # In terminal, with device connected
+/// xcrun simctl spawn booted log stream --predicate 'subsystem == "DeepLink"'
+/// ```
+///
+/// ## Limitations
+/// - Logs don't persist indefinitely
+/// - No automatic data aggregation
+/// - Not suitable for large-scale production analytics
+///
+/// ## Migration to Production
+/// For production, consider implementing a provider that sends data to:
+/// - Firebase Analytics
+/// - Mixpanel
+/// - Your own analytics backend
+/// - Logging services like LogRocket or Sentry
+///
+/// - SeeAlso: ``AnalyticsProvider`` to implement custom providers
+/// - SeeAlso: ``AnalyticsMiddleware`` to use this provider
+public final class DefaultAnalyticsProvider: AnalyticsProvider {
+    private let logger: Logger
+
+    /// Creates a new default analytics provider.
+    ///
+    /// - Parameter logger: The logger to use for registering events. By default uses
+    ///   a logger with subsystem "DeepLink" and category "Analytics".
+    ///
+    /// ## Example
+    /// ```swift
+    /// // Use default configuration
+    /// let provider = DefaultAnalyticsProvider()
+    ///
+    /// // With custom logger
+    /// let customLogger = Logger(subsystem: "com.myapp", category: "DeepLinks")
+    /// let customProvider = DefaultAnalyticsProvider(logger: customLogger)
+    /// ```
+    public init(logger: Logger = Logger(subsystem: "swift-deep-link", category: "DefaultAnalyticsProvider")) {
+        self.logger = logger
+    }
+
+    /// Logs an analytics event to system logs.
+    ///
+    /// - Parameters:
+    ///   - event: The name of the event to track
+    ///   - parameters: The event parameters
+    ///
+    /// ## Output Example
+    /// For the "deep_link_opened" event with parameters:
+    /// ```
+    /// Analytics: deep_link_opened - url: myApp://product/123, scheme: myApp, host: product, timestamp: 1640995200.0
+    /// ```
+    public func track(_ event: String, parameters: [String: Any]) async {
+        let parametersString = parameters.map { "\($0.key): \($0.value)" }.joined(separator: ", ")
+        logger.info("Analytics: \(event) - \(parametersString)")
+    }
+}
+
+//
+//  Copyright © 2025 Jesús Alfredo Hernández Alarcón. All rights reserved.
+//
+
+import Foundation
+
 /// Analytics tracking strategies for deep links.
 ///
 /// This struct defines different strategies for tracking deep link usage, each optimized

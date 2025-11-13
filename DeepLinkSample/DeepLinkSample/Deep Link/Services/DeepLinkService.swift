@@ -32,16 +32,34 @@ final class DeepLinkService {
 
     /// Creates a fully configured deep link coordinator.
     ///
-    /// This method sets up the complete deep link processing pipeline including:
-    /// - Parser registration for all supported route types
-    /// - Middleware stack configuration (rate limiting, security, authentication, etc.)
-    /// - Delegate setup for logging, analytics, and notifications
-    /// - Handler configuration with the provided navigation router
+    /// This method demonstrates the modern functional API features:
+    /// - **Type Aliases**: Using `CoordinatorOf<AppRoute>` for cleaner signatures
+    /// - **Factory Methods**: Using `.analytics()`, `.logging()`, etc.
+    /// - **Functional Composition**: Using `compose()` for middleware and delegates
+    ///
+    /// ## Traditional vs Modern Style
+    ///
+    /// Before (verbose):
+    /// ```swift
+    /// let coordinator: DeepLinkCoordinator<AppRoute> = ...
+    /// .addingMiddleware(AnalyticsMiddleware(analyticsProvider: provider))
+    /// .addingDelegates([
+    ///     DeepLinkLoggingDelegate(enableDebugLogging: true),
+    ///     DeepLinkAnalyticsDelegate(analyticsProvider: provider)
+    /// ])
+    /// ```
+    ///
+    /// After (functional style):
+    /// ```swift
+    /// let coordinator: CoordinatorOf<AppRoute> = ...
+    /// .addingMiddleware(.analytics(provider: provider))
+    /// .addingDelegate(compose(.logging(enableDebugLogging: true), .analytics(provider: provider)))
+    /// ```
     ///
     /// - Parameter navigationRouter: The navigation router for handling route actions
     /// - Returns: A fully configured deep link coordinator
     /// - Throws: `DeepLinkError` if coordinator creation fails
-    func createCoordinator(navigationRouter: NavigationRouter) async throws -> DeepLinkCoordinator<AppRoute> {
+    func createCoordinator(navigationRouter: NavigationRouter) async throws -> CoordinatorOf<AppRoute> {
         logger.info("Creating deep link coordinator")
 
         // Configure parsers
@@ -92,7 +110,26 @@ private extension DeepLinkService {
         ]
     }
 
-    /// Creates the middleware stack with all necessary components.
+    /// Creates the middleware stack using functional factory methods.
+    ///
+    /// **Modern Functional API**: This method uses static factory methods
+    /// and the `compose()` function for cleaner, more declarative configuration.
+    ///
+    /// ## Before (Traditional Style):
+    /// ```swift
+    /// [
+    ///     RateLimitMiddleware(maxRequests: 10, timeWindow: 60.0),
+    ///     AnalyticsMiddleware(analyticsProvider: provider)
+    /// ]
+    /// ```
+    ///
+    /// ## After (Functional Style):
+    /// ```swift
+    /// compose(
+    ///     .rateLimit(maxRequests: 10, timeWindow: 60),
+    ///     .analytics(provider: provider)
+    /// )
+    /// ```
     ///
     /// The middleware stack is configured in the following order:
     /// 1. Rate limiting (prevents abuse)
@@ -104,40 +141,58 @@ private extension DeepLinkService {
     ///
     /// - Returns: An array of configured middleware
     func createMiddlewareStack() -> [any DeepLinkMiddleware] {
-        [
-            RateLimitMiddleware(maxRequests: 10, timeWindow: 60.0),
-            SecurityMiddleware(
+        compose(
+            .rateLimit(maxRequests: 10, timeWindow: 60.0),
+            .security(
                 allowedSchemes: ["deeplink", "testapp"],
                 allowedHosts: ["profile", "product", "settings", "info", "alert"],
-                blockedPatterns: [],
             ),
-            AuthenticationMiddleware(
-                authProvider: authenticationProvider,
+            .authentication(
+                provider: authenticationProvider,
                 protectedHosts: ["profile", "settings"],
             ),
-            URLTransformationMiddleware(transformer: URLNormalizationTransformer()),
-            AnalyticsMiddleware(analyticsProvider: analyticsProvider),
-            LoggingMiddleware(),
-        ]
+            .urlTransformation(transformer: URLNormalizationTransformer()),
+            .analytics(provider: analyticsProvider),
+            .logging(),
+        )
     }
 
-    /// Creates the delegate stack for comprehensive monitoring.
+    /// Creates a composite delegate using functional composition.
     ///
-    /// The delegate stack provides:
+    /// **Modern Functional API**: This method uses static factory methods
+    /// and the `compose()` function to create a composite delegate.
+    ///
+    /// ## Before (Traditional Style):
+    /// ```swift
+    /// [
+    ///     DeepLinkLoggingDelegate(enableDebugLogging: true),
+    ///     DeepLinkAnalyticsDelegate(analyticsProvider: provider)
+    /// ]
+    /// ```
+    ///
+    /// ## After (Functional Style):
+    /// ```swift
+    /// [compose(
+    ///     .logging(enableDebugLogging: true),
+    ///     .analytics(provider: provider)
+    /// )]
+    /// ```
+    ///
+    /// The delegate provides:
     /// - Detailed logging of deep link processing
     /// - Analytics tracking for usage insights
     /// - User notifications for feedback
     ///
-    /// - Returns: An array of configured delegates
+    /// - Returns: An array with a single composite delegate
     func createDelegates() -> [DeepLinkCoordinatorDelegate] {
-        [
-            DeepLinkLoggingDelegate(enableDebugLogging: true),
-            DeepLinkAnalyticsDelegate(analyticsProvider: analyticsProvider),
-            DeepLinkNotificationDelegate(
-                showSuccessNotifications: true,
-                showErrorNotifications: true,
-                showInfoNotifications: false,
+        [compose(
+            .logging(enableDebugLogging: true),
+            .analytics(provider: analyticsProvider),
+            .notification(
+                showSuccess: true,
+                showErrors: true,
+                showInfo: false,
             ),
-        ]
+        )]
     }
 }

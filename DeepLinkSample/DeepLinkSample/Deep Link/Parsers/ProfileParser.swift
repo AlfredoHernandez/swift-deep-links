@@ -5,6 +5,15 @@
 import DeepLink
 import Foundation
 
+/// Parser for profile-related deep links.
+///
+/// This parser demonstrates the use of the `ParserOf<Route>` type alias
+/// for cleaner type signatures when conforming to `DeepLinkParser`.
+///
+/// ## Example URLs:
+/// ```
+/// deeplink://profile?userID=123&name=John
+/// ```
 final class ProfileParser: DeepLinkParser {
     typealias Route = AppRoute
     private let parameterParser: any QueryParameterParser

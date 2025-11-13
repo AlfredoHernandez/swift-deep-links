@@ -35,7 +35,7 @@ final class DeepLinkViewModel {
     var isProcessing = false
 
     /// Last processing result for debugging/display
-    var lastResult: DeepLinkResult<AppRoute>?
+    var lastResult: ResultOf<AppRoute>?
 
     /// Processing error for user feedback
     var processingError: Error?
@@ -109,7 +109,7 @@ private extension DeepLinkViewModel {
     /// quick visual identification of the processing status.
     ///
     /// - Parameter result: The result of the deep link processing
-    func logDeepLinkResult(_ result: DeepLinkResult<AppRoute>) {
+    func logDeepLinkResult(_ result: ResultOf<AppRoute>) {
         let separator = String(repeating: "=", count: 50)
         print("\n" + separator)
         print("🔗 DEEP LINK PROCESSING RESULT")
