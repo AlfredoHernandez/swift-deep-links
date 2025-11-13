@@ -28,7 +28,17 @@ import OSLog
 ///     middlewareCoordinator: customMiddlewareCoordinator,
 ///     routeExecutionDelay: .milliseconds(250)
 /// )
+///
+/// // Using the convenience type alias
+/// let coordinator: CoordinatorOf<AppRoute> = DeepLinkCoordinator(
+///     routing: routing,
+///     handler: handler
+/// )
 /// ```
+///
+/// ## See Also
+///
+/// - ``CoordinatorOf``
 ///
 /// ## Thread Safety
 ///

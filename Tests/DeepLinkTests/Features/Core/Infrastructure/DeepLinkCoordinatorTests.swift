@@ -215,6 +215,28 @@ struct DeepLinkCoordinatorTests {
         #expect(handlerSpy.handledRoutes == [.route1])
     }
 
+    @Test("CoordinatorOf type alias works correctly")
+    func coordinatorOf_typeAlias_worksCorrectly() async throws {
+        let routingStub = DeepLinkRoutingStub<TestRoute>()
+        let handlerSpy = DeepLinkHandlerSpy<TestRoute>()
+
+        // Using the convenience type alias
+        let coordinator: CoordinatorOf<TestRoute> = DeepLinkCoordinator(
+            routing: routingStub,
+            handler: handlerSpy,
+        )
+
+        let url = try #require(URL(string: "test://type-alias"))
+        routingStub.routesToReturn = [.route1, .route2]
+
+        let result: ResultOf<TestRoute> = await coordinator.handle(url: url)
+
+        #expect(result.wasSuccessful)
+        #expect(result.routes == [.route1, .route2])
+        #expect(result.successfulRoutes == 2)
+        #expect(handlerSpy.handledRoutes == [.route1, .route2])
+    }
+
     // MARK: - Test doubles
 
     enum TestRoute: DeepLinkRoute, Equatable {

@@ -21,6 +21,10 @@ import Foundation
 ///     print("Failed with errors: \(result.errors)")
 /// }
 /// ```
+///
+/// ## See Also
+///
+/// - ``ResultOf``
 public struct DeepLinkResult<Route: DeepLinkRoute>: Sendable, DeepLinkResultProtocol {
     /// The original URL that was processed
     public let originalURL: URL
