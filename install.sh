@@ -22,6 +22,6 @@ if ! check_installed swiftformat; then
 fi
 
 echo "[+] Installing pre-commit hooks ..."
-cp scripts/pre-commit .git/hooks/pre-commit
+cp Scripts/pre-commit .git/hooks/pre-commit
 
 echo "[+] Done ✅"
