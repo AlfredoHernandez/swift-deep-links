@@ -10,31 +10,44 @@ import Foundation
 /// with middleware, delegates, and other configuration options. This makes it easier to create
 /// complex coordinator configurations without having to manually manage all the setup steps.
 ///
-/// ## Usage
+/// ## Basic Usage
 ///
 /// ```swift
 /// let coordinator = DeepLinkCoordinatorBuilder<AppRoute>()
 ///     .addingRouting(DefaultDeepLinkRouting(parsers: parsers))
 ///     .addingHandler(AppDeepLinkHandler(navigationRouter: router))
-///     .addingMiddleware(AnalyticsMiddleware())
-///     .addingMiddleware(AuthenticationMiddleware())
+///     .addingMiddleware(AnalyticsMiddleware(analyticsProvider: provider))
+///     .addingMiddleware(AuthenticationMiddleware(authProvider: authProvider, protectedHosts: []))
 ///     .addingDelegate(DeepLinkLoggingDelegate())
-///     .addingDelegate(DeepLinkAnalyticsDelegate())
+///     .addingDelegate(DeepLinkAnalyticsDelegate(analyticsProvider: provider))
+///     .build()
+/// ```
+///
+/// ## Usage with Static Factory Methods
+///
+/// ```swift
+/// let coordinator = DeepLinkCoordinatorBuilder<AppRoute>()
+///     .addingRouting(DefaultDeepLinkRouting(parsers: parsers))
+///     .addingHandler(AppDeepLinkHandler(navigationRouter: router))
+///     .addingMiddleware(.analytics(provider: myProvider, strategy: .detailed))
+///     .addingMiddleware(.rateLimit(maxRequests: 10, timeWindow: 60))
+///     .addingMiddleware(.security(allowedSchemes: ["https", "myapp"]))
+///     .addingDelegate(.logging(enableDebugLogging: true))
 ///     .build()
 /// ```
 ///
 /// ## Advanced Usage with Arrays
 ///
 /// ```swift
-/// let middleware = [
-///     RateLimitMiddleware(maxRequests: 10, timeWindow: 60.0),
-///     SecurityMiddleware(allowedSchemes: ["deeplink"], allowedHosts: ["profile"]),
-///     AnalyticsMiddleware(analyticsProvider: provider)
+/// let middleware: [any DeepLinkMiddleware] = [
+///     .rateLimit(maxRequests: 10, timeWindow: 60.0),
+///     .security(allowedSchemes: ["myapp"], allowedHosts: ["secure.myapp.com"]),
+///     .analytics(provider: provider, strategy: .performance)
 /// ]
 ///
-/// let delegates = [
-///     DeepLinkLoggingDelegate(),
-///     DeepLinkAnalyticsDelegate(analyticsProvider: provider)
+/// let delegates: [DeepLinkCoordinatorDelegate] = [
+///     .logging(enableDebugLogging: false),
+///     .analytics(provider: provider)
 /// ]
 ///
 /// let coordinator = DeepLinkCoordinatorBuilder<AppRoute>()

@@ -18,7 +18,17 @@ import Foundation
 /// can either allow the URL to continue to the next middleware/parser, or stop the processing
 /// by throwing an error or returning a modified URL.
 ///
-/// ## Usage Example
+/// ## Usage with Static Factory Methods
+///
+/// ```swift
+/// // Using static factory methods (recommended)
+/// coordinator.add(.analytics(provider: myProvider))
+/// coordinator.add(.rateLimit(maxRequests: 10, timeWindow: 60))
+/// coordinator.add(.security(allowedSchemes: ["https", "myapp"]))
+/// coordinator.add(.logging(format: .detailed))
+/// ```
+///
+/// ## Custom Implementation
 ///
 /// ```swift
 /// final class AnalyticsMiddleware: DeepLinkMiddleware {
