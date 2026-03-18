@@ -373,19 +373,19 @@ private final class DelegateSpy: DeepLinkCoordinatorDelegate, @unchecked Sendabl
 	}
 }
 
-private final class AuthenticationProviderDummy: AuthenticationProvider, @unchecked Sendable {
+private final class AuthenticationProviderDummy: AuthenticationProvider {
 	func isAuthenticated() async -> Bool {
 		true
 	}
 }
 
-private final class AnalyticsProviderDummy: AnalyticsProvider, @unchecked Sendable {
+private final class AnalyticsProviderDummy: AnalyticsProvider {
 	func track(_: String, parameters _: [String: Any]) async {
 		// Dummy implementation - does nothing
 	}
 }
 
-private final class ErrorMiddleware: DeepLinkMiddleware, @unchecked Sendable {
+private final class ErrorMiddleware: DeepLinkMiddleware {
 	func intercept(_: URL) async throws -> URL? {
 		throw DeepLinkError.securityViolation("Test security violation")
 	}

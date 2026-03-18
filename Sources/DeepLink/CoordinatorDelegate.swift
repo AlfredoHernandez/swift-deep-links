@@ -19,7 +19,7 @@ public protocol DeepLinkResultProtocol: Sendable {
 	var executionTime: TimeInterval { get }
 
 	/// A list of all errors encountered during processing
-	var errors: [any Error & Sendable] { get }
+	var errors: [any Error] { get }
 
 	/// The number of routes that were successfully handled
 	var successfulRoutes: Int { get }

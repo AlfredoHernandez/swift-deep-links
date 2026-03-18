@@ -25,7 +25,7 @@ import Foundation
 /// ## See Also
 ///
 /// - ``ResultOf``
-public struct DeepLinkResult<Route: DeepLinkRoute>: Sendable, DeepLinkResultProtocol {
+public struct DeepLinkResult<Route: DeepLinkRoute>: DeepLinkResultProtocol {
 	/// The original URL that was processed
 	public let originalURL: URL
 
@@ -39,7 +39,7 @@ public struct DeepLinkResult<Route: DeepLinkRoute>: Sendable, DeepLinkResultProt
 	public let executionTime: TimeInterval
 
 	/// Any errors that occurred during processing
-	public let errors: [any Error & Sendable]
+	public let errors: [any Error]
 
 	/// Whether the processing was completely successful
 	public let wasSuccessful: Bool
@@ -65,7 +65,7 @@ public struct DeepLinkResult<Route: DeepLinkRoute>: Sendable, DeepLinkResultProt
 		processedURL: URL?,
 		routes: [Route],
 		executionTime: TimeInterval,
-		errors: [any Error & Sendable] = [],
+		errors: [any Error] = [],
 		successfulRoutes: Int = 0,
 		failedRoutes: Int = 0,
 	) {
@@ -99,7 +99,7 @@ public extension DeepLinkResult {
 	}
 
 	/// The first error that occurred (if any)
-	var firstError: (any Error & Sendable)? {
+	var firstError: (any Error)? {
 		errors.first
 	}
 

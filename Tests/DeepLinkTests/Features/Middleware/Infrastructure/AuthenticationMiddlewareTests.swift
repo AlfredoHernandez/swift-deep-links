@@ -429,7 +429,7 @@ struct AuthenticationMiddlewareTests {
 
 	// MARK: - Test Helpers
 
-	private final class AuthenticationStub: AuthenticationProvider, @unchecked Sendable {
+	private final class AuthenticationStub: AuthenticationProvider {
 		private let isAuthenticated: Bool
 
 		init(isAuthenticated: Bool) {

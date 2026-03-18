@@ -289,7 +289,7 @@ struct DeepLinkCoordinatorTests {
 	}
 
 	/// Middleware that always returns nil to stop processing
-	final class StoppingMiddleware: DeepLinkMiddleware, @unchecked Sendable {
+	final class StoppingMiddleware: DeepLinkMiddleware {
 		func intercept(_: URL) async throws -> URL? {
 			nil // Always stops processing
 		}

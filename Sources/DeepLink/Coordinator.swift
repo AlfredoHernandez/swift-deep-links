@@ -182,7 +182,7 @@ private extension DeepLinkCoordinator {
 	func executeRoutes(_ routes: [Route]) async -> RouteExecutionResult {
 		var successfulRoutes = 0
 		var failedRoutes = 0
-		var errors: [any Error & Sendable] = []
+		var errors: [any Error] = []
 
 		for route in routes {
 			do {
@@ -291,7 +291,7 @@ private extension DeepLinkCoordinator {
 private struct RouteExecutionResult {
 	let successfulRoutes: Int
 	let failedRoutes: Int
-	let errors: [any Error & Sendable]
+	let errors: [any Error]
 }
 
 // MARK: - Delegate Notifications

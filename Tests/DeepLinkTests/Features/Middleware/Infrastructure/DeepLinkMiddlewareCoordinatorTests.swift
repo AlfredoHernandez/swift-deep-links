@@ -375,7 +375,7 @@ struct DeepLinkMiddlewareCoordinatorTests {
 
 	// MARK: - Dummies
 
-	private final class DummyMiddleware: DeepLinkMiddleware, @unchecked Sendable {
+	private final class DummyMiddleware: DeepLinkMiddleware {
 		func intercept(_: URL) async throws -> URL? {
 			nil
 		}
@@ -383,7 +383,7 @@ struct DeepLinkMiddlewareCoordinatorTests {
 
 	// MARK: - Stubs
 
-	private final class MiddlewareStub: DeepLinkMiddleware, @unchecked Sendable {
+	private final class MiddlewareStub: DeepLinkMiddleware {
 		private let result: URL?
 
 		init(result: URL?) {
@@ -395,7 +395,7 @@ struct DeepLinkMiddlewareCoordinatorTests {
 		}
 	}
 
-	private final class ErrorThrowingStub: DeepLinkMiddleware, @unchecked Sendable {
+	private final class ErrorThrowingStub: DeepLinkMiddleware {
 		private let error: Error
 
 		init(error: Error = DeepLinkError.handlerError("Test error")) {
@@ -407,7 +407,7 @@ struct DeepLinkMiddlewareCoordinatorTests {
 		}
 	}
 
-	private final class URLTransformingStub: DeepLinkMiddleware, @unchecked Sendable {
+	private final class URLTransformingStub: DeepLinkMiddleware {
 		private let transformedURL: URL
 
 		init(transformedURL: URL) {
@@ -419,7 +419,7 @@ struct DeepLinkMiddlewareCoordinatorTests {
 		}
 	}
 
-	private final class AuthenticationStub: AuthenticationProvider, @unchecked Sendable {
+	private final class AuthenticationStub: AuthenticationProvider {
 		private let isAuthenticated: Bool
 
 		init(isAuthenticated: Bool) {
@@ -431,7 +431,7 @@ struct DeepLinkMiddlewareCoordinatorTests {
 		}
 	}
 
-	private final class URLTransformerStub: URLTransformer, @unchecked Sendable {
+	private final class URLTransformerStub: URLTransformer {
 		private let transformedURL: URL
 
 		init(transformedURL: URL) {

@@ -36,7 +36,7 @@ struct URLTransformationMiddlewareTests {
 
 	// MARK: - Test Helpers
 
-	private final class URLTransformerStub: URLTransformer, @unchecked Sendable {
+	private final class URLTransformerStub: URLTransformer {
 		private let transformedURL: URL
 
 		init(transformedURL: URL) {
@@ -48,7 +48,7 @@ struct URLTransformationMiddlewareTests {
 		}
 	}
 
-	private final class ErrorThrowingTransformer: URLTransformer, @unchecked Sendable {
+	private final class ErrorThrowingTransformer: URLTransformer {
 		func transform(_: URL) async throws -> URL {
 			throw DeepLinkError.handlerError("Transformer error")
 		}
