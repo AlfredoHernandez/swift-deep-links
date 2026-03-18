@@ -34,6 +34,7 @@ import Foundation
 ///
 /// - Parameter delegates: The delegates to compose, in execution order
 /// - Returns: A composite delegate that executes all provided delegates
+@MainActor
 public func compose(
 	_ delegates: DeepLinkCoordinatorDelegate...,
 ) -> CompositeDeepLinkDelegate {
@@ -59,6 +60,7 @@ public func compose(
 ///
 /// - Parameter delegates: Array of delegates to compose
 /// - Returns: A composite delegate that executes all provided delegates
+@MainActor
 public func compose(
 	_ delegates: [DeepLinkCoordinatorDelegate],
 ) -> CompositeDeepLinkDelegate {

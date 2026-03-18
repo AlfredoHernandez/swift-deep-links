@@ -226,14 +226,15 @@ public final class DeepLinkCoordinatorBuilder<Route: DeepLinkRoute>: @unchecked 
 		}
 
 		// Determine the delegate to use
-		let finalDelegate: (any DeepLinkCoordinatorDelegate)? = {
-			if delegates.count == 1 {
-				return delegates.first
-			} else if delegates.count > 1 {
-				return CompositeDeepLinkDelegate(delegates: delegates)
+		let finalDelegate: (any DeepLinkCoordinatorDelegate)? = if delegates.count == 1 {
+			delegates.first
+		} else if delegates.count > 1 {
+			await MainActor.run {
+				CompositeDeepLinkDelegate(delegates: delegates)
 			}
-			return nil
-		}()
+		} else {
+			nil
+		}
 
 		// Create the deep link coordinator with all components
 		return DeepLinkCoordinator(

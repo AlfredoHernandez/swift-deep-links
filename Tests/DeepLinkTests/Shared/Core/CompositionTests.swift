@@ -11,7 +11,7 @@ struct CompositionTests {
 	// MARK: - Delegate Composition Tests
 
 	@Test("compose with variadic delegates creates composite delegate")
-	func compose_withVariadicDelegates_createsCompositeDelegate() {
+	@MainActor func compose_withVariadicDelegates_createsCompositeDelegate() {
 		let provider = DefaultAnalyticsProvider()
 
 		let composite = compose(
@@ -24,7 +24,7 @@ struct CompositionTests {
 	}
 
 	@Test("compose with array of delegates creates composite delegate")
-	func compose_withArrayOfDelegates_createsCompositeDelegate() {
+	@MainActor func compose_withArrayOfDelegates_createsCompositeDelegate() {
 		let provider = DefaultAnalyticsProvider()
 
 		let delegates: [DeepLinkCoordinatorDelegate] = [
@@ -39,7 +39,7 @@ struct CompositionTests {
 	}
 
 	@Test("composed delegate executes all delegates in order")
-	func composedDelegate_executesAllDelegatesInOrder() throws {
+	@MainActor func composedDelegate_executesAllDelegatesInOrder() throws {
 		let spy1 = DelegateSpy()
 		let spy2 = DelegateSpy()
 		let spy3 = DelegateSpy()
@@ -56,7 +56,7 @@ struct CompositionTests {
 	}
 
 	@Test("composed delegate works with coordinator")
-	func composedDelegate_worksWithCoordinator() async throws {
+	@MainActor func composedDelegate_worksWithCoordinator() async throws {
 		let provider = DefaultAnalyticsProvider()
 		let routing = TestRouting()
 		let handler = TestHandler()
@@ -135,7 +135,7 @@ struct CompositionTests {
 	}
 
 	@Test("compose with single delegate works correctly")
-	func compose_withSingleDelegate_worksCorrectly() {
+	@MainActor func compose_withSingleDelegate_worksCorrectly() {
 		let composite = compose(.logging())
 
 		#expect(composite is CompositeDeepLinkDelegate)
@@ -150,7 +150,7 @@ struct CompositionTests {
 	}
 
 	@Test("compose with empty array creates empty composite")
-	func compose_withEmptyArray_createsEmptyComposite() throws {
+	@MainActor func compose_withEmptyArray_createsEmptyComposite() throws {
 		let delegates: [DeepLinkCoordinatorDelegate] = []
 		let composite = compose(delegates)
 

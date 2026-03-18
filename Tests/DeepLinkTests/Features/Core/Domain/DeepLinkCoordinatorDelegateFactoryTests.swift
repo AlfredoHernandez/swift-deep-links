@@ -7,6 +7,7 @@ import Foundation
 import Testing
 
 @Suite("DeepLinkCoordinatorDelegate Factory Methods Tests")
+@MainActor
 struct DeepLinkCoordinatorDelegateFactoryTests {
 	@Test("Analytics delegate factory method creates delegate with correct type")
 	func analytics_factoryMethod_createsDelegateWithCorrectType() {

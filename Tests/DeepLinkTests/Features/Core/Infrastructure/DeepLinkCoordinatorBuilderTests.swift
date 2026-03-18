@@ -7,6 +7,7 @@ import Foundation
 import Testing
 
 @Suite("DeepLinkCoordinatorBuilder Tests")
+@MainActor
 struct DeepLinkCoordinatorBuilderTests {
 	// MARK: - Basic Configuration Tests
 

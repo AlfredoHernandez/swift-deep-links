@@ -7,6 +7,7 @@ import Foundation
 import Testing
 
 @Suite("DeepLinkCoordinator Tests")
+@MainActor
 struct DeepLinkCoordinatorTests {
 	@Test("DeepLinkCoordinator handle processes single route successfully")
 	func deepLinkCoordinator_handle_processesSingleRouteSuccessfully() async throws {

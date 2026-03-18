@@ -44,15 +44,10 @@ import OSLog
 ///
 /// Thread-safe coordinator for handling deep links.
 ///
-/// This class uses `@unchecked Sendable` because:
+/// Thread safety is achieved through:
 /// - Core stored properties (routing, handler, middlewareCoordinator) are immutable (`let`)
-/// - The `delegate` property is mutable (`var`) but all delegate calls are dispatched to MainActor for UI safety
-/// - No other mutable state is shared across threads
-///
-/// The `@unchecked` annotation is used because protocol types (`DeepLinkRouting`,
-/// `DeepLinkHandler`, `DeepLinkCoordinatorDelegate`) don't conform to `Sendable`,
-/// allowing implementers flexibility in their concurrency approaches while maintaining
-/// thread safety through MainActor isolation for delegate calls.
+/// - The `delegate` property is `@MainActor`-isolated via protocol conformance
+/// - All protocols conform to `Sendable`
 ///
 /// - Parameter Route: The type of route that this coordinator handles
 public final class DeepLinkCoordinator<Route: DeepLinkRoute>: @unchecked Sendable {
@@ -308,9 +303,7 @@ private extension DeepLinkCoordinator {
 	func notifyDelegateWillProcess(_ url: URL) async {
 		guard let delegate else { return }
 
-		await MainActor.run {
-			delegate.coordinator(self, willProcess: url)
-		}
+		await delegate.coordinator(self, willProcess: url)
 	}
 
 	/// Notifies the delegate that processing has completed.
@@ -321,9 +314,7 @@ private extension DeepLinkCoordinator {
 	func notifyDelegateDidProcess(_ url: URL, result: DeepLinkResult<Route>) async {
 		guard let delegate else { return }
 
-		await MainActor.run {
-			delegate.coordinator(self, didProcess: url, result: result)
-		}
+		await delegate.coordinator(self, didProcess: url, result: result)
 	}
 
 	/// Notifies the delegate that processing has failed.
@@ -334,9 +325,7 @@ private extension DeepLinkCoordinator {
 	func notifyDelegateDidFailProcessing(_ url: URL, error: Error) async {
 		guard let delegate else { return }
 
-		await MainActor.run {
-			delegate.coordinator(self, didFailProcessing: url, error: error)
-		}
+		await delegate.coordinator(self, didFailProcessing: url, error: error)
 	}
 }
 
