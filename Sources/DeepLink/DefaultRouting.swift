@@ -29,11 +29,11 @@ import OSLog
 ///
 /// ## Thread Safety
 ///
-/// This class is designed to be safely used across different execution contexts.
-/// All operations are performed asynchronously.
+/// This struct is `Sendable` by value semantics and can be safely shared
+/// across different execution contexts.
 ///
 /// - Parameter Route: The type of route this routing system produces
-public final class DefaultDeepLinkRouting<Route: DeepLinkRoute>: DeepLinkRouting {
+public struct DefaultDeepLinkRouting<Route: DeepLinkRoute>: DeepLinkRouting {
 	private let logger = Logger(subsystem: "swift-deep-link", category: "DefaultDeepLinkRouting")
 	private let parsers: [any DeepLinkParser<Route>]
 
