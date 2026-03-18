@@ -39,7 +39,7 @@
 ///     }
 /// }
 /// ```
-public protocol QueryParameterParser {
+public protocol QueryParameterParser: Sendable {
 	/// Parses query parameters into a strongly-typed object.
 	///
 	/// This method should convert the string-based query parameter dictionary

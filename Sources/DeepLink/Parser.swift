@@ -44,7 +44,7 @@ import Foundation
 /// - ``ParserOf``
 ///
 /// - AssociatedType Route: The type of route this parser can produce
-public protocol DeepLinkParser<Route> {
+public protocol DeepLinkParser<Route>: Sendable {
 	/// The type of route this parser can produce.
 	associatedtype Route: DeepLinkRoute
 

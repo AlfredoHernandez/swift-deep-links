@@ -37,7 +37,7 @@
 /// - ``HandlerOf``
 ///
 /// - AssociatedType Route: The type of route this handler can process
-public protocol DeepLinkHandler<Route> {
+public protocol DeepLinkHandler<Route>: Sendable {
 	/// The type of route this handler can process.
 	associatedtype Route: DeepLinkRoute
 

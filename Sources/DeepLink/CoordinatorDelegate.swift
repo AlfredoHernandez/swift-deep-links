@@ -82,7 +82,7 @@ public protocol DeepLinkResultProtocol: Sendable {
 ///
 /// All delegate methods are called on the main thread to ensure thread safety
 /// and proper UI updates if needed.
-public protocol DeepLinkCoordinatorDelegate: AnyObject {
+public protocol DeepLinkCoordinatorDelegate: AnyObject, Sendable {
 	/// Called before the coordinator begins processing a deep link URL.
 	///
 	/// This method is called immediately before the coordinator starts processing

@@ -184,7 +184,7 @@ struct CompositionTests {
 
 	final class DummyCoordinator {}
 
-	final class DelegateSpy: DeepLinkCoordinatorDelegate {
+	final class DelegateSpy: DeepLinkCoordinatorDelegate, @unchecked Sendable {
 		var willProcessCalled = false
 		var didProcessCalled = false
 		var didFailProcessingCalled = false

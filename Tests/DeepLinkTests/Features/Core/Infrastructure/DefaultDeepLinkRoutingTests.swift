@@ -253,7 +253,7 @@ struct DefaultDeepLinkRoutingTests {
 		}
 	}
 
-	final class DeepLinkParserStub<Route: DeepLinkRoute>: DeepLinkParser {
+	final class DeepLinkParserStub<Route: DeepLinkRoute>: DeepLinkParser, @unchecked Sendable {
 		typealias Route = Route
 
 		private let shouldSucceed: Bool

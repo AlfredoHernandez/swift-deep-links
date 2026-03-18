@@ -41,7 +41,7 @@ import Foundation
 /// - ``RoutingOf``
 ///
 /// - AssociatedType Route: The type of route this routing system produces
-public protocol DeepLinkRouting<Route> {
+public protocol DeepLinkRouting<Route>: Sendable {
 	/// The type of route this routing system produces.
 	associatedtype Route: DeepLinkRoute
 
