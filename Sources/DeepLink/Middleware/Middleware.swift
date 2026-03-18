@@ -1,5 +1,5 @@
 //
-//  Copyright © 2025 Jesús Alfredo Hernández Alarcón. All rights reserved.
+//  Copyright © 2026 Jesús Alfredo Hernández Alarcón. All rights reserved.
 //
 
 import Foundation
@@ -45,55 +45,55 @@ import Foundation
 /// }
 /// ```
 public protocol DeepLinkMiddleware: Sendable {
-    /// Intercepts a deep link URL before it reaches the parsers.
-    ///
-    /// - Parameter url: The deep link URL to intercept
-    /// - Returns: The URL to continue processing with, or `nil` to stop processing
-    /// - Throws: An error to stop processing and report the issue
-    func intercept(_ url: URL) async throws -> URL?
+	/// Intercepts a deep link URL before it reaches the parsers.
+	///
+	/// - Parameter url: The deep link URL to intercept
+	/// - Returns: The URL to continue processing with, or `nil` to stop processing
+	/// - Throws: An error to stop processing and report the issue
+	func intercept(_ url: URL) async throws -> URL?
 }
 
 /// Result of middleware processing
 public enum MiddlewareResult {
-    /// Continue processing with the original URL
-    case `continue`(URL)
+	/// Continue processing with the original URL
+	case `continue`(URL)
 
-    /// Continue processing with a modified URL
-    case transform(URL)
+	/// Continue processing with a modified URL
+	case transform(URL)
 
-    /// Stop processing and report an error
-    case error(Error)
+	/// Stop processing and report an error
+	case error(Error)
 
-    /// Stop processing without error (e.g., handled by middleware)
-    case handled
+	/// Stop processing without error (e.g., handled by middleware)
+	case handled
 }
 
 /// Enhanced middleware protocol with more control over processing flow
 public protocol AdvancedDeepLinkMiddleware: Sendable {
-    /// Intercepts a deep link URL with full control over the processing flow.
-    ///
-    /// - Parameter url: The deep link URL to intercept
-    /// - Returns: A result indicating how to proceed with processing
-    func intercept(_ url: URL) async -> MiddlewareResult
+	/// Intercepts a deep link URL with full control over the processing flow.
+	///
+	/// - Parameter url: The deep link URL to intercept
+	/// - Returns: A result indicating how to proceed with processing
+	func intercept(_ url: URL) async -> MiddlewareResult
 }
 
 /// Default implementation that converts AdvancedDeepLinkMiddleware to DeepLinkMiddleware
 public extension AdvancedDeepLinkMiddleware {
-    func intercept(_ url: URL) async throws -> URL? {
-        let result = await intercept(url)
+	func intercept(_ url: URL) async throws -> URL? {
+		let result = await intercept(url)
 
-        switch result {
-        case let .continue(url):
-            return url
+		switch result {
+		case let .continue(url):
+			return url
 
-        case let .transform(url):
-            return url
+		case let .transform(url):
+			return url
 
-        case let .error(error):
-            throw error
+		case let .error(error):
+			throw error
 
-        case .handled:
-            return nil
-        }
-    }
+		case .handled:
+			return nil
+		}
+	}
 }

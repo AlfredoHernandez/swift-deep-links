@@ -1,5 +1,5 @@
 //
-//  Copyright © 2025 Jesús Alfredo Hernández Alarcón. All rights reserved.
+//  Copyright © 2026 Jesús Alfredo Hernández Alarcón. All rights reserved.
 //
 
 import Foundation
@@ -42,17 +42,17 @@ import Foundation
 ///
 /// - AssociatedType Route: The type of route this routing system produces
 public protocol DeepLinkRouting<Route> {
-    /// The type of route this routing system produces.
-    associatedtype Route: DeepLinkRoute
+	/// The type of route this routing system produces.
+	associatedtype Route: DeepLinkRoute
 
-    /// Routes a URL to one or more deep link routes.
-    ///
-    /// This method should analyze the URL and determine which routes should be
-    /// generated. It may use multiple parsers or custom logic to determine
-    /// the appropriate routes.
-    ///
-    /// - Parameter url: The URL to route
-    /// - Returns: An array of routes that correspond to the URL
-    /// - Throws: `DeepLinkError` or other routing-related errors
-    func route(from url: URL) async throws -> [Route]
+	/// Routes a URL to one or more deep link routes.
+	///
+	/// This method should analyze the URL and determine which routes should be
+	/// generated. It may use multiple parsers or custom logic to determine
+	/// the appropriate routes.
+	///
+	/// - Parameter url: The URL to route
+	/// - Returns: An array of routes that correspond to the URL
+	/// - Throws: `DeepLinkError` or other routing-related errors
+	func route(from url: URL) async throws -> [Route]
 }

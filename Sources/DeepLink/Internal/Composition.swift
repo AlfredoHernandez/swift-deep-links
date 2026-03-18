@@ -1,5 +1,5 @@
 //
-//  Copyright © 2025 Jesús Alfredo Hernández Alarcón. All rights reserved.
+//  Copyright © 2026 Jesús Alfredo Hernández Alarcón. All rights reserved.
 //
 
 import Foundation
@@ -35,9 +35,9 @@ import Foundation
 /// - Parameter delegates: The delegates to compose, in execution order
 /// - Returns: A composite delegate that executes all provided delegates
 public func compose(
-    _ delegates: DeepLinkCoordinatorDelegate...,
+	_ delegates: DeepLinkCoordinatorDelegate...,
 ) -> CompositeDeepLinkDelegate {
-    CompositeDeepLinkDelegate(delegates: delegates)
+	CompositeDeepLinkDelegate(delegates: delegates)
 }
 
 /// Composes multiple delegates from an array into a single composite delegate.
@@ -60,9 +60,9 @@ public func compose(
 /// - Parameter delegates: Array of delegates to compose
 /// - Returns: A composite delegate that executes all provided delegates
 public func compose(
-    _ delegates: [DeepLinkCoordinatorDelegate],
+	_ delegates: [DeepLinkCoordinatorDelegate],
 ) -> CompositeDeepLinkDelegate {
-    CompositeDeepLinkDelegate(delegates: delegates)
+	CompositeDeepLinkDelegate(delegates: delegates)
 }
 
 /// Composes multiple middleware into an array for convenient configuration.
@@ -103,9 +103,9 @@ public func compose(
 /// - Parameter middleware: The middleware to compose, in execution order
 /// - Returns: An array of middleware in the specified order
 public func compose(
-    _ middleware: any DeepLinkMiddleware...,
+	_ middleware: any DeepLinkMiddleware...,
 ) -> [any DeepLinkMiddleware] {
-    middleware
+	middleware
 }
 
 /// Composes multiple middleware from an array.
@@ -128,7 +128,7 @@ public func compose(
 /// - Parameter middleware: Array of middleware to compose
 /// - Returns: The same array of middleware
 public func compose(
-    _ middleware: [any DeepLinkMiddleware],
+	_ middleware: [any DeepLinkMiddleware],
 ) -> [any DeepLinkMiddleware] {
-    middleware
+	middleware
 }

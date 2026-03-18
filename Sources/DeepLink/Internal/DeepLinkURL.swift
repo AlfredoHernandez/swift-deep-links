@@ -1,5 +1,5 @@
 //
-//  Copyright © 2025 Jesús Alfredo Hernández Alarcón. All rights reserved.
+//  Copyright © 2026 Jesús Alfredo Hernández Alarcón. All rights reserved.
 //
 
 import Foundation
@@ -33,67 +33,67 @@ import Foundation
 /// The initializer throws `DeepLinkError.invalidURL` if the URL cannot be parsed
 /// or if required components (scheme, host) are missing.
 public struct DeepLinkURL {
-    /// The original URL
-    public let url: URL
+	/// The original URL
+	public let url: URL
 
-    /// The URL scheme (e.g., "myapp" from "myapp://...")
-    public let scheme: String
+	/// The URL scheme (e.g., "myapp" from "myapp://...")
+	public let scheme: String
 
-    /// The URL host (e.g., "profile" from "myapp://profile")
-    public let host: String
+	/// The URL host (e.g., "profile" from "myapp://profile")
+	public let host: String
 
-    /// The URL path component
-    public let path: String
+	/// The URL path component
+	public let path: String
 
-    /// Query parameters as a dictionary of key-value pairs
-    ///
-    /// When multiple values exist for the same key, only the last value is retained.
-    /// For array support, use `allQueryParameters` instead.
-    public let queryParameters: [String: String]
+	/// Query parameters as a dictionary of key-value pairs
+	///
+	/// When multiple values exist for the same key, only the last value is retained.
+	/// For array support, use `allQueryParameters` instead.
+	public let queryParameters: [String: String]
 
-    /// All query parameters including multiple values for the same key
-    ///
-    /// This property supports array parameters in URLs like:
-    /// `myapp://products?tags=electronics&tags=new&tags=sale`
-    ///
-    /// Which would produce:
-    /// ```
-    /// ["tags": ["electronics", "new", "sale"]]
-    /// ```
-    public let allQueryParameters: [String: [String]]
+	/// All query parameters including multiple values for the same key
+	///
+	/// This property supports array parameters in URLs like:
+	/// `myapp://products?tags=electronics&tags=new&tags=sale`
+	///
+	/// Which would produce:
+	/// ```
+	/// ["tags": ["electronics", "new", "sale"]]
+	/// ```
+	public let allQueryParameters: [String: [String]]
 
-    /// Creates a new `DeepLinkURL` from a standard `URL`.
-    ///
-    /// This initializer parses the URL and extracts all relevant components.
-    /// It validates that the URL has both a scheme and host, throwing an error
-    /// if these required components are missing.
-    ///
-    /// - Parameter url: The URL to parse
-    /// - Throws: `DeepLinkError.invalidURL` if the URL is malformed or missing required components
-    public init(url: URL) throws(DeepLinkError) {
-        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false), let scheme = components.scheme, let host = components.host else {
-            throw .invalidURL(url)
-        }
+	/// Creates a new `DeepLinkURL` from a standard `URL`.
+	///
+	/// This initializer parses the URL and extracts all relevant components.
+	/// It validates that the URL has both a scheme and host, throwing an error
+	/// if these required components are missing.
+	///
+	/// - Parameter url: The URL to parse
+	/// - Throws: `DeepLinkError.invalidURL` if the URL is malformed or missing required components
+	public init(url: URL) throws(DeepLinkError) {
+		guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false), let scheme = components.scheme, let host = components.host else {
+			throw .invalidURL(url)
+		}
 
-        self.url = url
-        self.scheme = scheme
-        self.host = host
-        path = components.path
+		self.url = url
+		self.scheme = scheme
+		self.host = host
+		path = components.path
 
-        // Parse query parameters (single values only - last value wins)
-        var singleParams: [String: String] = [:]
-        for item in components.queryItems ?? [] {
-            guard let value = item.value else { continue }
-            singleParams[item.name] = value // Last value wins for duplicates
-        }
-        queryParameters = singleParams
+		// Parse query parameters (single values only - last value wins)
+		var singleParams: [String: String] = [:]
+		for item in components.queryItems ?? [] {
+			guard let value = item.value else { continue }
+			singleParams[item.name] = value // Last value wins for duplicates
+		}
+		queryParameters = singleParams
 
-        // Parse all query parameters (supports arrays)
-        var allParams: [String: [String]] = [:]
-        for item in components.queryItems ?? [] {
-            guard let value = item.value else { continue }
-            allParams[item.name, default: []].append(value)
-        }
-        allQueryParameters = allParams
-    }
+		// Parse all query parameters (supports arrays)
+		var allParams: [String: [String]] = [:]
+		for item in components.queryItems ?? [] {
+			guard let value = item.value else { continue }
+			allParams[item.name, default: []].append(value)
+		}
+		allQueryParameters = allParams
+	}
 }

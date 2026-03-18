@@ -1,5 +1,5 @@
 //
-//  Copyright © 2025 Jesús Alfredo Hernández Alarcón. All rights reserved.
+//  Copyright © 2026 Jesús Alfredo Hernández Alarcón. All rights reserved.
 //
 
 /// A protocol that defines how to handle specific deep link routes.
@@ -38,16 +38,16 @@
 ///
 /// - AssociatedType Route: The type of route this handler can process
 public protocol DeepLinkHandler<Route> {
-    /// The type of route this handler can process.
-    associatedtype Route: DeepLinkRoute
+	/// The type of route this handler can process.
+	associatedtype Route: DeepLinkRoute
 
-    /// Handles a specific deep link route by executing the appropriate action.
-    ///
-    /// This method should contain the business logic for what happens when a
-    /// particular route is triggered. It may involve navigation, data loading,
-    /// or any other application-specific actions.
-    ///
-    /// - Parameter route: The route to handle
-    /// - Throws: Any error that occurs during route handling
-    func handle(_ route: Route) async throws
+	/// Handles a specific deep link route by executing the appropriate action.
+	///
+	/// This method should contain the business logic for what happens when a
+	/// particular route is triggered. It may involve navigation, data loading,
+	/// or any other application-specific actions.
+	///
+	/// - Parameter route: The route to handle
+	/// - Throws: Any error that occurs during route handling
+	func handle(_ route: Route) async throws
 }

@@ -1,5 +1,5 @@
 //
-//  Copyright © 2025 Jesús Alfredo Hernández Alarcón. All rights reserved.
+//  Copyright © 2026 Jesús Alfredo Hernández Alarcón. All rights reserved.
 //
 
 import Foundation
@@ -69,25 +69,25 @@ import Foundation
 /// ## Thread Safety
 /// This middleware is thread-safe and can be used concurrently.
 public final class URLTransformationMiddleware: DeepLinkMiddleware {
-    private let transformer: URLTransformer
-    private let strategy: URLTransformationStrategy
+	private let transformer: URLTransformer
+	private let strategy: URLTransformationStrategy
 
-    /// Creates a new URL transformation middleware.
-    ///
-    /// - Parameters:
-    ///   - transformer: The URL transformer to use
-    ///   - strategy: The transformation strategy to use (defaults to .standard)
-    public init(
-        transformer: URLTransformer,
-        strategy: URLTransformationStrategy = .standard,
-    ) {
-        self.transformer = transformer
-        self.strategy = strategy
-    }
+	/// Creates a new URL transformation middleware.
+	///
+	/// - Parameters:
+	///   - transformer: The URL transformer to use
+	///   - strategy: The transformation strategy to use (defaults to .standard)
+	public init(
+		transformer: URLTransformer,
+		strategy: URLTransformationStrategy = .standard,
+	) {
+		self.transformer = transformer
+		self.strategy = strategy
+	}
 
-    public func intercept(_ url: URL) async throws -> URL? {
-        try await strategy.transform(url: url, transformer: transformer)
-    }
+	public func intercept(_ url: URL) async throws -> URL? {
+		try await strategy.transform(url: url, transformer: transformer)
+	}
 }
 
 //
@@ -165,124 +165,124 @@ import Foundation
 /// | `.validation` | Throws errors | ❌ | ✅ | Validated transformation |
 /// | `.batch` | Throws errors | ❌ | ❌ | Sequential transformation |
 public struct URLTransformationStrategy: Sendable {
-    private let transformFunction: @Sendable (URL, URLTransformer) async throws -> URL?
+	private let transformFunction: @Sendable (URL, URLTransformer) async throws -> URL?
 
-    init(_ transformFunction: @escaping @Sendable (URL, URLTransformer) async throws -> URL?) {
-        self.transformFunction = transformFunction
-    }
+	init(_ transformFunction: @escaping @Sendable (URL, URLTransformer) async throws -> URL?) {
+		self.transformFunction = transformFunction
+	}
 
-    /// Executes the URL transformation strategy.
-    func transform(url: URL, transformer: URLTransformer) async throws -> URL? {
-        try await transformFunction(url, transformer)
-    }
+	/// Executes the URL transformation strategy.
+	func transform(url: URL, transformer: URLTransformer) async throws -> URL? {
+		try await transformFunction(url, transformer)
+	}
 }
 
 // MARK: - URL Transformation Strategy Implementations
 
 public extension URLTransformationStrategy {
-    /// Standard transformation strategy that applies the transformer directly.
-    /// This is the default transformation approach.
-    static let standard = URLTransformationStrategy { url, transformer in
-        try await transformer.transform(url)
-    }
+	/// Standard transformation strategy that applies the transformer directly.
+	/// This is the default transformation approach.
+	static let standard = URLTransformationStrategy { url, transformer in
+		try await transformer.transform(url)
+	}
 
-    /// Conditional transformation strategy that only transforms URLs matching certain criteria.
-    /// Only transforms URLs with specific schemes or hosts.
-    static let conditional = URLTransformationStrategy { url, transformer in
-        // Only transform URLs with specific schemes
-        guard let scheme = url.scheme, ["https", "http"].contains(scheme) else {
-            return url // Return original URL without transformation
-        }
+	/// Conditional transformation strategy that only transforms URLs matching certain criteria.
+	/// Only transforms URLs with specific schemes or hosts.
+	static let conditional = URLTransformationStrategy { url, transformer in
+		// Only transform URLs with specific schemes
+		guard let scheme = url.scheme, ["https", "http"].contains(scheme) else {
+			return url // Return original URL without transformation
+		}
 
-        // Only transform URLs with specific hosts (if any)
-        if let host = url.host, !host.isEmpty {
-            return try await transformer.transform(url)
-        }
+		// Only transform URLs with specific hosts (if any)
+		if let host = url.host, !host.isEmpty {
+			return try await transformer.transform(url)
+		}
 
-        return url
-    }
+		return url
+	}
 
-    /// Safe transformation strategy that catches and handles transformation errors.
-    /// Returns the original URL if transformation fails.
-    static let safe = URLTransformationStrategy { url, transformer in
-        do {
-            return try await transformer.transform(url)
-        } catch {
-            // Log the error but return the original URL
-            // This ensures the deep link processing continues even if transformation fails
-            return url
-        }
-    }
+	/// Safe transformation strategy that catches and handles transformation errors.
+	/// Returns the original URL if transformation fails.
+	static let safe = URLTransformationStrategy { url, transformer in
+		do {
+			return try await transformer.transform(url)
+		} catch {
+			// Log the error but return the original URL
+			// This ensures the deep link processing continues even if transformation fails
+			return url
+		}
+	}
 
-    /// Aggressive transformation strategy that applies multiple transformation passes.
-    /// Applies the transformer multiple times until no more changes occur.
-    static let aggressive = URLTransformationStrategy { url, transformer in
-        var currentURL = url
-        var previousURL: URL?
-        var iterations = 0
-        let maxIterations = 5 // Prevent infinite loops
+	/// Aggressive transformation strategy that applies multiple transformation passes.
+	/// Applies the transformer multiple times until no more changes occur.
+	static let aggressive = URLTransformationStrategy { url, transformer in
+		var currentURL = url
+		var previousURL: URL?
+		var iterations = 0
+		let maxIterations = 5 // Prevent infinite loops
 
-        while currentURL != previousURL, iterations < maxIterations {
-            previousURL = currentURL
-            currentURL = try await transformer.transform(currentURL)
-            iterations += 1
-        }
+		while currentURL != previousURL, iterations < maxIterations {
+			previousURL = currentURL
+			currentURL = try await transformer.transform(currentURL)
+			iterations += 1
+		}
 
-        return currentURL
-    }
+		return currentURL
+	}
 
-    /// Selective transformation strategy that only transforms specific URL components.
-    /// Only transforms URLs that need normalization (e.g., have double slashes, empty params).
-    static let selective = URLTransformationStrategy { url, transformer in
-        let urlString = url.absoluteString
+	/// Selective transformation strategy that only transforms specific URL components.
+	/// Only transforms URLs that need normalization (e.g., have double slashes, empty params).
+	static let selective = URLTransformationStrategy { url, transformer in
+		let urlString = url.absoluteString
 
-        // Check if URL needs transformation
-        let needsTransformation = urlString.contains("//") ||
-            urlString.contains("?&") ||
-            urlString.contains("&&") ||
-            urlString.hasSuffix("?") ||
-            urlString.hasSuffix("&")
+		// Check if URL needs transformation
+		let needsTransformation = urlString.contains("//") ||
+			urlString.contains("?&") ||
+			urlString.contains("&&") ||
+			urlString.hasSuffix("?") ||
+			urlString.hasSuffix("&")
 
-        if needsTransformation {
-            return try await transformer.transform(url)
-        }
+		if needsTransformation {
+			return try await transformer.transform(url)
+		}
 
-        return url
-    }
+		return url
+	}
 
-    /// Passthrough transformation strategy that never transforms URLs.
-    /// Always returns the original URL without any transformation.
-    static let passthrough = URLTransformationStrategy { url, _ in
-        url
-    }
+	/// Passthrough transformation strategy that never transforms URLs.
+	/// Always returns the original URL without any transformation.
+	static let passthrough = URLTransformationStrategy { url, _ in
+		url
+	}
 
-    /// Validation transformation strategy that validates URLs before transformation.
-    /// Only transforms valid URLs and throws errors for invalid ones.
-    static let validation = URLTransformationStrategy { url, transformer in
-        // Validate URL structure before transformation
-        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-              let scheme = components.scheme, !scheme.isEmpty,
-              let host = components.host, !host.isEmpty
-        else {
-            throw DeepLinkError.invalidURL(url)
-        }
+	/// Validation transformation strategy that validates URLs before transformation.
+	/// Only transforms valid URLs and throws errors for invalid ones.
+	static let validation = URLTransformationStrategy { url, transformer in
+		// Validate URL structure before transformation
+		guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+		      let scheme = components.scheme, !scheme.isEmpty,
+		      let host = components.host, !host.isEmpty
+		else {
+			throw DeepLinkError.invalidURL(url)
+		}
 
-        return try await transformer.transform(url)
-    }
+		return try await transformer.transform(url)
+	}
 
-    /// Batch transformation strategy that applies multiple transformers in sequence.
-    /// Note: This strategy requires a composite transformer that applies multiple transformations.
-    static let batch = URLTransformationStrategy { url, transformer in
-        // For batch transformation, we apply the transformer multiple times
-        // This simulates having multiple transformers applied in sequence
-        var result = url
+	/// Batch transformation strategy that applies multiple transformers in sequence.
+	/// Note: This strategy requires a composite transformer that applies multiple transformations.
+	static let batch = URLTransformationStrategy { url, transformer in
+		// For batch transformation, we apply the transformer multiple times
+		// This simulates having multiple transformers applied in sequence
+		var result = url
 
-        // Apply transformation twice to simulate batch processing
-        result = try await transformer.transform(result)
-        result = try await transformer.transform(result)
+		// Apply transformation twice to simulate batch processing
+		result = try await transformer.transform(result)
+		result = try await transformer.transform(result)
 
-        return result
-    }
+		return result
+	}
 }
 
 //
@@ -293,31 +293,31 @@ import Foundation
 
 /// Protocol for URL transformers
 public protocol URLTransformer: Sendable {
-    func transform(_ url: URL) async throws -> URL
+	func transform(_ url: URL) async throws -> URL
 }
 
 /// Default URL transformer that normalizes URLs
 public final class URLNormalizationTransformer: URLTransformer {
-    public init() {}
+	public init() {}
 
-    public func transform(_ url: URL) async throws -> URL {
-        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
-            throw DeepLinkError.invalidURL(url)
-        }
+	public func transform(_ url: URL) async throws -> URL {
+		guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+			throw DeepLinkError.invalidURL(url)
+		}
 
-        // Normalize path
-        components.path = components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        if !components.path.isEmpty, !components.path.hasPrefix("/") {
-            components.path = "/" + components.path
-        }
+		// Normalize path
+		components.path = components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+		if !components.path.isEmpty, !components.path.hasPrefix("/") {
+			components.path = "/" + components.path
+		}
 
-        // Remove empty query parameters
-        components.queryItems = components.queryItems?.filter { $0.value != nil && !$0.value!.isEmpty }
+		// Remove empty query parameters
+		components.queryItems = components.queryItems?.filter { $0.value != nil && !$0.value!.isEmpty }
 
-        guard let normalizedURL = components.url else {
-            throw DeepLinkError.invalidURL(url)
-        }
+		guard let normalizedURL = components.url else {
+			throw DeepLinkError.invalidURL(url)
+		}
 
-        return normalizedURL
-    }
+		return normalizedURL
+	}
 }

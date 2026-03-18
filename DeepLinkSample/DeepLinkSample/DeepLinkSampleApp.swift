@@ -1,5 +1,5 @@
 //
-//  Copyright © 2025 Jesús Alfredo Hernández Alarcón. All rights reserved.
+//  Copyright © 2026 Jesús Alfredo Hernández Alarcón. All rights reserved.
 //
 
 import SwiftUI
@@ -27,22 +27,22 @@ import SwiftUI
 /// - **Providers**: Sample providers for authentication and analytics
 @main
 struct DeepLinkSampleApp: App {
-    // MARK: - Properties
+	// MARK: - Properties
 
-    /// The main ViewModel that manages app state and deep link processing
-    @State private var viewModel = DeepLinkViewModel()
+	/// The main ViewModel that manages app state and deep link processing
+	@State private var viewModel = DeepLinkViewModel()
 
-    // MARK: - Body
+	// MARK: - Body
 
-    var body: some Scene {
-        WindowGroup {
-            MainView()
-                .environmentObject(viewModel.navigationRouter)
-                .onOpenURL { url in
-                    Task {
-                        await viewModel.processDeepLink(url: url)
-                    }
-                }
-        }
-    }
+	var body: some Scene {
+		WindowGroup {
+			MainView()
+				.environmentObject(viewModel.navigationRouter)
+				.onOpenURL { url in
+					Task {
+						await viewModel.processDeepLink(url: url)
+					}
+				}
+		}
+	}
 }

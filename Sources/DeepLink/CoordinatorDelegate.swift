@@ -1,5 +1,5 @@
 //
-//  Copyright © 2025 Jesús Alfredo Hernández Alarcón. All rights reserved.
+//  Copyright © 2026 Jesús Alfredo Hernández Alarcón. All rights reserved.
 //
 
 import Foundation
@@ -9,38 +9,38 @@ import Foundation
 /// This protocol allows delegates to work with any deep link result type
 /// without being tied to a specific route type.
 public protocol DeepLinkResultProtocol: Sendable {
-    /// The original URL that was processed
-    var originalURL: URL { get }
+	/// The original URL that was processed
+	var originalURL: URL { get }
 
-    /// The URL after middleware processing, or nil if stopped
-    var processedURL: URL? { get }
+	/// The URL after middleware processing, or nil if stopped
+	var processedURL: URL? { get }
 
-    /// The total execution time in seconds
-    var executionTime: TimeInterval { get }
+	/// The total execution time in seconds
+	var executionTime: TimeInterval { get }
 
-    /// A list of all errors encountered during processing
-    var errors: [Error] { get }
+	/// A list of all errors encountered during processing
+	var errors: [Error] { get }
 
-    /// The number of routes that were successfully handled
-    var successfulRoutes: Int { get }
+	/// The number of routes that were successfully handled
+	var successfulRoutes: Int { get }
 
-    /// The number of routes that failed to be handled
-    var failedRoutes: Int { get }
+	/// The number of routes that failed to be handled
+	var failedRoutes: Int { get }
 
-    /// True if the deep link was processed without any errors
-    var wasSuccessful: Bool { get }
+	/// True if the deep link was processed without any errors
+	var wasSuccessful: Bool { get }
 
-    /// True if the deep link processing was stopped by middleware
-    var wasStoppedByMiddleware: Bool { get }
+	/// True if the deep link processing was stopped by middleware
+	var wasStoppedByMiddleware: Bool { get }
 
-    /// True if any routes were found during processing
-    var hasRoutes: Bool { get }
+	/// True if any routes were found during processing
+	var hasRoutes: Bool { get }
 
-    /// True if any errors were encountered during processing
-    var hasErrors: Bool { get }
+	/// True if any errors were encountered during processing
+	var hasErrors: Bool { get }
 
-    /// A concise summary of the deep link processing result
-    var summary: String { get }
+	/// A concise summary of the deep link processing result
+	var summary: String { get }
 }
 
 /// A protocol that allows objects to observe and respond to deep link coordinator events.
@@ -83,95 +83,95 @@ public protocol DeepLinkResultProtocol: Sendable {
 /// All delegate methods are called on the main thread to ensure thread safety
 /// and proper UI updates if needed.
 public protocol DeepLinkCoordinatorDelegate: AnyObject {
-    /// Called before the coordinator begins processing a deep link URL.
-    ///
-    /// This method is called immediately before the coordinator starts processing
-    /// the URL through middleware, routing, and handling. Use this to:
-    /// - Track deep link attempts
-    /// - Log incoming URLs
-    /// - Perform pre-processing validation
-    /// - Update UI state (e.g., show loading indicator)
-    ///
-    /// - Parameters:
-    ///   - coordinator: The coordinator that will process the URL
-    ///   - url: The deep link URL that will be processed
-    func coordinator(
-        _ coordinator: AnyObject,
-        willProcess url: URL,
-    )
+	/// Called before the coordinator begins processing a deep link URL.
+	///
+	/// This method is called immediately before the coordinator starts processing
+	/// the URL through middleware, routing, and handling. Use this to:
+	/// - Track deep link attempts
+	/// - Log incoming URLs
+	/// - Perform pre-processing validation
+	/// - Update UI state (e.g., show loading indicator)
+	///
+	/// - Parameters:
+	///   - coordinator: The coordinator that will process the URL
+	///   - url: The deep link URL that will be processed
+	func coordinator(
+		_ coordinator: AnyObject,
+		willProcess url: URL,
+	)
 
-    /// Called after the coordinator successfully processes a deep link URL.
-    ///
-    /// This method is called after the coordinator has completed processing
-    /// the URL, regardless of whether the processing was successful or not.
-    /// Use this to:
-    /// - Track processing results
-    /// - Log success/failure metrics
-    /// - Update analytics
-    /// - Perform post-processing actions
-    ///
-    /// - Parameters:
-    ///   - coordinator: The coordinator that processed the URL
-    ///   - url: The deep link URL that was processed
-    ///   - result: The result of the processing operation
-    func coordinator(
-        _ coordinator: AnyObject,
-        didProcess url: URL,
-        result: DeepLinkResultProtocol,
-    )
+	/// Called after the coordinator successfully processes a deep link URL.
+	///
+	/// This method is called after the coordinator has completed processing
+	/// the URL, regardless of whether the processing was successful or not.
+	/// Use this to:
+	/// - Track processing results
+	/// - Log success/failure metrics
+	/// - Update analytics
+	/// - Perform post-processing actions
+	///
+	/// - Parameters:
+	///   - coordinator: The coordinator that processed the URL
+	///   - url: The deep link URL that was processed
+	///   - result: The result of the processing operation
+	func coordinator(
+		_ coordinator: AnyObject,
+		didProcess url: URL,
+		result: DeepLinkResultProtocol,
+	)
 
-    /// Called when the coordinator fails to process a deep link URL.
-    ///
-    /// This method is called when an error occurs during processing that
-    /// prevents the coordinator from completing the operation. Use this to:
-    /// - Handle critical errors
-    /// - Show error notifications to users
-    /// - Log error details
-    /// - Implement retry logic
-    ///
-    /// - Parameters:
-    ///   - coordinator: The coordinator that failed to process the URL
-    ///   - url: The deep link URL that failed to process
-    ///   - error: The error that caused the processing to fail
-    func coordinator(
-        _ coordinator: AnyObject,
-        didFailProcessing url: URL,
-        error: Error,
-    )
+	/// Called when the coordinator fails to process a deep link URL.
+	///
+	/// This method is called when an error occurs during processing that
+	/// prevents the coordinator from completing the operation. Use this to:
+	/// - Handle critical errors
+	/// - Show error notifications to users
+	/// - Log error details
+	/// - Implement retry logic
+	///
+	/// - Parameters:
+	///   - coordinator: The coordinator that failed to process the URL
+	///   - url: The deep link URL that failed to process
+	///   - error: The error that caused the processing to fail
+	func coordinator(
+		_ coordinator: AnyObject,
+		didFailProcessing url: URL,
+		error: Error,
+	)
 }
 
 // MARK: - Default Implementations
 
 public extension DeepLinkCoordinatorDelegate {
-    /// Default implementation that does nothing.
-    ///
-    /// This allows implementers to only override the methods they need.
-    func coordinator(
-        _: AnyObject,
-        willProcess _: URL,
-    ) {
-        // Default: do nothing
-    }
+	/// Default implementation that does nothing.
+	///
+	/// This allows implementers to only override the methods they need.
+	func coordinator(
+		_: AnyObject,
+		willProcess _: URL,
+	) {
+		// Default: do nothing
+	}
 
-    /// Default implementation that does nothing.
-    ///
-    /// This allows implementers to only override the methods they need.
-    func coordinator(
-        _: AnyObject,
-        didProcess _: URL,
-        result _: DeepLinkResultProtocol,
-    ) {
-        // Default: do nothing
-    }
+	/// Default implementation that does nothing.
+	///
+	/// This allows implementers to only override the methods they need.
+	func coordinator(
+		_: AnyObject,
+		didProcess _: URL,
+		result _: DeepLinkResultProtocol,
+	) {
+		// Default: do nothing
+	}
 
-    /// Default implementation that does nothing.
-    ///
-    /// This allows implementers to only override the methods they need.
-    func coordinator(
-        _: AnyObject,
-        didFailProcessing _: URL,
-        error _: Error,
-    ) {
-        // Default: do nothing
-    }
+	/// Default implementation that does nothing.
+	///
+	/// This allows implementers to only override the methods they need.
+	func coordinator(
+		_: AnyObject,
+		didFailProcessing _: URL,
+		error _: Error,
+	) {
+		// Default: do nothing
+	}
 }

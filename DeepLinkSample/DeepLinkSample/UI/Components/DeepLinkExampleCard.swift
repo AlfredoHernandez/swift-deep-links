@@ -1,5 +1,5 @@
 //
-//  Copyright © 2025 Jesús Alfredo Hernández Alarcón. All rights reserved.
+//  Copyright © 2026 Jesús Alfredo Hernández Alarcón. All rights reserved.
 //
 
 import SwiftUI
@@ -21,97 +21,97 @@ import SwiftUI
 ///   - url: The complete deep link URL to display and copy
 ///   - color: The accent color for the indicator dot and copy button
 struct DeepLinkExampleCard: View {
-    let title: String
-    let url: String
-    let color: Color
+	let title: String
+	let url: String
+	let color: Color
 
-    @State private var showingCopiedAlert = false
+	@State private var showingCopiedAlert = false
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Circle()
-                    .fill(color)
-                    .frame(width: 8, height: 8)
+	var body: some View {
+		VStack(alignment: .leading, spacing: 8) {
+			HStack {
+				Circle()
+					.fill(color)
+					.frame(width: 8, height: 8)
 
-                Text(title)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
+				Text(title)
+					.font(.subheadline)
+					.fontWeight(.medium)
 
-                Spacer()
+				Spacer()
 
-                // Copy deep link URL to clipboard for testing
-                Button(action: copyToClipboard) {
-                    HStack(spacing: 4) {
-                        Image(systemName: showingCopiedAlert ? "checkmark.circle.fill" : "doc.on.doc")
-                            .font(.caption)
-                        Text(showingCopiedAlert ? "Copiado" : "Copiar")
-                            .font(.caption2)
-                    }
-                    .foregroundColor(showingCopiedAlert ? .green : color)
-                }
-                .buttonStyle(.plain)
-            }
+				// Copy deep link URL to clipboard for testing
+				Button(action: copyToClipboard) {
+					HStack(spacing: 4) {
+						Image(systemName: showingCopiedAlert ? "checkmark.circle.fill" : "doc.on.doc")
+							.font(.caption)
+						Text(showingCopiedAlert ? "Copiado" : "Copiar")
+							.font(.caption2)
+					}
+					.foregroundColor(showingCopiedAlert ? .green : color)
+				}
+				.buttonStyle(.plain)
+			}
 
-            // Deep link URL format for external testing
-            Text(url)
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .padding(.leading, 16)
-        }
-        .padding()
-        .background(Color.gray.opacity(0.05))
-        .cornerRadius(8)
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(color.opacity(0.3), lineWidth: 1),
-        )
-        .alert("Copied", isPresented: $showingCopiedAlert) {
-            Button("OK") {}
-        } message: {
-            Text("The deep link has been copied to the clipboard")
-        }
-    }
+			// Deep link URL format for external testing
+			Text(url)
+				.font(.caption)
+				.foregroundColor(.secondary)
+				.padding(.leading, 16)
+		}
+		.padding()
+		.background(Color.gray.opacity(0.05))
+		.cornerRadius(8)
+		.overlay(
+			RoundedRectangle(cornerRadius: 8)
+				.stroke(color.opacity(0.3), lineWidth: 1),
+		)
+		.alert("Copied", isPresented: $showingCopiedAlert) {
+			Button("OK") {}
+		} message: {
+			Text("The deep link has been copied to the clipboard")
+		}
+	}
 
-    /// Copies the deep link URL to the system clipboard for external testing.
-    ///
-    /// This method enables developers to test deep links in external apps (Safari, Notes, etc.)
-    /// by copying the URL format to the clipboard with visual feedback.
-    private func copyToClipboard() {
-        UIPasteboard.general.string = url
+	/// Copies the deep link URL to the system clipboard for external testing.
+	///
+	/// This method enables developers to test deep links in external apps (Safari, Notes, etc.)
+	/// by copying the URL format to the clipboard with visual feedback.
+	private func copyToClipboard() {
+		UIPasteboard.general.string = url
 
-        withAnimation(.easeInOut(duration: 0.2)) {
-            showingCopiedAlert = true
-        }
+		withAnimation(.easeInOut(duration: 0.2)) {
+			showingCopiedAlert = true
+		}
 
-        // Reset the alert after 2 seconds
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            withAnimation(.easeInOut(duration: 0.2)) {
-                showingCopiedAlert = false
-            }
-        }
-    }
+		// Reset the alert after 2 seconds
+		DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+			withAnimation(.easeInOut(duration: 0.2)) {
+				showingCopiedAlert = false
+			}
+		}
+	}
 }
 
 #Preview {
-    VStack(spacing: 12) {
-        DeepLinkExampleCard(
-            title: "Information",
-            url: "deeplink://info?title=News&brief=News description",
-            color: .blue,
-        )
+	VStack(spacing: 12) {
+		DeepLinkExampleCard(
+			title: "Information",
+			url: "deeplink://info?title=News&brief=News description",
+			color: .blue,
+		)
 
-        DeepLinkExampleCard(
-            title: "Profile",
-            url: "deeplink://profile?userId=123&name=John Doe",
-            color: .green,
-        )
+		DeepLinkExampleCard(
+			title: "Profile",
+			url: "deeplink://profile?userId=123&name=John Doe",
+			color: .green,
+		)
 
-        DeepLinkExampleCard(
-            title: "Product",
-            url: "deeplink://product?productId=PROD-001&category=Electronics",
-            color: .orange,
-        )
-    }
-    .padding()
+		DeepLinkExampleCard(
+			title: "Product",
+			url: "deeplink://product?productId=PROD-001&category=Electronics",
+			color: .orange,
+		)
+	}
+	.padding()
 }

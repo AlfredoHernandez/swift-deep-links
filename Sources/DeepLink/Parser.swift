@@ -1,5 +1,5 @@
 //
-//  Copyright © 2025 Jesús Alfredo Hernández Alarcón. All rights reserved.
+//  Copyright © 2026 Jesús Alfredo Hernández Alarcón. All rights reserved.
 //
 
 import Foundation
@@ -45,17 +45,17 @@ import Foundation
 ///
 /// - AssociatedType Route: The type of route this parser can produce
 public protocol DeepLinkParser<Route> {
-    /// The type of route this parser can produce.
-    associatedtype Route: DeepLinkRoute
+	/// The type of route this parser can produce.
+	associatedtype Route: DeepLinkRoute
 
-    /// Parses a URL into one or more deep link routes.
-    ///
-    /// This method should analyze the URL structure and extract the necessary
-    /// information to create appropriate route objects. It should throw appropriate
-    /// errors for invalid or unsupported URLs.
-    ///
-    /// - Parameter url: The URL to parse
-    /// - Returns: An array of routes that correspond to the URL
-    /// - Throws: `DeepLinkError` or other parsing-related errors
-    func parse(from url: URL) throws -> [Route]
+	/// Parses a URL into one or more deep link routes.
+	///
+	/// This method should analyze the URL structure and extract the necessary
+	/// information to create appropriate route objects. It should throw appropriate
+	/// errors for invalid or unsupported URLs.
+	///
+	/// - Parameter url: The URL to parse
+	/// - Returns: An array of routes that correspond to the URL
+	/// - Throws: `DeepLinkError` or other parsing-related errors
+	func parse(from url: URL) throws -> [Route]
 }

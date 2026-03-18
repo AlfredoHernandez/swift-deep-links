@@ -1,5 +1,5 @@
 //
-//  Copyright © 2025 Jesús Alfredo Hernández Alarcón. All rights reserved.
+//  Copyright © 2026 Jesús Alfredo Hernández Alarcón. All rights reserved.
 //
 
 import Foundation
@@ -23,71 +23,71 @@ import OSLog
 /// - **Error**: Processing failures and errors
 /// - **Debug**: Detailed processing information (when debug logging is enabled)
 public final class DeepLinkLoggingDelegate: DeepLinkCoordinatorDelegate, @unchecked Sendable {
-    private let logger = Logger(subsystem: "swift-deep-link", category: "DeepLinkLoggingDelegate")
-    private let enableDebugLogging: Bool
+	private let logger = Logger(subsystem: "swift-deep-link", category: "DeepLinkLoggingDelegate")
+	private let enableDebugLogging: Bool
 
-    /// Creates a new logging delegate.
-    ///
-    /// - Parameter enableDebugLogging: Whether to enable detailed debug logging (default: false)
-    public init(enableDebugLogging: Bool = false) {
-        self.enableDebugLogging = enableDebugLogging
-    }
+	/// Creates a new logging delegate.
+	///
+	/// - Parameter enableDebugLogging: Whether to enable detailed debug logging (default: false)
+	public init(enableDebugLogging: Bool = false) {
+		self.enableDebugLogging = enableDebugLogging
+	}
 
-    public func coordinator(
-        _: AnyObject,
-        willProcess url: URL,
-    ) {
-        logger.info("Starting deep link processing: \(url.absoluteString)")
+	public func coordinator(
+		_: AnyObject,
+		willProcess url: URL,
+	) {
+		logger.info("Starting deep link processing: \(url.absoluteString)")
 
-        if enableDebugLogging {
-            logger.debug("Deep link details - Scheme: \(url.scheme ?? "nil"), Host: \(url.host() ?? "nil"), Path: \(url.path), Query: \(url.query ?? "nil")")
-        }
-    }
+		if enableDebugLogging {
+			logger.debug("Deep link details - Scheme: \(url.scheme ?? "nil"), Host: \(url.host() ?? "nil"), Path: \(url.path), Query: \(url.query ?? "nil")")
+		}
+	}
 
-    public func coordinator(
-        _: AnyObject,
-        didProcess url: URL,
-        result: DeepLinkResultProtocol,
-    ) {
-        if result.wasSuccessful {
-            logger.info("Deep link processed successfully: \(url.absoluteString)")
+	public func coordinator(
+		_: AnyObject,
+		didProcess url: URL,
+		result: DeepLinkResultProtocol,
+	) {
+		if result.wasSuccessful {
+			logger.info("Deep link processed successfully: \(url.absoluteString)")
 
-            if enableDebugLogging {
-                logger.debug("Processing details - Execution time: \(String(format: "%.3f", result.executionTime))s")
-            }
-        } else {
-            logger.error("Deep link processing failed: \(url.absoluteString)")
+			if enableDebugLogging {
+				logger.debug("Processing details - Execution time: \(String(format: "%.3f", result.executionTime))s")
+			}
+		} else {
+			logger.error("Deep link processing failed: \(url.absoluteString)")
 
-            if !result.errors.isEmpty {
-                for (index, error) in result.errors.enumerated() {
-                    logger.error("Error \(index + 1): \(error.localizedDescription)")
-                }
-            }
+			if !result.errors.isEmpty {
+				for (index, error) in result.errors.enumerated() {
+					logger.error("Error \(index + 1): \(error.localizedDescription)")
+				}
+			}
 
-            if enableDebugLogging {
-                logger
-                    .debug(
-                        "Failure details - Successful: \(result.successfulRoutes), Failed: \(result.failedRoutes), Execution time: \(String(format: "%.3f", result.executionTime))s",
-                    )
-            }
-        }
+			if enableDebugLogging {
+				logger
+					.debug(
+						"Failure details - Successful: \(result.successfulRoutes), Failed: \(result.failedRoutes), Execution time: \(String(format: "%.3f", result.executionTime))s",
+					)
+			}
+		}
 
-        if result.wasStoppedByMiddleware {
-            logger.info("Deep link processing stopped by middleware: \(url.absoluteString)")
-        }
-    }
+		if result.wasStoppedByMiddleware {
+			logger.info("Deep link processing stopped by middleware: \(url.absoluteString)")
+		}
+	}
 
-    public func coordinator(
-        _: AnyObject,
-        didFailProcessing url: URL,
-        error: Error,
-    ) {
-        logger.error("Deep link processing failed with critical error: \(url.absoluteString)")
-        logger.error("Critical error: \(error.localizedDescription)")
+	public func coordinator(
+		_: AnyObject,
+		didFailProcessing url: URL,
+		error: Error,
+	) {
+		logger.error("Deep link processing failed with critical error: \(url.absoluteString)")
+		logger.error("Critical error: \(error.localizedDescription)")
 
-        if enableDebugLogging {
-            let nsError = error as NSError
-            logger.debug("Error details - Domain: \(nsError.domain), Code: \(nsError.code), UserInfo: \(nsError.userInfo)")
-        }
-    }
+		if enableDebugLogging {
+			let nsError = error as NSError
+			logger.debug("Error details - Domain: \(nsError.domain), Code: \(nsError.code), UserInfo: \(nsError.userInfo)")
+		}
+	}
 }

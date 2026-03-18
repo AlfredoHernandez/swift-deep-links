@@ -1,5 +1,5 @@
 //
-//  Copyright © 2025 Jesús Alfredo Hernández Alarcón. All rights reserved.
+//  Copyright © 2026 Jesús Alfredo Hernández Alarcón. All rights reserved.
 //
 
 /// A protocol that defines how to parse query parameters into strongly-typed objects.
@@ -40,15 +40,15 @@
 /// }
 /// ```
 public protocol QueryParameterParser {
-    /// Parses query parameters into a strongly-typed object.
-    ///
-    /// This method should convert the string-based query parameter dictionary
-    /// into a strongly-typed object of the specified type.
-    ///
-    /// - Parameters:
-    ///   - type: The type to parse the parameters into
-    ///   - parameters: The query parameters as a dictionary of strings
-    /// - Returns: An instance of the specified type with the parsed parameters
-    /// - Throws: Parsing errors if the conversion fails
-    func parse<T: Decodable>(_ type: T.Type, from parameters: [String: String]) throws -> T
+	/// Parses query parameters into a strongly-typed object.
+	///
+	/// This method should convert the string-based query parameter dictionary
+	/// into a strongly-typed object of the specified type.
+	///
+	/// - Parameters:
+	///   - type: The type to parse the parameters into
+	///   - parameters: The query parameters as a dictionary of strings
+	/// - Returns: An instance of the specified type with the parsed parameters
+	/// - Throws: Parsing errors if the conversion fails
+	func parse<T: Decodable>(_ type: T.Type, from parameters: [String: String]) throws -> T
 }

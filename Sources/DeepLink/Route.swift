@@ -1,5 +1,5 @@
 //
-//  Copyright © 2025 Jesús Alfredo Hernández Alarcón. All rights reserved.
+//  Copyright © 2026 Jesús Alfredo Hernández Alarcón. All rights reserved.
 //
 
 /// A protocol that defines a deep link route within the application.
@@ -38,9 +38,9 @@
 /// - Ensure identifiers are unique across all possible route combinations
 /// - Consider including parameter values in the identifier for better debugging
 public protocol DeepLinkRoute: Sendable {
-    /// A unique identifier for this route.
-    ///
-    /// This identifier should be unique across all possible route combinations
-    /// and should include relevant parameters to aid in debugging and logging.
-    var id: String { get }
+	/// A unique identifier for this route.
+	///
+	/// This identifier should be unique across all possible route combinations
+	/// and should include relevant parameters to aid in debugging and logging.
+	var id: String { get }
 }

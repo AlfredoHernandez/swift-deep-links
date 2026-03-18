@@ -1,5 +1,5 @@
 //
-//  Copyright © 2025 Jesús Alfredo Hernández Alarcón. All rights reserved.
+//  Copyright © 2026 Jesús Alfredo Hernández Alarcón. All rights reserved.
 //
 
 import Foundation
@@ -34,54 +34,54 @@ import OSLog
 ///
 /// - Parameter Route: The type of route this routing system produces
 public final class DefaultDeepLinkRouting<Route: DeepLinkRoute>: DeepLinkRouting {
-    private let logger = Logger(subsystem: "swift-deep-link", category: "DefaultDeepLinkRouting")
-    private let parsers: [any DeepLinkParser<Route>]
+	private let logger = Logger(subsystem: "swift-deep-link", category: "DefaultDeepLinkRouting")
+	private let parsers: [any DeepLinkParser<Route>]
 
-    /// Creates a new default deep link routing instance.
-    ///
-    /// - Parameter parsers: An array of parsers to try in sequence
-    public init(parsers: [any DeepLinkParser<Route>]) {
-        self.parsers = parsers
-    }
+	/// Creates a new default deep link routing instance.
+	///
+	/// - Parameter parsers: An array of parsers to try in sequence
+	public init(parsers: [any DeepLinkParser<Route>]) {
+		self.parsers = parsers
+	}
 
-    /// Routes a URL by trying multiple parsers until one succeeds.
-    ///
-    /// This method attempts to parse the URL using each provided parser in sequence.
-    /// It returns the first successful result and throws an error if no parser
-    /// can handle the URL.
-    ///
-    /// - Parameter url: The URL to route
-    /// - Returns: An array of routes from the first successful parser
-    /// - Throws: `DeepLinkError.routeNotFound` if no parser can handle the URL
-    public func route(from url: URL) async throws -> [Route] {
-        let deepLinkURL = try DeepLinkURL(url: url)
+	/// Routes a URL by trying multiple parsers until one succeeds.
+	///
+	/// This method attempts to parse the URL using each provided parser in sequence.
+	/// It returns the first successful result and throws an error if no parser
+	/// can handle the URL.
+	///
+	/// - Parameter url: The URL to route
+	/// - Returns: An array of routes from the first successful parser
+	/// - Throws: `DeepLinkError.routeNotFound` if no parser can handle the URL
+	public func route(from url: URL) async throws -> [Route] {
+		let deepLinkURL = try DeepLinkURL(url: url)
 
-        guard !parsers.isEmpty else {
-            logger.error("No parsers available for URL: \(url.absoluteString)")
-            throw DeepLinkError.routeNotFound(deepLinkURL.host)
-        }
+		guard !parsers.isEmpty else {
+			logger.error("No parsers available for URL: \(url.absoluteString)")
+			throw DeepLinkError.routeNotFound(deepLinkURL.host)
+		}
 
-        var lastError: Error?
+		var lastError: Error?
 
-        for parser in parsers {
-            do {
-                let routes = try parser.parse(from: url)
-                logger.debug("Parser \(String(describing: type(of: parser))) successfully parsed URL: \(url.absoluteString)")
-                return routes
-            } catch {
-                logger.debug("Parser \(String(describing: type(of: parser))) failed to parse URL: \(url.absoluteString) - Error: \(error.localizedDescription)")
-                lastError = error
-                continue
-            }
-        }
+		for parser in parsers {
+			do {
+				let routes = try parser.parse(from: url)
+				logger.debug("Parser \(String(describing: type(of: parser))) successfully parsed URL: \(url.absoluteString)")
+				return routes
+			} catch {
+				logger.debug("Parser \(String(describing: type(of: parser))) failed to parse URL: \(url.absoluteString) - Error: \(error.localizedDescription)")
+				lastError = error
+				continue
+			}
+		}
 
-        let parsersCount = parsers.count
-        if let lastError {
-            logger.error("All \(parsersCount) parsers failed for URL: \(url.absoluteString) - Last error: \(lastError.localizedDescription)")
-        } else {
-            logger.error("All \(parsersCount) parsers failed for URL: \(url.absoluteString)")
-        }
+		let parsersCount = parsers.count
+		if let lastError {
+			logger.error("All \(parsersCount) parsers failed for URL: \(url.absoluteString) - Last error: \(lastError.localizedDescription)")
+		} else {
+			logger.error("All \(parsersCount) parsers failed for URL: \(url.absoluteString)")
+		}
 
-        throw DeepLinkError.routeNotFound(deepLinkURL.host)
-    }
+		throw DeepLinkError.routeNotFound(deepLinkURL.host)
+	}
 }

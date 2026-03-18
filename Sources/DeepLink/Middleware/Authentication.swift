@@ -1,5 +1,5 @@
 //
-//  Copyright © 2025 Jesús Alfredo Hernández Alarcón. All rights reserved.
+//  Copyright © 2026 Jesús Alfredo Hernández Alarcón. All rights reserved.
 //
 
 import Foundation
@@ -73,29 +73,29 @@ import Foundation
 /// ## Thread Safety
 /// This middleware is thread-safe and can be used concurrently.
 public final class AuthenticationMiddleware: DeepLinkMiddleware {
-    private let authProvider: AuthenticationProvider
-    private let protectedHosts: Set<String>
-    private let strategy: AuthenticationStrategy
+	private let authProvider: AuthenticationProvider
+	private let protectedHosts: Set<String>
+	private let strategy: AuthenticationStrategy
 
-    /// Creates a new authentication middleware.
-    ///
-    /// - Parameters:
-    ///   - authProvider: The authentication provider to use
-    ///   - protectedHosts: Set of hosts that require authentication
-    ///   - strategy: The authentication validation strategy to use (defaults to .standard)
-    public init(
-        authProvider: AuthenticationProvider,
-        protectedHosts: Set<String>,
-        strategy: AuthenticationStrategy = .standard,
-    ) {
-        self.authProvider = authProvider
-        self.protectedHosts = protectedHosts
-        self.strategy = strategy
-    }
+	/// Creates a new authentication middleware.
+	///
+	/// - Parameters:
+	///   - authProvider: The authentication provider to use
+	///   - protectedHosts: Set of hosts that require authentication
+	///   - strategy: The authentication validation strategy to use (defaults to .standard)
+	public init(
+		authProvider: AuthenticationProvider,
+		protectedHosts: Set<String>,
+		strategy: AuthenticationStrategy = .standard,
+	) {
+		self.authProvider = authProvider
+		self.protectedHosts = protectedHosts
+		self.strategy = strategy
+	}
 
-    public func intercept(_ url: URL) async throws -> URL? {
-        try await strategy.validate(url: url, protectedHosts: protectedHosts, provider: authProvider)
-    }
+	public func intercept(_ url: URL) async throws -> URL? {
+		try await strategy.validate(url: url, protectedHosts: protectedHosts, provider: authProvider)
+	}
 }
 
 //
@@ -149,13 +149,13 @@ import Foundation
 /// This protocol is marked as `Sendable`, meaning implementations must be
 /// thread-safe and can be used across different execution contexts.
 public protocol AuthenticationProvider: Sendable {
-    /// Determines whether the user is currently authenticated.
-    ///
-    /// This method is called by the `AuthenticationMiddleware` to check
-    /// the authentication status before allowing access to protected URLs.
-    ///
-    /// - Returns: `true` if the user is authenticated, `false` otherwise
-    func isAuthenticated() async -> Bool
+	/// Determines whether the user is currently authenticated.
+	///
+	/// This method is called by the `AuthenticationMiddleware` to check
+	/// the authentication status before allowing access to protected URLs.
+	///
+	/// - Returns: `true` if the user is authenticated, `false` otherwise
+	func isAuthenticated() async -> Bool
 }
 
 /// Permissive authentication provider that always returns true.
@@ -214,21 +214,21 @@ public protocol AuthenticationProvider: Sendable {
 /// - ✅ Thread-safe and can be used across different execution contexts
 /// - ✅ Lightweight implementation with minimal overhead
 public final class PermissiveAuthenticationProvider: AuthenticationProvider {
-    /// Creates a new permissive authentication provider.
-    ///
-    /// This initializer creates an authentication provider that will
-    /// always return `true` for authentication checks.
-    public init() {}
+	/// Creates a new permissive authentication provider.
+	///
+	/// This initializer creates an authentication provider that will
+	/// always return `true` for authentication checks.
+	public init() {}
 
-    /// Always returns `true` indicating the user is authenticated.
-    ///
-    /// This method always returns `true`, effectively bypassing all
-    /// authentication checks when used with `AuthenticationMiddleware`.
-    ///
-    /// - Returns: Always returns `true`
-    public func isAuthenticated() async -> Bool {
-        true
-    }
+	/// Always returns `true` indicating the user is authenticated.
+	///
+	/// This method always returns `true`, effectively bypassing all
+	/// authentication checks when used with `AuthenticationMiddleware`.
+	///
+	/// - Returns: Always returns `true`
+	public func isAuthenticated() async -> Bool {
+		true
+	}
 }
 
 //
@@ -302,163 +302,163 @@ import Foundation
 /// | `.permissive` | ❌ | ❌ | ✅ | ✅ |
 /// | `.schemeBased` | ❌ | ✅ | ✅ | ❌ |
 public struct AuthenticationStrategy: Sendable {
-    private let validateFunction: @Sendable (URL, Set<String>, AuthenticationProvider) async throws -> URL?
+	private let validateFunction: @Sendable (URL, Set<String>, AuthenticationProvider) async throws -> URL?
 
-    init(_ validateFunction: @escaping @Sendable (URL, Set<String>, AuthenticationProvider) async throws -> URL?) {
-        self.validateFunction = validateFunction
-    }
+	init(_ validateFunction: @escaping @Sendable (URL, Set<String>, AuthenticationProvider) async throws -> URL?) {
+		self.validateFunction = validateFunction
+	}
 
-    /// Executes the authentication validation strategy.
-    func validate(url: URL, protectedHosts: Set<String>, provider: AuthenticationProvider) async throws -> URL? {
-        try await validateFunction(url, protectedHosts, provider)
-    }
+	/// Executes the authentication validation strategy.
+	func validate(url: URL, protectedHosts: Set<String>, provider: AuthenticationProvider) async throws -> URL? {
+		try await validateFunction(url, protectedHosts, provider)
+	}
 }
 
 // MARK: - Authentication Strategy Implementations
 
 public extension AuthenticationStrategy {
-    /// Standard authentication strategy that checks protected hosts.
-    ///
-    /// Validates authentication for URLs with hosts in the protected set.
-    /// URLs without hosts (like custom schemes) are allowed by default.
-    /// This is the most commonly used strategy for apps that have both public
-    /// and private sections.
-    ///
-    /// ## Usage
-    /// Perfect for apps with mixed public/private content where only specific
-    /// hosts require authentication.
-    ///
-    /// ## Example
-    /// ```swift
-    /// let middleware = AuthenticationMiddleware(
-    ///     authProvider: authProvider,
-    ///     protectedHosts: ["secure.myapp.com", "admin.myapp.com"],
-    ///     strategy: .standard
-    /// )
-    /// ```
-    ///
-    /// ## Behavior
-    /// - ✅ `myapp://public-content` → No authentication required (no host)
-    /// - ✅ `https://public.myapp.com/help` → No authentication required
-    /// - 🔒 `https://secure.myapp.com/profile` → Authentication required
-    /// - 🔒 `https://admin.myapp.com/dashboard` → Authentication required
-    static let standard = AuthenticationStrategy { url, protectedHosts, provider in
-        guard let host = url.host else {
-            // Allow URLs without hosts (like custom schemes: myapp://)
-            return url
-        }
+	/// Standard authentication strategy that checks protected hosts.
+	///
+	/// Validates authentication for URLs with hosts in the protected set.
+	/// URLs without hosts (like custom schemes) are allowed by default.
+	/// This is the most commonly used strategy for apps that have both public
+	/// and private sections.
+	///
+	/// ## Usage
+	/// Perfect for apps with mixed public/private content where only specific
+	/// hosts require authentication.
+	///
+	/// ## Example
+	/// ```swift
+	/// let middleware = AuthenticationMiddleware(
+	///     authProvider: authProvider,
+	///     protectedHosts: ["secure.myapp.com", "admin.myapp.com"],
+	///     strategy: .standard
+	/// )
+	/// ```
+	///
+	/// ## Behavior
+	/// - ✅ `myapp://public-content` → No authentication required (no host)
+	/// - ✅ `https://public.myapp.com/help` → No authentication required
+	/// - 🔒 `https://secure.myapp.com/profile` → Authentication required
+	/// - 🔒 `https://admin.myapp.com/dashboard` → Authentication required
+	static let standard = AuthenticationStrategy { url, protectedHosts, provider in
+		guard let host = url.host else {
+			// Allow URLs without hosts (like custom schemes: myapp://)
+			return url
+		}
 
-        guard protectedHosts.contains(host) else {
-            // Allow URLs with unprotected hosts
-            return url
-        }
+		guard protectedHosts.contains(host) else {
+			// Allow URLs with unprotected hosts
+			return url
+		}
 
-        let isAuthenticated = await provider.isAuthenticated()
+		let isAuthenticated = await provider.isAuthenticated()
 
-        if !isAuthenticated {
-            throw DeepLinkError.unauthorizedAccess(host)
-        }
+		if !isAuthenticated {
+			throw DeepLinkError.unauthorizedAccess(host)
+		}
 
-        return url
-    }
+		return url
+	}
 
-    /// Strict authentication strategy that requires authentication for all URLs.
-    ///
-    /// Validates authentication regardless of host protection rules. This strategy
-    /// is useful for apps that are entirely private and require authentication
-    /// for any deep link access.
-    ///
-    /// ## Usage
-    /// Ideal for enterprise apps, banking apps, or any app where all content
-    /// requires user authentication.
-    ///
-    /// ## Example
-    /// ```swift
-    /// let middleware = AuthenticationMiddleware(
-    ///     authProvider: authProvider,
-    ///     protectedHosts: [], // Ignored by strict strategy
-    ///     strategy: .strict
-    /// )
-    /// ```
-    ///
-    /// ## Behavior
-    /// - 🔒 `https://any-host.com/anything` → Authentication required
-    /// - 🔒 `myapp://public-content` → Authentication required
-    /// - 🔒 `https://docs.myapp.com/help` → Authentication required
-    static let strict = AuthenticationStrategy { url, _, provider in
-        let isAuthenticated = await provider.isAuthenticated()
+	/// Strict authentication strategy that requires authentication for all URLs.
+	///
+	/// Validates authentication regardless of host protection rules. This strategy
+	/// is useful for apps that are entirely private and require authentication
+	/// for any deep link access.
+	///
+	/// ## Usage
+	/// Ideal for enterprise apps, banking apps, or any app where all content
+	/// requires user authentication.
+	///
+	/// ## Example
+	/// ```swift
+	/// let middleware = AuthenticationMiddleware(
+	///     authProvider: authProvider,
+	///     protectedHosts: [], // Ignored by strict strategy
+	///     strategy: .strict
+	/// )
+	/// ```
+	///
+	/// ## Behavior
+	/// - 🔒 `https://any-host.com/anything` → Authentication required
+	/// - 🔒 `myapp://public-content` → Authentication required
+	/// - 🔒 `https://docs.myapp.com/help` → Authentication required
+	static let strict = AuthenticationStrategy { url, _, provider in
+		let isAuthenticated = await provider.isAuthenticated()
 
-        if !isAuthenticated {
-            let host = url.host ?? "unknown"
-            throw DeepLinkError.unauthorizedAccess(host)
-        }
+		if !isAuthenticated {
+			let host = url.host ?? "unknown"
+			throw DeepLinkError.unauthorizedAccess(host)
+		}
 
-        return url
-    }
+		return url
+	}
 
-    /// Permissive authentication strategy that allows all URLs.
-    ///
-    /// Never validates authentication, always allows access. This strategy
-    /// is useful for development, testing, or apps that are entirely public.
-    ///
-    /// ## Usage
-    /// Perfect for public apps, marketing apps, or during development when
-    /// you want to bypass authentication temporarily.
-    ///
-    /// ## Example
-    /// ```swift
-    /// let middleware = AuthenticationMiddleware(
-    ///     authProvider: authProvider,
-    ///     protectedHosts: [], // Ignored by permissive strategy
-    ///     strategy: .permissive
-    /// )
-    /// ```
-    ///
-    /// ## Behavior
-    /// - ✅ `https://any-host.com/anything` → No authentication required
-    /// - ✅ `myapp://private-content` → No authentication required
-    /// - ✅ `https://secure.myapp.com/admin` → No authentication required
-    static let permissive = AuthenticationStrategy { url, _, _ in
-        url
-    }
+	/// Permissive authentication strategy that allows all URLs.
+	///
+	/// Never validates authentication, always allows access. This strategy
+	/// is useful for development, testing, or apps that are entirely public.
+	///
+	/// ## Usage
+	/// Perfect for public apps, marketing apps, or during development when
+	/// you want to bypass authentication temporarily.
+	///
+	/// ## Example
+	/// ```swift
+	/// let middleware = AuthenticationMiddleware(
+	///     authProvider: authProvider,
+	///     protectedHosts: [], // Ignored by permissive strategy
+	///     strategy: .permissive
+	/// )
+	/// ```
+	///
+	/// ## Behavior
+	/// - ✅ `https://any-host.com/anything` → No authentication required
+	/// - ✅ `myapp://private-content` → No authentication required
+	/// - ✅ `https://secure.myapp.com/admin` → No authentication required
+	static let permissive = AuthenticationStrategy { url, _, _ in
+		url
+	}
 
-    /// Scheme-based authentication strategy.
-    ///
-    /// Validates authentication based on URL scheme rather than host. This strategy
-    /// treats the `protectedHosts` parameter as a set of protected schemes instead.
-    ///
-    /// ## Usage
-    /// Useful when you want to protect certain URL schemes (like `myapp-secure://`)
-    /// while allowing others (like `myapp://`) to be public.
-    ///
-    /// ## Example
-    /// ```swift
-    /// let middleware = AuthenticationMiddleware(
-    ///     authProvider: authProvider,
-    ///     protectedHosts: ["myapp-secure", "myapp-admin"], // Treated as schemes
-    ///     strategy: .schemeBased
-    /// )
-    /// ```
-    ///
-    /// ## Behavior
-    /// - ✅ `myapp://public-content` → No authentication required
-    /// - ✅ `https://secure.myapp.com/profile` → No authentication required (different scheme)
-    /// - 🔒 `myapp-secure://profile` → Authentication required
-    /// - 🔒 `myapp-admin://dashboard` → Authentication required
-    static let schemeBased = AuthenticationStrategy { url, protectedHosts, provider in
-        guard let scheme = url.scheme else {
-            return url
-        }
+	/// Scheme-based authentication strategy.
+	///
+	/// Validates authentication based on URL scheme rather than host. This strategy
+	/// treats the `protectedHosts` parameter as a set of protected schemes instead.
+	///
+	/// ## Usage
+	/// Useful when you want to protect certain URL schemes (like `myapp-secure://`)
+	/// while allowing others (like `myapp://`) to be public.
+	///
+	/// ## Example
+	/// ```swift
+	/// let middleware = AuthenticationMiddleware(
+	///     authProvider: authProvider,
+	///     protectedHosts: ["myapp-secure", "myapp-admin"], // Treated as schemes
+	///     strategy: .schemeBased
+	/// )
+	/// ```
+	///
+	/// ## Behavior
+	/// - ✅ `myapp://public-content` → No authentication required
+	/// - ✅ `https://secure.myapp.com/profile` → No authentication required (different scheme)
+	/// - 🔒 `myapp-secure://profile` → Authentication required
+	/// - 🔒 `myapp-admin://dashboard` → Authentication required
+	static let schemeBased = AuthenticationStrategy { url, protectedHosts, provider in
+		guard let scheme = url.scheme else {
+			return url
+		}
 
-        // Treat scheme as "host" for validation purposes
-        if protectedHosts.contains(scheme) {
-            let isAuthenticated = await provider.isAuthenticated()
+		// Treat scheme as "host" for validation purposes
+		if protectedHosts.contains(scheme) {
+			let isAuthenticated = await provider.isAuthenticated()
 
-            if !isAuthenticated {
-                throw DeepLinkError.unauthorizedAccess(scheme)
-            }
-        }
+			if !isAuthenticated {
+				throw DeepLinkError.unauthorizedAccess(scheme)
+			}
+		}
 
-        return url
-    }
+		return url
+	}
 }
