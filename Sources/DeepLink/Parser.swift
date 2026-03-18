@@ -57,5 +57,5 @@ public protocol DeepLinkParser<Route>: Sendable {
 	/// - Parameter url: The URL to parse
 	/// - Returns: An array of routes that correspond to the URL
 	/// - Throws: `DeepLinkError` or other parsing-related errors
-	func parse(from url: URL) throws -> [Route]
+	func parse(from url: URL) async throws -> [Route]
 }

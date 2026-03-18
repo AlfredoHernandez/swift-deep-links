@@ -65,7 +65,7 @@ public struct DefaultDeepLinkRouting<Route: DeepLinkRoute>: DeepLinkRouting {
 
 		for parser in parsers {
 			do {
-				let routes = try parser.parse(from: url)
+				let routes = try await parser.parse(from: url)
 				logger.debug("Parser \(String(describing: type(of: parser))) successfully parsed URL: \(url.absoluteString)")
 				return routes
 			} catch {
