@@ -22,7 +22,7 @@ import OSLog
 /// - **Info**: Normal processing events (willProcess, didProcess)
 /// - **Error**: Processing failures and errors
 /// - **Debug**: Detailed processing information (when debug logging is enabled)
-public final class DeepLinkLoggingDelegate: DeepLinkCoordinatorDelegate, @unchecked Sendable {
+public final class DeepLinkLoggingDelegate: DeepLinkCoordinatorDelegate {
 	private let logger = Logger(subsystem: "swift-deep-link", category: "DeepLinkLoggingDelegate")
 	private let enableDebugLogging: Bool
 

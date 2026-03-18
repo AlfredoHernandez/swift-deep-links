@@ -22,7 +22,7 @@ import UserNotifications
 /// - **Success**: When deep links are processed successfully (optional)
 /// - **Error**: When deep links fail to process (recommended)
 /// - **Info**: General information about deep link processing (optional)
-public final class DeepLinkNotificationDelegate: DeepLinkCoordinatorDelegate, @unchecked Sendable {
+public final class DeepLinkNotificationDelegate: DeepLinkCoordinatorDelegate {
 	private let showSuccessNotifications: Bool
 	private let showErrorNotifications: Bool
 	private let showInfoNotifications: Bool

@@ -226,11 +226,12 @@ public final class DeepLinkCoordinatorBuilder<Route: DeepLinkRoute>: @unchecked 
 		}
 
 		// Determine the delegate to use
-		let finalDelegate: (any DeepLinkCoordinatorDelegate)? = if delegates.count == 1 {
-			delegates.first
-		} else if delegates.count > 1 {
+		let capturedDelegates = delegates
+		let finalDelegate: (any DeepLinkCoordinatorDelegate)? = if capturedDelegates.count == 1 {
+			capturedDelegates.first
+		} else if capturedDelegates.count > 1 {
 			await MainActor.run {
-				CompositeDeepLinkDelegate(delegates: delegates)
+				CompositeDeepLinkDelegate(delegates: capturedDelegates)
 			}
 		} else {
 			nil
@@ -249,7 +250,7 @@ public final class DeepLinkCoordinatorBuilder<Route: DeepLinkRoute>: @unchecked 
 // MARK: - Helper Classes
 
 /// A wrapper for advanced middleware to handle type conversion.
-private final class AnyMiddleware: DeepLinkMiddleware, @unchecked Sendable {
+private final class AnyMiddleware: DeepLinkMiddleware {
 	let advancedMiddleware: any AdvancedDeepLinkMiddleware
 
 	init(_ middleware: any AdvancedDeepLinkMiddleware) {
@@ -281,7 +282,7 @@ private final class AnyMiddleware: DeepLinkMiddleware, @unchecked Sendable {
 ///
 /// Thread safety is guaranteed by making the delegates array immutable after initialization.
 /// The array is set once during init and never modified, making it safe for concurrent access.
-public final class CompositeDeepLinkDelegate: DeepLinkCoordinatorDelegate, @unchecked Sendable {
+public final class CompositeDeepLinkDelegate: DeepLinkCoordinatorDelegate {
 	private let delegates: [DeepLinkCoordinatorDelegate]
 
 	/// Creates a composite delegate with the provided delegates.

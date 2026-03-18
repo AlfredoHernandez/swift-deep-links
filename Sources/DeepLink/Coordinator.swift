@@ -50,7 +50,7 @@ import OSLog
 /// - All protocols conform to `Sendable`
 ///
 /// - Parameter Route: The type of route that this coordinator handles
-public final class DeepLinkCoordinator<Route: DeepLinkRoute>: @unchecked Sendable {
+public final class DeepLinkCoordinator<Route: DeepLinkRoute>: Sendable {
 	private let logger = Logger(subsystem: "swift-deep-link", category: "DeepLinkCoordinator")
 
 	// MARK: - Private Properties
@@ -69,7 +69,7 @@ public final class DeepLinkCoordinator<Route: DeepLinkRoute>: @unchecked Sendabl
 	/// - Deep link processing start (`willProcess`)
 	/// - Deep link processing completion (`didProcess`)
 	/// - Deep link processing failures (`didFailProcessing`)
-	public var delegate: (any DeepLinkCoordinatorDelegate)?
+	public let delegate: (any DeepLinkCoordinatorDelegate)?
 
 	// MARK: - Initialization
 

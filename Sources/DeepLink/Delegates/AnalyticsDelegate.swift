@@ -30,7 +30,7 @@ import Foundation
 /// - Success/failure status
 /// - Number of routes processed
 /// - Error details (if applicable)
-public final class DeepLinkAnalyticsDelegate: DeepLinkCoordinatorDelegate, @unchecked Sendable {
+public final class DeepLinkAnalyticsDelegate: DeepLinkCoordinatorDelegate {
 	private let analyticsProvider: AnalyticsProvider
 
 	/// Creates a new analytics delegate.
