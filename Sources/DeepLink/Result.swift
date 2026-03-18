@@ -39,7 +39,7 @@ public struct DeepLinkResult<Route: DeepLinkRoute>: Sendable, DeepLinkResultProt
 	public let executionTime: TimeInterval
 
 	/// Any errors that occurred during processing
-	public let errors: [Error]
+	public let errors: [any Error & Sendable]
 
 	/// Whether the processing was completely successful
 	public let wasSuccessful: Bool
@@ -65,7 +65,7 @@ public struct DeepLinkResult<Route: DeepLinkRoute>: Sendable, DeepLinkResultProt
 		processedURL: URL?,
 		routes: [Route],
 		executionTime: TimeInterval,
-		errors: [Error] = [],
+		errors: [any Error & Sendable] = [],
 		successfulRoutes: Int = 0,
 		failedRoutes: Int = 0,
 	) {
@@ -99,7 +99,7 @@ public extension DeepLinkResult {
 	}
 
 	/// The first error that occurred (if any)
-	var firstError: Error? {
+	var firstError: (any Error & Sendable)? {
 		errors.first
 	}
 
