@@ -228,3 +228,31 @@ public extension DeepLinkMiddleware where Self == URLTransformationMiddleware {
 		URLTransformationMiddleware(transformer: transformer, strategy: strategy)
 	}
 }
+
+public extension DeepLinkMiddleware where Self == ReadinessMiddleware {
+	/// Creates readiness middleware that queues deep links until
+	/// the app signals readiness.
+	///
+	/// ## Usage
+	///
+	/// ```swift
+	/// let queue = DeepLinkReadinessQueue()
+	///
+	/// // In the middleware stack
+	/// .readiness(queue: queue)
+	///
+	/// // When ready, drain and reprocess
+	/// let pending = queue.markReady()
+	/// for url in pending {
+	///     await coordinator.handle(url: url)
+	/// }
+	/// ```
+	///
+	/// - Parameter queue: The readiness queue that stores URLs until ready
+	/// - Returns: A configured readiness middleware instance
+	static func readiness(
+		queue: any ReadinessQueue,
+	) -> ReadinessMiddleware {
+		ReadinessMiddleware(queue: queue)
+	}
+}
