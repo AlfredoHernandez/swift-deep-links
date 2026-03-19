@@ -133,12 +133,13 @@ do {
 The library provides comprehensive test helpers. See the test suite for examples:
 
 ```swift
-func testProfileDeepLink() async throws {
+@Test("Profile deep link parses correctly")
+func profileDeepLink() async throws {
     let url = URL(string: "myapp://profile?userId=123")!
     let result = try await parser.parse(from: url)
-    
-    XCTAssertEqual(result.count, 1)
-    XCTAssertEqual(result.first, .profile(userId: "123"))
+
+    #expect(result.count == 1)
+    #expect(result.first == .profile(userId: "123"))
 }
 ```
 
@@ -147,9 +148,10 @@ func testProfileDeepLink() async throws {
 Yes, the protocol-oriented design makes mocking easy:
 
 ```swift
-class MockDeepLinkHandler: DeepLinkHandler {
+final class HandlerSpy: DeepLinkHandler, @unchecked Sendable {
+    typealias Route = AppRoute
     var handledRoutes: [AppRoute] = []
-    
+
     func handle(_ route: AppRoute) async throws {
         handledRoutes.append(route)
     }
@@ -255,4 +257,4 @@ If you have questions not covered in this FAQ:
 1. Check the [Sample App](../DeepLinkSample/) for examples
 2. Review the [API Reference](./api-reference-en.md)
 3. Look at the [Tests](../Tests/) for usage patterns
-4. Open an [Issue](https://github.com/AlfredoHdz/swift-deep-link/issues) on GitHub
+4. Open an [Issue](https://github.com/AlfredoHernandez/swift-deep-link/issues) on GitHub
