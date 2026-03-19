@@ -70,12 +70,10 @@ struct DeepLinkCoordinatorDelegateFactoryTests {
 		let provider = DefaultAnalyticsProvider()
 
 		let coordinator = try await DeepLinkCoordinatorBuilder<TestRoute>()
-			.addingRouting(TestRouting())
-			.addingHandler(TestHandler())
-			.addingMiddleware(.logging())
-			.addingMiddleware(.analytics(provider: provider))
-			.addingDelegate(.logging())
-			.addingDelegate(.analytics(provider: provider))
+			.routing(TestRouting())
+			.handler(TestHandler())
+			.middleware(.logging(), .analytics(provider: provider))
+			.delegate(.logging(), .analytics(provider: provider))
 			.build()
 
 		// Verify coordinator was created successfully

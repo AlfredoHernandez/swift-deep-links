@@ -62,9 +62,9 @@ struct CompositionTests {
 		let handler = TestHandler()
 
 		let coordinator = try await DeepLinkCoordinatorBuilder<TestRoute>()
-			.addingRouting(routing)
-			.addingHandler(handler)
-			.addingDelegate(compose(
+			.routing(routing)
+			.handler(handler)
+			.delegate(compose(
 				.logging(),
 				.analytics(provider: provider),
 			))
@@ -118,9 +118,9 @@ struct CompositionTests {
 		let handler = TestHandler()
 
 		let coordinator = try await DeepLinkCoordinatorBuilder<TestRoute>()
-			.addingRouting(routing)
-			.addingHandler(handler)
-			.addingMiddleware(compose(
+			.routing(routing)
+			.handler(handler)
+			.middleware(compose(
 				.logging(),
 				.analytics(provider: provider),
 				.rateLimit(maxRequests: 10, timeWindow: 60),

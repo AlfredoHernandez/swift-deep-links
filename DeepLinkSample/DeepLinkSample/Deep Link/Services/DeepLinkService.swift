@@ -42,8 +42,8 @@ final class DeepLinkService {
 	/// Before (verbose):
 	/// ```swift
 	/// let coordinator: DeepLinkCoordinator<AppRoute> = ...
-	/// .addingMiddleware(AnalyticsMiddleware(analyticsProvider: provider))
-	/// .addingDelegates([
+	/// .middleware(AnalyticsMiddleware(analyticsProvider: provider))
+	/// .delegates([
 	///     DeepLinkLoggingDelegate(enableDebugLogging: true),
 	///     DeepLinkAnalyticsDelegate(analyticsProvider: provider)
 	/// ])
@@ -52,8 +52,8 @@ final class DeepLinkService {
 	/// After (functional style):
 	/// ```swift
 	/// let coordinator: CoordinatorOf<AppRoute> = ...
-	/// .addingMiddleware(.analytics(provider: provider))
-	/// .addingDelegate(compose(.logging(enableDebugLogging: true), .analytics(provider: provider)))
+	/// .middleware(.analytics(provider: provider))
+	/// .delegate(compose(.logging(enableDebugLogging: true), .analytics(provider: provider)))
 	/// ```
 	///
 	/// - Parameter navigationRouter: The navigation router for handling route actions
@@ -73,10 +73,10 @@ final class DeepLinkService {
 
 		// Create coordinator using builder pattern
 		let coordinator = try await DeepLinkCoordinatorBuilder<AppRoute>()
-			.addingRouting(DefaultDeepLinkRouting<AppRoute>(parsers: parsers))
-			.addingHandler(AppDeepLinkHandler(navigationRouter: navigationRouter))
-			.addingMiddleware(middleware)
-			.addingDelegates(delegates)
+			.routing(DefaultDeepLinkRouting<AppRoute>(parsers: parsers))
+			.handler(AppDeepLinkHandler(navigationRouter: navigationRouter))
+			.middleware(middleware)
+			.delegates(delegates)
 			.build()
 
 		logger.info("Deep link coordinator created successfully")

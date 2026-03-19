@@ -6,53 +6,39 @@ import Foundation
 
 /// A builder for creating and configuring `DeepLinkCoordinator` instances.
 ///
-/// The `DeepLinkCoordinatorBuilder` provides a fluent API for setting up deep link coordinators
-/// with middleware, delegates, and other configuration options. This makes it easier to create
-/// complex coordinator configurations without having to manually manage all the setup steps.
+/// The `DeepLinkCoordinatorBuilder` provides a fluent, immutable API for setting up
+/// deep link coordinators with middleware, delegates, and other configuration options.
+/// Each configuration method returns a new builder instance, preserving value semantics.
 ///
 /// ## Basic Usage
 ///
 /// ```swift
 /// let coordinator = try await DeepLinkCoordinatorBuilder<AppRoute>()
-///     .addingRouting(DefaultDeepLinkRouting(parsers: parsers))
-///     .addingHandler(appHandler)
-///     .addingMiddleware(myMiddleware)
-///     .addingDelegate(myDelegate)
+///     .routing(DefaultDeepLinkRouting(parsers: parsers))
+///     .handler(appHandler)
+///     .middleware(myMiddleware)
+///     .delegate(myDelegate)
 ///     .build()
 /// ```
 ///
-/// ## Advanced Usage with Arrays
-///
-/// ```swift
-/// let middleware: [any DeepLinkMiddleware] = [middlewareA, middlewareB]
-/// let delegates: [DeepLinkCoordinatorDelegate] = [delegateA, delegateB]
-///
-/// let coordinator = try await DeepLinkCoordinatorBuilder<AppRoute>()
-///     .addingRouting(DefaultDeepLinkRouting(parsers: parsers))
-///     .addingHandler(appHandler)
-///     .addingMiddleware(middleware)
-///     .addingDelegates(delegates)
-///     .build()
-/// ```
-///
-/// ## Functional Composition Style
+/// ## Multiple Middleware and Delegates
 ///
 /// ```swift
 /// let coordinator = try await DeepLinkCoordinatorBuilder<AppRoute>()
-///     .addingRouting(DefaultDeepLinkRouting(parsers: parsers))
-///     .addingHandler(appHandler)
-///     .addingMiddleware(compose(middlewareA, middlewareB))
-///     .addingDelegate(compose(delegateA, delegateB))
+///     .routing(DefaultDeepLinkRouting(parsers: parsers))
+///     .handler(appHandler)
+///     .middleware(.security(), .rateLimit(), .logging())
+///     .delegate(compose(.logging(), .analytics(provider: provider)))
 ///     .build()
 /// ```
 ///
 /// - Parameter Route: The type of route that the coordinator will handle
-public final class DeepLinkCoordinatorBuilder<Route: DeepLinkRoute>: @unchecked Sendable {
-	private var routing: (any DeepLinkRouting<Route>)?
-	private var handler: (any DeepLinkHandler<Route>)?
-	private var middlewareCoordinator: DeepLinkMiddlewareCoordinator?
-	private var middleware: [any DeepLinkMiddleware] = []
-	private var delegates: [DeepLinkCoordinatorDelegate] = []
+public struct DeepLinkCoordinatorBuilder<Route: DeepLinkRoute>: Sendable {
+	private var _routing: (any DeepLinkRouting<Route>)?
+	private var _handler: (any DeepLinkHandler<Route>)?
+	private var _middlewareCoordinator: DeepLinkMiddlewareCoordinator?
+	private var middlewareEntries: [MiddlewareEntry] = []
+	private var _delegates: [DeepLinkCoordinatorDelegate] = []
 
 	/// Creates a new builder instance.
 	public init() {}
@@ -60,143 +46,114 @@ public final class DeepLinkCoordinatorBuilder<Route: DeepLinkRoute>: @unchecked 
 	/// Sets the routing implementation for the coordinator.
 	///
 	/// - Parameter routing: The routing implementation
-	/// - Returns: The builder instance for method chaining
-	@discardableResult
-	public func addingRouting(_ routing: any DeepLinkRouting<Route>) -> Self {
-		self.routing = routing
-		return self
+	/// - Returns: A new builder with the routing configured
+	public func routing(_ routing: any DeepLinkRouting<Route>) -> Self {
+		var copy = self
+		copy._routing = routing
+		return copy
 	}
 
 	/// Sets the handler implementation for the coordinator.
 	///
 	/// - Parameter handler: The handler implementation
-	/// - Returns: The builder instance for method chaining
-	@discardableResult
-	public func addingHandler(_ handler: any DeepLinkHandler<Route>) -> Self {
-		self.handler = handler
-		return self
+	/// - Returns: A new builder with the handler configured
+	public func handler(_ handler: any DeepLinkHandler<Route>) -> Self {
+		var copy = self
+		copy._handler = handler
+		return copy
 	}
 
-	/// Sets a custom middleware coordinator for the coordinator.
+	/// Sets a custom middleware coordinator.
 	///
 	/// - Parameter coordinator: The custom middleware coordinator
-	/// - Returns: The builder instance for method chaining
-	@discardableResult
-	public func addingCustomMiddlewareCoordinator(_ coordinator: DeepLinkMiddlewareCoordinator) -> Self {
-		middlewareCoordinator = coordinator
-		return self
+	/// - Returns: A new builder with the middleware coordinator configured
+	public func middlewareCoordinator(_ coordinator: DeepLinkMiddlewareCoordinator) -> Self {
+		var copy = self
+		copy._middlewareCoordinator = coordinator
+		return copy
 	}
 
-	/// Adds middleware to the coordinator.
+	/// Adds one or more middleware to the coordinator.
+	///
+	/// Middleware is executed in the order it's added.
 	///
 	/// - Parameter middleware: The middleware to add
-	/// - Returns: The builder instance for method chaining
-	@discardableResult
-	public func addingMiddleware(_ middleware: any DeepLinkMiddleware) -> Self {
-		self.middleware.append(middleware)
-		return self
+	/// - Returns: A new builder with the middleware appended
+	public func middleware(_ middleware: any DeepLinkMiddleware...) -> Self {
+		var copy = self
+		copy.middlewareEntries.append(contentsOf: middleware.map { .standard($0) })
+		return copy
 	}
 
-	/// Adds middleware using a closure for lazy initialization.
-	///
-	/// - Parameter middlewareFactory: A closure that creates the middleware
-	/// - Returns: The builder instance for method chaining
-	@discardableResult
-	public func addingMiddleware(_ middlewareFactory: () -> any DeepLinkMiddleware) -> Self {
-		middleware.append(middlewareFactory())
-		return self
-	}
-
-	/// Adds advanced middleware to the coordinator.
-	///
-	/// - Parameter middleware: The advanced middleware to add
-	/// - Returns: The builder instance for method chaining
-	@discardableResult
-	public func addingAdvancedMiddleware(_ middleware: any AdvancedDeepLinkMiddleware) -> Self {
-		// Store as Any to handle the type conversion later
-		self.middleware.append(AnyMiddleware(middleware))
-		return self
-	}
-
-	/// Adds advanced middleware using a closure for lazy initialization.
-	///
-	/// - Parameter middlewareFactory: A closure that creates the advanced middleware
-	/// - Returns: The builder instance for method chaining
-	@discardableResult
-	public func addingAdvancedMiddleware(_ middlewareFactory: () -> any AdvancedDeepLinkMiddleware) -> Self {
-		// Store as Any to handle the type conversion later
-		middleware.append(AnyMiddleware(middlewareFactory()))
-		return self
-	}
-
-	/// Adds a delegate to the coordinator.
-	///
-	/// - Parameter delegate: The delegate to add
-	/// - Returns: The builder instance for method chaining
-	@discardableResult
-	public func addingDelegate(_ delegate: DeepLinkCoordinatorDelegate) -> Self {
-		delegates.append(delegate)
-		return self
-	}
-
-	/// Adds a delegate using a closure for lazy initialization.
-	///
-	/// - Parameter delegateFactory: A closure that creates the delegate
-	/// - Returns: The builder instance for method chaining
-	@discardableResult
-	public func addingDelegate(_ delegateFactory: () -> DeepLinkCoordinatorDelegate) -> Self {
-		delegates.append(delegateFactory())
-		return self
-	}
-
-	/// Adds multiple middleware at once.
+	/// Adds an array of middleware to the coordinator.
 	///
 	/// - Parameter middleware: An array of middleware to add
-	/// - Returns: The builder instance for method chaining
-	@discardableResult
-	public func addingMiddleware(_ middleware: [any DeepLinkMiddleware]) -> Self {
-		self.middleware.append(contentsOf: middleware)
-		return self
+	/// - Returns: A new builder with the middleware appended
+	public func middleware(_ middleware: [any DeepLinkMiddleware]) -> Self {
+		var copy = self
+		copy.middlewareEntries.append(contentsOf: middleware.map { .standard($0) })
+		return copy
 	}
 
-	/// Adds multiple delegates at once.
+	/// Adds one or more advanced middleware to the coordinator.
+	///
+	/// - Parameter middleware: The advanced middleware to add
+	/// - Returns: A new builder with the advanced middleware appended
+	public func advancedMiddleware(_ middleware: any AdvancedDeepLinkMiddleware...) -> Self {
+		var copy = self
+		copy.middlewareEntries.append(contentsOf: middleware.map { .advanced($0) })
+		return copy
+	}
+
+	/// Adds one or more delegates to the coordinator.
+	///
+	/// When multiple delegates are configured, they are automatically
+	/// composed into a `CompositeDeepLinkDelegate`.
+	///
+	/// - Parameter delegate: The delegates to add
+	/// - Returns: A new builder with the delegates appended
+	public func delegate(_ delegate: DeepLinkCoordinatorDelegate...) -> Self {
+		var copy = self
+		copy._delegates.append(contentsOf: delegate)
+		return copy
+	}
+
+	/// Adds an array of delegates to the coordinator.
 	///
 	/// - Parameter delegates: An array of delegates to add
-	/// - Returns: The builder instance for method chaining
-	@discardableResult
-	public func addingDelegates(_ delegates: [DeepLinkCoordinatorDelegate]) -> Self {
-		self.delegates.append(contentsOf: delegates)
-		return self
+	/// - Returns: A new builder with the delegates appended
+	public func delegates(_ delegates: [DeepLinkCoordinatorDelegate]) -> Self {
+		var copy = self
+		copy._delegates.append(contentsOf: delegates)
+		return copy
 	}
 
 	/// Builds and returns the configured `DeepLinkCoordinator`.
 	///
 	/// - Returns: A fully configured `DeepLinkCoordinator` instance
-	/// - Throws: `DeepLinkError.missingRequiredConfiguration` if required components are missing
+	/// - Throws: `DeepLinkError.missingRequiredConfiguration` if routing or handler are missing
 	public func build() async throws -> DeepLinkCoordinator<Route> {
-		// Validate required components
-		guard let routing else {
+		guard let routing = _routing else {
 			throw DeepLinkError.missingRequiredConfiguration("routing")
 		}
 
-		guard let handler else {
+		guard let handler = _handler else {
 			throw DeepLinkError.missingRequiredConfiguration("handler")
 		}
 
-		// Create middleware coordinator if not provided
-		let coordinator = middlewareCoordinator ?? DeepLinkMiddlewareCoordinator()
+		let coordinator = _middlewareCoordinator ?? DeepLinkMiddlewareCoordinator()
 
-		// Add all middleware
-		for middleware in middleware {
-			if let anyMiddleware = middleware as? AnyMiddleware {
-				await coordinator.add(anyMiddleware.advancedMiddleware)
-			} else {
-				await coordinator.add(middleware)
+		for entry in middlewareEntries {
+			switch entry {
+			case let .standard(m):
+				await coordinator.add(m)
+
+			case let .advanced(m):
+				await coordinator.add(m)
 			}
 		}
 
-		// Determine the delegate to use
-		let capturedDelegates = delegates
+		let capturedDelegates = _delegates
 		let finalDelegate: (any DeepLinkCoordinatorDelegate)? = if capturedDelegates.count == 1 {
 			capturedDelegates.first
 		} else if capturedDelegates.count > 1 {
@@ -207,7 +164,6 @@ public final class DeepLinkCoordinatorBuilder<Route: DeepLinkRoute>: @unchecked 
 			nil
 		}
 
-		// Create the deep link coordinator with all components
 		return DeepLinkCoordinator(
 			routing: routing,
 			handler: handler,
@@ -217,32 +173,11 @@ public final class DeepLinkCoordinatorBuilder<Route: DeepLinkRoute>: @unchecked 
 	}
 }
 
-// MARK: - Helper Classes
+// MARK: - Supporting Types
 
-/// A wrapper for advanced middleware to handle type conversion.
-private final class AnyMiddleware: DeepLinkMiddleware {
-	let advancedMiddleware: any AdvancedDeepLinkMiddleware
-
-	init(_ middleware: any AdvancedDeepLinkMiddleware) {
-		advancedMiddleware = middleware
-	}
-
-	func intercept(_ url: URL) async throws -> URL? {
-		let result = await advancedMiddleware.intercept(url)
-		switch result {
-		case let .continue(url):
-			return url
-
-		case let .transform(url):
-			return url
-
-		case let .error(error):
-			throw error
-
-		case .handled:
-			return nil
-		}
-	}
+private enum MiddlewareEntry: Sendable {
+	case standard(any DeepLinkMiddleware)
+	case advanced(any AdvancedDeepLinkMiddleware)
 }
 
 /// A composite delegate that combines multiple `DeepLinkCoordinatorDelegate` implementations.
