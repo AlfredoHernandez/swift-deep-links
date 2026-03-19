@@ -13,46 +13,23 @@ import Foundation
 /// ## Basic Usage
 ///
 /// ```swift
-/// let coordinator = DeepLinkCoordinatorBuilder<AppRoute>()
+/// let coordinator = try await DeepLinkCoordinatorBuilder<AppRoute>()
 ///     .addingRouting(DefaultDeepLinkRouting(parsers: parsers))
-///     .addingHandler(AppDeepLinkHandler(navigationRouter: router))
-///     .addingMiddleware(AnalyticsMiddleware(analyticsProvider: provider))
-///     .addingMiddleware(AuthenticationMiddleware(authProvider: authProvider, protectedHosts: []))
-///     .addingDelegate(DeepLinkLoggingDelegate())
-///     .addingDelegate(DeepLinkAnalyticsDelegate(analyticsProvider: provider))
-///     .build()
-/// ```
-///
-/// ## Usage with Static Factory Methods
-///
-/// ```swift
-/// let coordinator = DeepLinkCoordinatorBuilder<AppRoute>()
-///     .addingRouting(DefaultDeepLinkRouting(parsers: parsers))
-///     .addingHandler(AppDeepLinkHandler(navigationRouter: router))
-///     .addingMiddleware(.analytics(provider: myProvider, strategy: .detailed))
-///     .addingMiddleware(.rateLimit(maxRequests: 10, timeWindow: 60))
-///     .addingMiddleware(.security(allowedSchemes: ["https", "myapp"]))
-///     .addingDelegate(.logging(enableDebugLogging: true))
+///     .addingHandler(appHandler)
+///     .addingMiddleware(myMiddleware)
+///     .addingDelegate(myDelegate)
 ///     .build()
 /// ```
 ///
 /// ## Advanced Usage with Arrays
 ///
 /// ```swift
-/// let middleware: [any DeepLinkMiddleware] = [
-///     .rateLimit(maxRequests: 10, timeWindow: 60.0),
-///     .security(allowedSchemes: ["myapp"], allowedHosts: ["secure.myapp.com"]),
-///     .analytics(provider: provider, strategy: .performance)
-/// ]
+/// let middleware: [any DeepLinkMiddleware] = [middlewareA, middlewareB]
+/// let delegates: [DeepLinkCoordinatorDelegate] = [delegateA, delegateB]
 ///
-/// let delegates: [DeepLinkCoordinatorDelegate] = [
-///     .logging(enableDebugLogging: false),
-///     .analytics(provider: provider)
-/// ]
-///
-/// let coordinator = DeepLinkCoordinatorBuilder<AppRoute>()
+/// let coordinator = try await DeepLinkCoordinatorBuilder<AppRoute>()
 ///     .addingRouting(DefaultDeepLinkRouting(parsers: parsers))
-///     .addingHandler(AppDeepLinkHandler(navigationRouter: router))
+///     .addingHandler(appHandler)
 ///     .addingMiddleware(middleware)
 ///     .addingDelegates(delegates)
 ///     .build()
@@ -61,18 +38,11 @@ import Foundation
 /// ## Functional Composition Style
 ///
 /// ```swift
-/// let coordinator = DeepLinkCoordinatorBuilder<AppRoute>()
+/// let coordinator = try await DeepLinkCoordinatorBuilder<AppRoute>()
 ///     .addingRouting(DefaultDeepLinkRouting(parsers: parsers))
-///     .addingHandler(AppDeepLinkHandler(navigationRouter: router))
-///     .addingMiddleware(compose(
-///         .analytics(provider: provider, strategy: .detailed),
-///         .rateLimit(maxRequests: 10, timeWindow: 60),
-///         .security(allowedSchemes: ["https", "myapp"])
-///     ))
-///     .addingDelegate(compose(
-///         .logging(enableDebugLogging: true),
-///         .analytics(provider: provider)
-///     ))
+///     .addingHandler(appHandler)
+///     .addingMiddleware(compose(middlewareA, middlewareB))
+///     .addingDelegate(compose(delegateA, delegateB))
 ///     .build()
 /// ```
 ///

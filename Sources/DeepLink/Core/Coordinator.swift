@@ -17,8 +17,7 @@ import OSLog
 /// ```swift
 /// // Basic usage with default configuration
 /// let coordinator = DeepLinkCoordinator(routing: routing, handler: handler)
-/// coordinator.add(AnalyticsMiddleware())
-/// coordinator.add(AuthenticationMiddleware())
+/// await coordinator.add(myMiddleware)
 /// await coordinator.handle(url: deepLinkURL)
 ///
 /// // Advanced usage with custom configuration

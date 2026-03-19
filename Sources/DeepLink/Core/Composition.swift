@@ -14,13 +14,7 @@ import Foundation
 /// ## Usage
 ///
 /// ```swift
-/// let delegate = compose(
-///     .logging(),
-///     .analytics(provider: analyticsProvider),
-///     customDelegate
-/// )
-///
-/// coordinator.delegate = delegate
+/// let delegate = compose(delegateA, delegateB, delegateC)
 /// ```
 ///
 /// ## Variadic Parameters
@@ -49,13 +43,8 @@ public func compose(
 /// ## Usage
 ///
 /// ```swift
-/// let delegateList: [DeepLinkCoordinatorDelegate] = [
-///     .logging(),
-///     .analytics(provider: provider)
-/// ]
-///
+/// let delegateList: [DeepLinkCoordinatorDelegate] = [delegateA, delegateB]
 /// let delegate = compose(delegateList)
-/// coordinator.delegate = delegate
 /// ```
 ///
 /// - Parameter delegates: Array of delegates to compose
@@ -75,31 +64,8 @@ public func compose(
 /// ## Usage
 ///
 /// ```swift
-/// let middleware = compose(
-///     .analytics(provider: analyticsProvider),
-///     .rateLimit(maxRequests: 10, timeWindow: 60),
-///     .security(allowedSchemes: ["https", "myapp"])
-/// )
-///
-/// coordinator.add(middleware)
-/// // Or with builder:
+/// let middleware = compose(middlewareA, middlewareB, middlewareC)
 /// builder.addingMiddleware(middleware)
-/// ```
-///
-/// ## Benefits
-///
-/// - Groups related middleware together
-/// - Improves code readability
-/// - Makes middleware reusable across coordinators
-/// - Supports conditional inclusion with Swift's language features
-///
-/// ## Example with Conditionals
-///
-/// ```swift
-/// let middleware = compose(
-///     .analytics(provider: analyticsProvider),
-///     .rateLimit(maxRequests: 10, timeWindow: 60)
-/// ) + (isDebug ? [.logging(format: .detailed)] : [])
 /// ```
 ///
 /// - Parameter middleware: The middleware to compose, in execution order
@@ -118,13 +84,8 @@ public func compose(
 /// ## Usage
 ///
 /// ```swift
-/// let middlewareList: [any DeepLinkMiddleware] = [
-///     .analytics(provider: provider),
-///     .rateLimit(maxRequests: 10)
-/// ]
-///
+/// let middlewareList: [any DeepLinkMiddleware] = [middlewareA, middlewareB]
 /// let middleware = compose(middlewareList)
-/// coordinator.add(middleware)
 /// ```
 ///
 /// - Parameter middleware: Array of middleware to compose
