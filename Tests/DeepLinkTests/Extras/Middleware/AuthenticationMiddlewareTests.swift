@@ -311,22 +311,22 @@ struct AuthenticationMiddlewareTests {
 	// MARK: - PermissiveAuthenticationProvider Tests
 
 	@Test("PermissiveAuthenticationProvider always returns true for authentication")
-	func permissiveAuthenticationProvider_alwaysReturnsTrueForAuthentication() async {
+	func permissiveAuthenticationProvider_alwaysReturnsTrueForAuthentication() {
 		let provider = PermissiveAuthenticationProvider()
 
-		let isAuthenticated = await provider.isAuthenticated()
+		let isAuthenticated = provider.isAuthenticated()
 
 		#expect(isAuthenticated == true)
 	}
 
 	@Test("PermissiveAuthenticationProvider returns consistent authentication status")
-	func permissiveAuthenticationProvider_returnsConsistentAuthenticationStatus() async {
+	func permissiveAuthenticationProvider_returnsConsistentAuthenticationStatus() {
 		let provider = PermissiveAuthenticationProvider()
 
 		// Test multiple calls to ensure consistency
-		let firstCall = await provider.isAuthenticated()
-		let secondCall = await provider.isAuthenticated()
-		let thirdCall = await provider.isAuthenticated()
+		let firstCall = provider.isAuthenticated()
+		let secondCall = provider.isAuthenticated()
+		let thirdCall = provider.isAuthenticated()
 
 		#expect(firstCall == true)
 		#expect(secondCall == true)
@@ -403,7 +403,7 @@ struct AuthenticationMiddlewareTests {
 		await withTaskGroup(of: Bool.self) { group in
 			for _ in 0 ..< 10 {
 				group.addTask {
-					await provider.isAuthenticated()
+					provider.isAuthenticated()
 				}
 			}
 
@@ -419,10 +419,10 @@ struct AuthenticationMiddlewareTests {
 	}
 
 	@Test("PermissiveAuthenticationProvider can be used as AuthenticationProvider protocol")
-	func defaultAuthenticationProvider_canBeUsedAsAuthenticationProviderProtocol() async {
+	func defaultAuthenticationProvider_canBeUsedAsAuthenticationProviderProtocol() {
 		let provider: AuthenticationProvider = PermissiveAuthenticationProvider()
 
-		let isAuthenticated = await provider.isAuthenticated()
+		let isAuthenticated = provider.isAuthenticated()
 
 		#expect(isAuthenticated == true)
 	}

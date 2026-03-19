@@ -94,7 +94,7 @@ public final class AuthenticationMiddleware: DeepLinkMiddleware {
 	}
 
 	public func intercept(_ url: URL) async throws -> URL? {
-		try await strategy.validate(url: url, protectedHosts: protectedHosts, provider: authProvider)
+		try strategy.validate(url: url, protectedHosts: protectedHosts, provider: authProvider)
 	}
 }
 
@@ -126,9 +126,9 @@ import Foundation
 ///         self.keychainService = keychainService
 ///     }
 ///
-///     func isAuthenticated() async -> Bool {
+///     func isAuthenticated() -> Bool {
 ///         // Check if valid token exists in keychain
-///         return await keychainService.hasValidToken()
+///         return keychainService.hasValidToken()
 ///     }
 /// }
 /// ```
@@ -155,7 +155,7 @@ public protocol AuthenticationProvider: Sendable {
 	/// the authentication status before allowing access to protected URLs.
 	///
 	/// - Returns: `true` if the user is authenticated, `false` otherwise
-	func isAuthenticated() async -> Bool
+	func isAuthenticated() -> Bool
 }
 
 /// Permissive authentication provider that always returns true.
@@ -226,7 +226,7 @@ public final class PermissiveAuthenticationProvider: AuthenticationProvider {
 	/// authentication checks when used with `AuthenticationMiddleware`.
 	///
 	/// - Returns: Always returns `true`
-	public func isAuthenticated() async -> Bool {
+	public func isAuthenticated() -> Bool {
 		true
 	}
 }
@@ -302,15 +302,15 @@ import Foundation
 /// | `.permissive` | ❌ | ❌ | ✅ | ✅ |
 /// | `.schemeBased` | ❌ | ✅ | ✅ | ❌ |
 public struct AuthenticationStrategy: Sendable {
-	private let validateFunction: @Sendable (URL, Set<String>, AuthenticationProvider) async throws -> URL?
+	private let validateFunction: @Sendable (URL, Set<String>, AuthenticationProvider) throws -> URL?
 
-	init(_ validateFunction: @escaping @Sendable (URL, Set<String>, AuthenticationProvider) async throws -> URL?) {
+	init(_ validateFunction: @escaping @Sendable (URL, Set<String>, AuthenticationProvider) throws -> URL?) {
 		self.validateFunction = validateFunction
 	}
 
 	/// Executes the authentication validation strategy.
-	func validate(url: URL, protectedHosts: Set<String>, provider: AuthenticationProvider) async throws -> URL? {
-		try await validateFunction(url, protectedHosts, provider)
+	func validate(url: URL, protectedHosts: Set<String>, provider: AuthenticationProvider) throws -> URL? {
+		try validateFunction(url, protectedHosts, provider)
 	}
 }
 
@@ -353,7 +353,7 @@ public extension AuthenticationStrategy {
 			return url
 		}
 
-		let isAuthenticated = await provider.isAuthenticated()
+		let isAuthenticated = provider.isAuthenticated()
 
 		if !isAuthenticated {
 			throw DeepLinkError.unauthorizedAccess(host)
@@ -386,7 +386,7 @@ public extension AuthenticationStrategy {
 	/// - 🔒 `myapp://public-content` → Authentication required
 	/// - 🔒 `https://docs.myapp.com/help` → Authentication required
 	static let strict = AuthenticationStrategy { url, _, provider in
-		let isAuthenticated = await provider.isAuthenticated()
+		let isAuthenticated = provider.isAuthenticated()
 
 		if !isAuthenticated {
 			let host = url.host ?? "unknown"
@@ -452,7 +452,7 @@ public extension AuthenticationStrategy {
 
 		// Treat scheme as "host" for validation purposes
 		if protectedHosts.contains(scheme) {
-			let isAuthenticated = await provider.isAuthenticated()
+			let isAuthenticated = provider.isAuthenticated()
 
 			if !isAuthenticated {
 				throw DeepLinkError.unauthorizedAccess(scheme)

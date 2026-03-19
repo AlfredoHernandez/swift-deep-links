@@ -315,13 +315,13 @@ private final class AdvancedMiddlewareSpy: AdvancedDeepLinkMiddleware, @unchecke
 }
 
 private final class AuthenticationProviderDummy: AuthenticationProvider {
-	func isAuthenticated() async -> Bool {
+	func isAuthenticated() -> Bool {
 		true
 	}
 }
 
 private final class AnalyticsProviderDummy: AnalyticsProvider {
-	func track(_: String, parameters _: [String: Any]) async {}
+	func track(_: String, parameters _: [String: Any]) {}
 }
 
 private final class ErrorMiddleware: DeepLinkMiddleware {

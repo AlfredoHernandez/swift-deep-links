@@ -312,11 +312,11 @@ struct AnalyticsMiddlewareTests {
 	}
 
 	@Test("DefaultAnalyticsProvider can be used as AnalyticsProvider protocol")
-	func defaultAnalyticsProvider_canBeUsedAsAnalyticsProviderProtocol() async {
+	func defaultAnalyticsProvider_canBeUsedAsAnalyticsProviderProtocol() {
 		let provider: AnalyticsProvider = DefaultAnalyticsProvider()
 
 		// Test that it can be used as protocol
-		await provider.track("test_event", parameters: ["key": "value"])
+		provider.track("test_event", parameters: ["key": "value"])
 		// If no error is thrown, the test passes
 	}
 }

@@ -86,7 +86,7 @@ public final class URLTransformationMiddleware: DeepLinkMiddleware {
 	}
 
 	public func intercept(_ url: URL) async throws -> URL? {
-		try await strategy.transform(url: url, transformer: transformer)
+		try strategy.transform(url: url, transformer: transformer)
 	}
 }
 
@@ -165,15 +165,15 @@ import Foundation
 /// | `.validation` | Throws errors | ❌ | ✅ | Validated transformation |
 /// | `.batch` | Throws errors | ❌ | ❌ | Sequential transformation |
 public struct URLTransformationStrategy: Sendable {
-	private let transformFunction: @Sendable (URL, URLTransformer) async throws -> URL?
+	private let transformFunction: @Sendable (URL, URLTransformer) throws -> URL?
 
-	init(_ transformFunction: @escaping @Sendable (URL, URLTransformer) async throws -> URL?) {
+	init(_ transformFunction: @escaping @Sendable (URL, URLTransformer) throws -> URL?) {
 		self.transformFunction = transformFunction
 	}
 
 	/// Executes the URL transformation strategy.
-	func transform(url: URL, transformer: URLTransformer) async throws -> URL? {
-		try await transformFunction(url, transformer)
+	func transform(url: URL, transformer: URLTransformer) throws -> URL? {
+		try transformFunction(url, transformer)
 	}
 }
 
@@ -183,7 +183,7 @@ public extension URLTransformationStrategy {
 	/// Standard transformation strategy that applies the transformer directly.
 	/// This is the default transformation approach.
 	static let standard = URLTransformationStrategy { url, transformer in
-		try await transformer.transform(url)
+		try transformer.transform(url)
 	}
 
 	/// Conditional transformation strategy that only transforms URLs matching certain criteria.
@@ -196,7 +196,7 @@ public extension URLTransformationStrategy {
 
 		// Only transform URLs with specific hosts (if any)
 		if let host = url.host, !host.isEmpty {
-			return try await transformer.transform(url)
+			return try transformer.transform(url)
 		}
 
 		return url
@@ -206,7 +206,7 @@ public extension URLTransformationStrategy {
 	/// Returns the original URL if transformation fails.
 	static let safe = URLTransformationStrategy { url, transformer in
 		do {
-			return try await transformer.transform(url)
+			return try transformer.transform(url)
 		} catch {
 			// Log the error but return the original URL
 			// This ensures the deep link processing continues even if transformation fails
@@ -224,7 +224,7 @@ public extension URLTransformationStrategy {
 
 		while currentURL != previousURL, iterations < maxIterations {
 			previousURL = currentURL
-			currentURL = try await transformer.transform(currentURL)
+			currentURL = try transformer.transform(currentURL)
 			iterations += 1
 		}
 
@@ -244,7 +244,7 @@ public extension URLTransformationStrategy {
 			urlString.hasSuffix("&")
 
 		if needsTransformation {
-			return try await transformer.transform(url)
+			return try transformer.transform(url)
 		}
 
 		return url
@@ -267,7 +267,7 @@ public extension URLTransformationStrategy {
 			throw DeepLinkError.invalidURL(url)
 		}
 
-		return try await transformer.transform(url)
+		return try transformer.transform(url)
 	}
 
 	/// Batch transformation strategy that applies multiple transformers in sequence.
@@ -278,8 +278,8 @@ public extension URLTransformationStrategy {
 		var result = url
 
 		// Apply transformation twice to simulate batch processing
-		result = try await transformer.transform(result)
-		result = try await transformer.transform(result)
+		result = try transformer.transform(result)
+		result = try transformer.transform(result)
 
 		return result
 	}
@@ -293,14 +293,14 @@ import Foundation
 
 /// Protocol for URL transformers
 public protocol URLTransformer: Sendable {
-	func transform(_ url: URL) async throws -> URL
+	func transform(_ url: URL) throws -> URL
 }
 
 /// Default URL transformer that normalizes URLs
 public final class URLNormalizationTransformer: URLTransformer {
 	public init() {}
 
-	public func transform(_ url: URL) async throws -> URL {
+	public func transform(_ url: URL) throws -> URL {
 		guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
 			throw DeepLinkError.invalidURL(url)
 		}

@@ -14,13 +14,13 @@ import os
 ///
 /// ## Features:
 /// - Simulated authentication state management
-/// - Async authentication checking
+/// - Synchronous authentication checking
 /// - Thread-safe state mutations via `OSAllocatedUnfairLock`
 ///
 /// ## Usage:
 /// ```swift
 /// let authProvider = SampleAuthenticationProvider()
-/// let isAuthenticated = await authProvider.isAuthenticated()
+/// let isAuthenticated = authProvider.isAuthenticated()
 ///
 /// // For testing
 /// authProvider.toggleAuthentication()
@@ -35,9 +35,8 @@ final class SampleAuthenticationProvider: AuthenticationProvider, Sendable {
 	/// Checks if the user is currently authenticated.
 	///
 	/// - Returns: `true` if the user is authenticated, `false` otherwise
-	func isAuthenticated() async -> Bool {
-		try? await Task.sleep(nanoseconds: 10_000_000) // 10ms delay
-		return state.withLock { $0 }
+	func isAuthenticated() -> Bool {
+		state.withLock { $0 }
 	}
 
 	/// Toggles the authentication state for testing purposes.

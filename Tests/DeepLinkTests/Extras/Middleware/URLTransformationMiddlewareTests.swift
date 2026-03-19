@@ -43,13 +43,13 @@ struct URLTransformationMiddlewareTests {
 			self.transformedURL = transformedURL
 		}
 
-		func transform(_: URL) async throws -> URL {
+		func transform(_: URL) throws -> URL {
 			transformedURL
 		}
 	}
 
 	private final class ErrorThrowingTransformer: URLTransformer {
-		func transform(_: URL) async throws -> URL {
+		func transform(_: URL) throws -> URL {
 			throw DeepLinkError.handlerError("Transformer error")
 		}
 	}

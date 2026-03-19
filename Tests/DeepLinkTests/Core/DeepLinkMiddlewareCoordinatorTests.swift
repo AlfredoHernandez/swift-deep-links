@@ -344,11 +344,11 @@ struct DeepLinkMiddlewareCoordinatorTests {
 	}
 
 	@Test("URLNormalizationTransformer normalizes URLs")
-	func urlNormalizationTransformer_normalizesURLs() async throws {
+	func urlNormalizationTransformer_normalizesURLs() throws {
 		let testURL = try #require(URL(string: "testapp://test//path?param1=value1&param2="))
 		let transformer = URLNormalizationTransformer()
 
-		let result = try await transformer.transform(testURL)
+		let result = try transformer.transform(testURL)
 
 		#expect(result.path == "/path")
 		#expect(result.query?.contains("param1=value1") == true)
@@ -426,7 +426,7 @@ struct DeepLinkMiddlewareCoordinatorTests {
 			self.transformedURL = transformedURL
 		}
 
-		func transform(_: URL) async throws -> URL {
+		func transform(_: URL) throws -> URL {
 			transformedURL
 		}
 	}

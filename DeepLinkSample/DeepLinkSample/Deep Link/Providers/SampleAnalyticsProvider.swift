@@ -22,7 +22,7 @@ import os
 /// ## Usage:
 /// ```swift
 /// let analyticsProvider = SampleAnalyticsProvider()
-/// await analyticsProvider.track("deep_link_opened", parameters: ["url": url.absoluteString])
+/// analyticsProvider.track("deep_link_opened", parameters: ["url": url.absoluteString])
 ///
 /// // For testing
 /// let events = analyticsProvider.getTrackedEvents()
@@ -39,8 +39,7 @@ final class SampleAnalyticsProvider: AnalyticsProvider, Sendable {
 	/// - Parameters:
 	///   - event: The name of the event to track
 	///   - parameters: Optional parameters associated with the event
-	func track(_ event: String, parameters: [String: Any]) async {
-		try? await Task.sleep(nanoseconds: 5_000_000) // 5ms delay
+	func track(_ event: String, parameters: [String: Any]) {
 		state.withLockUnchecked { $0.append((event: event, parameters: parameters)) }
 		print("Analytics: \(event) - \(parameters)")
 	}

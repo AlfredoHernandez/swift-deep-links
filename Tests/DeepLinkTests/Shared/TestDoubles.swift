@@ -80,19 +80,19 @@ final class AnalyticsProviderSpy: AnalyticsProvider, @unchecked Sendable {
 
 	private(set) var trackedEvents: [TrackedEvent] = []
 
-	func track(_ event: String, parameters: [String: Any]) async {
+	func track(_ event: String, parameters: [String: Any]) {
 		trackedEvents.append(TrackedEvent(event: event, parameters: parameters))
 	}
 }
 
 final class AuthenticationProviderStub: AuthenticationProvider {
-	private let isAuthenticated: Bool
+	private let authenticated: Bool
 
 	init(isAuthenticated: Bool) {
-		self.isAuthenticated = isAuthenticated
+		authenticated = isAuthenticated
 	}
 
-	func isAuthenticated() async -> Bool {
-		isAuthenticated
+	func isAuthenticated() -> Bool {
+		authenticated
 	}
 }

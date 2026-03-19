@@ -9,11 +9,11 @@ import Testing
 @Suite("URLNormalizationTransformer Tests")
 struct URLNormalizationTransformerTests {
 	@Test("URLNormalizationTransformer normalizes URLs correctly")
-	func urlNormalizationTransformer_normalizesURLsCorrectly() async throws {
+	func urlNormalizationTransformer_normalizesURLsCorrectly() throws {
 		let testURL = try #require(URL(string: "testapp://test//path?param1=value1&param2=&param3=value3"))
 		let transformer = URLNormalizationTransformer()
 
-		let result = try await transformer.transform(testURL)
+		let result = try transformer.transform(testURL)
 
 		#expect(result.path == "/path")
 		#expect(result.query?.contains("param1=value1") == true)
@@ -22,22 +22,22 @@ struct URLNormalizationTransformerTests {
 	}
 
 	@Test("URLNormalizationTransformer handles URLs without query parameters")
-	func urlNormalizationTransformer_handlesURLsWithoutQueryParameters() async throws {
+	func urlNormalizationTransformer_handlesURLsWithoutQueryParameters() throws {
 		let testURL = try #require(URL(string: "testapp://test//path"))
 		let transformer = URLNormalizationTransformer()
 
-		let result = try await transformer.transform(testURL)
+		let result = try transformer.transform(testURL)
 
 		#expect(result.path == "/path")
 		#expect(result.query == nil)
 	}
 
 	@Test("URLNormalizationTransformer handles URLs with empty path")
-	func urlNormalizationTransformer_handlesURLsWithEmptyPath() async throws {
+	func urlNormalizationTransformer_handlesURLsWithEmptyPath() throws {
 		let testURL = try #require(URL(string: "testapp://host"))
 		let transformer = URLNormalizationTransformer()
 
-		let result = try await transformer.transform(testURL)
+		let result = try transformer.transform(testURL)
 
 		#expect(result.path == "")
 		#expect(result.host == "host")

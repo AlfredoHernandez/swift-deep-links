@@ -55,9 +55,9 @@ import Foundation
 /// ### Custom Provider
 /// ```swift
 /// struct MyAnalyticsProvider: AnalyticsProvider {
-///     func track(_ event: String, parameters: [String: Any]) async {
+///     func track(_ event: String, parameters: [String: Any]) {
 ///         // Send to Firebase Analytics, Mixpanel, etc.
-///         await FirebaseAnalytics.track(event: event, parameters: parameters)
+///         FirebaseAnalytics.track(event: event, parameters: parameters)
 ///     }
 /// }
 ///
@@ -107,7 +107,7 @@ public final class AnalyticsMiddleware: DeepLinkMiddleware {
 	/// - Returns: The same URL to allow continued processing, or `nil` if it should be cancelled
 	/// - Throws: Does not throw errors in the current implementation
 	public func intercept(_ url: URL) async throws -> URL? {
-		await strategy.track(url: url, provider: analyticsProvider)
+		strategy.track(url: url, provider: analyticsProvider)
 		return url
 	}
 }
@@ -135,9 +135,9 @@ import os.log
 /// ## Basic Implementation Example
 /// ```swift
 /// struct MyAnalyticsProvider: AnalyticsProvider {
-///     func track(_ event: String, parameters: [String: Any]) async {
+///     func track(_ event: String, parameters: [String: Any]) {
 ///         // Send to your analytics service
-///         await MyAnalyticsService.track(event: event, parameters: parameters)
+///         MyAnalyticsService.track(event: event, parameters: parameters)
 ///     }
 /// }
 /// ```
@@ -147,11 +147,8 @@ import os.log
 /// import FirebaseAnalytics
 ///
 /// struct FirebaseAnalyticsProvider: AnalyticsProvider {
-///     func track(_ event: String, parameters: [String: Any]) async {
-///         await withCheckedContinuation { continuation in
-///             Analytics.logEvent(event, parameters: parameters)
-///             continuation.resume()
-///         }
+///     func track(_ event: String, parameters: [String: Any]) {
+///         Analytics.logEvent(event, parameters: parameters)
 ///     }
 /// }
 /// ```
@@ -170,7 +167,7 @@ public protocol AnalyticsProvider: Sendable {
 	/// - Parameters:
 	///   - event: The name of the event to track (e.g., "deep_link_opened")
 	///   - parameters: Dictionary with the event parameters
-	func track(_ event: String, parameters: [String: Any]) async
+	func track(_ event: String, parameters: [String: Any])
 }
 
 /// Default analytics provider that logs events to system logs.
@@ -281,7 +278,7 @@ public final class DefaultAnalyticsProvider: AnalyticsProvider {
 	/// ```
 	/// Analytics: deep_link_opened - url: myApp://product/123, scheme: myApp, host: product, timestamp: 1640995200.0
 	/// ```
-	public func track(_ event: String, parameters: [String: Any]) async {
+	public func track(_ event: String, parameters: [String: Any]) {
 		let parametersString = parameters.map { "\($0.key): \($0.value)" }.joined(separator: ", ")
 		logger.info("Analytics: \(event) - \(parametersString)")
 	}
@@ -356,9 +353,9 @@ import Foundation
 /// - SeeAlso: ``AnalyticsMiddleware`` to implement the middleware
 /// - SeeAlso: ``AnalyticsProvider`` for custom providers
 public struct AnalyticsStrategy: Sendable {
-	private let trackFunction: @Sendable (URL, AnalyticsProvider) async -> Void
+	private let trackFunction: @Sendable (URL, AnalyticsProvider) -> Void
 
-	init(_ trackFunction: @escaping @Sendable (URL, AnalyticsProvider) async -> Void) {
+	init(_ trackFunction: @escaping @Sendable (URL, AnalyticsProvider) -> Void) {
 		self.trackFunction = trackFunction
 	}
 
@@ -370,8 +367,8 @@ public struct AnalyticsStrategy: Sendable {
 	/// - Parameters:
 	///   - url: The deep link URL to track
 	///   - provider: The analytics provider that will receive the data
-	func track(url: URL, provider: AnalyticsProvider) async {
-		await trackFunction(url, provider)
+	func track(url: URL, provider: AnalyticsProvider) {
+		trackFunction(url, provider)
 	}
 }
 
@@ -417,7 +414,7 @@ public extension AnalyticsStrategy {
 	/// )
 	/// ```
 	static let standard = AnalyticsStrategy { url, provider in
-		await provider.track("deep_link_opened", parameters: [
+		provider.track("deep_link_opened", parameters: [
 			"url": url.absoluteString,
 			"scheme": url.scheme ?? "unknown",
 			"host": url.host ?? "unknown",
@@ -504,7 +501,7 @@ public extension AnalyticsStrategy {
 			parameters["query_parameters"] = queryParams
 		}
 
-		await provider.track("deep_link_opened", parameters: parameters)
+		provider.track("deep_link_opened", parameters: parameters)
 	}
 
 	/// Minimal analytics tracking strategy with only essential information.
@@ -564,7 +561,7 @@ public extension AnalyticsStrategy {
 	/// )
 	/// ```
 	static let minimal = AnalyticsStrategy { url, provider in
-		await provider.track("deep_link_opened", parameters: [
+		provider.track("deep_link_opened", parameters: [
 			"scheme": url.scheme ?? "unknown",
 			"host": url.host ?? "unknown",
 			"timestamp": Date().timeIntervalSince1970,
@@ -634,7 +631,7 @@ public extension AnalyticsStrategy {
 	static let performance = AnalyticsStrategy { url, provider in
 		let startTime = Date()
 
-		await provider.track("deep_link_opened", parameters: [
+		provider.track("deep_link_opened", parameters: [
 			"url": url.absoluteString,
 			"scheme": url.scheme ?? "unknown",
 			"host": url.host ?? "unknown",
