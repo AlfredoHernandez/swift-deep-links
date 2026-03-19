@@ -2,7 +2,7 @@
 //  Copyright © 2026 Jesús Alfredo Hernández Alarcón. All rights reserved.
 //
 
-struct ProfileDeepLinkParameters: Decodable {
+nonisolated struct ProfileDeepLinkParameters: Decodable, Sendable {
 	let userID: String
 	let name: String?
 }

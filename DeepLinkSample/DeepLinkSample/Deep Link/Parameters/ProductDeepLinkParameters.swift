@@ -2,7 +2,7 @@
 //  Copyright © 2026 Jesús Alfredo Hernández Alarcón. All rights reserved.
 //
 
-struct ProductDeepLinkParameters: Decodable {
+nonisolated struct ProductDeepLinkParameters: Decodable, Sendable {
 	let productID: String
 	let category: String?
 }

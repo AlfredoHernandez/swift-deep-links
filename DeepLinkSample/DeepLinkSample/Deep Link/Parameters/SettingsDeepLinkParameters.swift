@@ -2,6 +2,6 @@
 //  Copyright © 2026 Jesús Alfredo Hernández Alarcón. All rights reserved.
 //
 
-struct SettingsDeepLinkParameters: Decodable {
+nonisolated struct SettingsDeepLinkParameters: Decodable, Sendable {
 	let section: String
 }

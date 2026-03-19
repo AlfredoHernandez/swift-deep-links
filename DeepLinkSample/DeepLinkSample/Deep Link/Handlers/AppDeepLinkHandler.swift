@@ -48,21 +48,23 @@ final class AppDeepLinkHandler: DeepLinkHandler {
 	/// - Parameter route: The parsed deep link route to handle
 	/// - Throws: No errors are currently thrown, but the method signature supports future error handling
 	func handle(_ route: AppRoute) async throws {
-		switch route {
-		case let .stack(navigationRoute):
-			navigationRouter.push(to: navigationRoute)
+		await MainActor.run {
+			switch route {
+			case let .stack(navigationRoute):
+				navigationRouter.push(to: navigationRoute)
 
-		case let .sheet(sheet):
-			navigationRouter.sheet = sheet
+			case let .sheet(sheet):
+				navigationRouter.sheet = sheet
 
-		case let .alert(alert):
-			switch alert {
-			case let .alert(title, message, type):
-				navigationRouter.alert = NavigationRouter.AlertItem(
-					title: title,
-					message: message,
-					type: Alert.AlertType(rawValue: type.rawValue) ?? .info,
-				)
+			case let .alert(alert):
+				switch alert {
+				case let .alert(title, message, type):
+					navigationRouter.alert = NavigationRouter.AlertItem(
+						title: title,
+						message: message,
+						type: Alert.AlertType(rawValue: type.rawValue) ?? .info,
+					)
+				}
 			}
 		}
 	}
