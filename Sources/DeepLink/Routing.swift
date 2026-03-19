@@ -36,10 +36,6 @@ import Foundation
 /// - Throws `routeNotFound` if no parser can handle the URL
 /// - Logs errors for debugging
 ///
-/// ## See Also
-///
-/// - ``RoutingOf``
-///
 /// - AssociatedType Route: The type of route this routing system produces
 public protocol DeepLinkRouting<Route>: Sendable {
 	/// The type of route this routing system produces.

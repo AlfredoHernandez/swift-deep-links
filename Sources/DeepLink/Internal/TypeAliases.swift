@@ -2,8 +2,6 @@
 //  Copyright © 2026 Jesús Alfredo Hernández Alarcón. All rights reserved.
 //
 
-import Foundation
-
 // MARK: - Convenience Type Aliases
 
 /// A convenience type alias for `DeepLinkCoordinator<R.Route>` where `R` is a `DeepLinkRoute`.
@@ -20,51 +18,6 @@ import Foundation
 /// let coordinator: CoordinatorOf<AppRoute> = ...
 /// ```
 public typealias CoordinatorOf<Route: DeepLinkRoute> = DeepLinkCoordinator<Route>
-
-/// A convenience type alias for `any DeepLinkParser<Route>`.
-///
-/// This type alias provides a more ergonomic way to reference existential parser types.
-///
-/// ## Usage
-///
-/// ```swift
-/// // Before
-/// let parser: any DeepLinkParser<AppRoute> = ...
-///
-/// // After
-/// let parser: ParserOf<AppRoute> = ...
-/// ```
-public typealias ParserOf<Route: DeepLinkRoute> = any DeepLinkParser<Route>
-
-/// A convenience type alias for `any DeepLinkHandler<Route>`.
-///
-/// This type alias provides a more ergonomic way to reference existential handler types.
-///
-/// ## Usage
-///
-/// ```swift
-/// // Before
-/// let handler: any DeepLinkHandler<AppRoute> = ...
-///
-/// // After
-/// let handler: HandlerOf<AppRoute> = ...
-/// ```
-public typealias HandlerOf<Route: DeepLinkRoute> = any DeepLinkHandler<Route>
-
-/// A convenience type alias for `any DeepLinkRouting<Route>`.
-///
-/// This type alias provides a more ergonomic way to reference existential routing types.
-///
-/// ## Usage
-///
-/// ```swift
-/// // Before
-/// let routing: any DeepLinkRouting<AppRoute> = ...
-///
-/// // After
-/// let routing: RoutingOf<AppRoute> = ...
-/// ```
-public typealias RoutingOf<Route: DeepLinkRoute> = any DeepLinkRouting<Route>
 
 /// A convenience type alias for `DeepLinkResult<Route>`.
 ///

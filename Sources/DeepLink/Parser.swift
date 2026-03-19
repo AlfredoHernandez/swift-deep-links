@@ -39,10 +39,6 @@ import Foundation
 /// A single parser can return multiple routes from a single URL, allowing for
 /// complex navigation scenarios where one deep link should trigger multiple actions.
 ///
-/// ## See Also
-///
-/// - ``ParserOf``
-///
 /// - AssociatedType Route: The type of route this parser can produce
 public protocol DeepLinkParser<Route>: Sendable {
 	/// The type of route this parser can produce.

@@ -32,10 +32,6 @@
 /// The `handle` method is async and should be implemented to handle any necessary
 /// thread management, particularly when updating UI components.
 ///
-/// ## See Also
-///
-/// - ``HandlerOf``
-///
 /// - AssociatedType Route: The type of route this handler can process
 public protocol DeepLinkHandler<Route>: Sendable {
 	/// The type of route this handler can process.
