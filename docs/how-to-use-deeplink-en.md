@@ -28,7 +28,7 @@ The library has four core protocols:
 
 The `DeepLinkCoordinator` orchestrates the flow:
 
-```
+```text
 URL → Middleware → Routing (Parsers) → Handler → Navigation
 ```
 
@@ -192,7 +192,7 @@ struct MyApp: App {
 
 Middleware processes URLs before routing. Each can pass through, transform, or stop the URL.
 
-```
+```text
 URL → Security → RateLimit → Auth → Transform → Analytics → Logging → Router
 ```
 

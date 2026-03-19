@@ -58,7 +58,7 @@ public actor InMemoryRateLimitPersistence: RateLimitPersistence {
 
 	/// Retrieves all stored request timestamps.
 	///
-	/// - Returns: An array of timestamps representing when requests were recorded, in chronological order.
+	/// - Returns: An array of timestamps representing when requests were recorded.
 	public func loadRequests() -> [TimeInterval] {
 		timestamps
 	}

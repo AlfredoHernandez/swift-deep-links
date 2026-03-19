@@ -110,7 +110,7 @@ struct MyApp: App {
 
 URLs flow through middleware in order before reaching the router. Each middleware can pass through, transform, or stop the URL.
 
-```
+```text
 URL → Security → RateLimit → Auth → Transform → Analytics → Logging → Router
 ```
 
