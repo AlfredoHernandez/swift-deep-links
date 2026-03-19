@@ -24,6 +24,7 @@ final class DeepLinkViewModel {
 	private let deepLinkService: DeepLinkService
 	private let logger = Logger(subsystem: "swift-deep-link-sample-app", category: "DeepLinkViewModel")
 	private var processingTask: Task<Void, Never>?
+	private var coordinator: CoordinatorOf<AppRoute>?
 
 	// MARK: - Public Properties
 
@@ -41,11 +42,8 @@ final class DeepLinkViewModel {
 
 	// MARK: - Initialization
 
-	/// Creates a new DeepLinkViewModel with the specified deep link service.
-	///
-	/// - Parameter deepLinkService: The service responsible for deep link processing
-	init(deepLinkService: DeepLinkService = DeepLinkService()) {
-		self.deepLinkService = deepLinkService
+	init() {
+		deepLinkService = DeepLinkService(navigationRouter: navigationRouter)
 	}
 
 	// MARK: - Public Interface
@@ -64,13 +62,13 @@ final class DeepLinkViewModel {
 			processingError = nil
 
 			do {
-				let coordinator = try await deepLinkService.createCoordinator(navigationRouter: navigationRouter)
+				let coordinator = try await getOrCreateCoordinator()
 				let result = await coordinator.handle(url: url)
 
 				guard !Task.isCancelled else { return }
 
 				lastResult = result
-				logDeepLinkResult(result)
+				logResult(result)
 
 				if !result.wasSuccessful {
 					processingError = DeepLinkError.routeNotFound("Deep link processing failed")
@@ -96,6 +94,7 @@ final class DeepLinkViewModel {
 	func reset() {
 		processingTask?.cancel()
 		processingTask = nil
+		coordinator = nil
 		isProcessing = false
 		lastResult = nil
 		processingError = nil
@@ -105,60 +104,25 @@ final class DeepLinkViewModel {
 // MARK: - Private Methods
 
 private extension DeepLinkViewModel {
-	/// Logs detailed information about the deep link processing result.
-	///
-	/// This method provides comprehensive logging of the deep link processing result,
-	/// including success/failure status, routes processed, execution time, and any errors.
-	/// The logs are formatted for easy reading in the console and include emojis for
-	/// quick visual identification of the processing status.
-	///
-	/// - Parameter result: The result of the deep link processing
-	func logDeepLinkResult(_ result: ResultOf<AppRoute>) {
-		let separator = String(repeating: "=", count: 50)
-		print("\n" + separator)
-		print("🔗 DEEP LINK PROCESSING RESULT")
-		print(separator)
-
-		// Basic information
-		print("📱 Original URL: \(result.originalURL.absoluteString)")
-		if let processedURL = result.processedURL {
-			print("⚙️  Processed URL: \(processedURL.absoluteString)")
-		} else {
-			print("⚠️  Processed URL: nil (stopped by middleware)")
+	func getOrCreateCoordinator() async throws -> CoordinatorOf<AppRoute> {
+		if let coordinator {
+			return coordinator
 		}
+		let newCoordinator = try await deepLinkService.createCoordinator()
+		coordinator = newCoordinator
+		return newCoordinator
+	}
 
-		// Processing status
-		if result.wasSuccessful {
-			print("✅ Status: SUCCESS")
-		} else {
-			print("❌ Status: FAILED")
-		}
+	func logResult(_ result: ResultOf<AppRoute>) {
+		let status = result.wasSuccessful ? "success" : "failed"
+		let routes = result.routes.map(\.id).joined(separator: ", ")
 
-		// Routes information
-		print("🛣️  Routes Found: \(result.routes.count)")
-		if !result.routes.isEmpty {
-			for (index, route) in result.routes.enumerated() {
-				print("   \(index + 1). \(route.id)")
-			}
-		}
+		logger.info("Deep link processed: \(result.originalURL.absoluteString) [\(status)] routes=[\(routes)] time=\(String(format: "%.3f", result.executionTime))s")
 
-		// Execution metrics
-		print("⏱️  Execution Time: \(String(format: "%.3f", result.executionTime))s")
-		print("✅ Successful Routes: \(result.successfulRoutes)")
-		print("❌ Failed Routes: \(result.failedRoutes)")
-
-		// Errors
 		if result.hasErrors {
-			print("🚨 Errors (\(result.errors.count)):")
-			for (index, error) in result.errors.enumerated() {
-				print("   \(index + 1). \(error.localizedDescription)")
+			for error in result.errors {
+				logger.error("Deep link error: \(error.localizedDescription)")
 			}
-		} else {
-			print("✨ No Errors")
 		}
-
-		// Summary
-		print("📋 Summary: \(result.summary)")
-		print(separator + "\n")
 	}
 }

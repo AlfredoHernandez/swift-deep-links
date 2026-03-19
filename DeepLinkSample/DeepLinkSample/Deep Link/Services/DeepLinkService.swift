@@ -22,11 +22,21 @@ final class DeepLinkService {
 	// MARK: - Private Properties
 
 	private let logger = Logger(subsystem: "swift-deep-link-sample-app", category: "DeepLinkService")
+	private let navigationRouter: NavigationRouter
 
 	// MARK: - Service Providers
 
-	private lazy var authenticationProvider = SampleAuthenticationProvider()
-	private lazy var analyticsProvider = SampleAnalyticsProvider()
+	private let authenticationProvider = SampleAuthenticationProvider()
+	private let analyticsProvider = SampleAnalyticsProvider()
+
+	// MARK: - Initialization
+
+	/// Creates a new deep link service.
+	///
+	/// - Parameter navigationRouter: The navigation router for handling route actions
+	init(navigationRouter: NavigationRouter) {
+		self.navigationRouter = navigationRouter
+	}
 
 	// MARK: - Public Interface
 
@@ -56,10 +66,9 @@ final class DeepLinkService {
 	/// .delegate(compose(.logging(enableDebugLogging: true), .analytics(provider: provider)))
 	/// ```
 	///
-	/// - Parameter navigationRouter: The navigation router for handling route actions
 	/// - Returns: A fully configured deep link coordinator
 	/// - Throws: `DeepLinkError` if coordinator creation fails
-	func createCoordinator(navigationRouter: NavigationRouter) async throws -> CoordinatorOf<AppRoute> {
+	func createCoordinator() async throws -> CoordinatorOf<AppRoute> {
 		logger.info("Creating deep link coordinator")
 
 		// Configure parsers
