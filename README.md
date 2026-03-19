@@ -6,127 +6,74 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Swift Package Manager](https://img.shields.io/badge/SPM-supported-DE5C43.svg)](https://swift.org/package-manager/)
 
-A clean, modular, and extensible deep link handling library for iOS and macOS applications built with Swift.
+A modular deep link handling library for Swift with a composable middleware pipeline, type-safe routing, and full Swift 6 concurrency support.
 
-## Why Swift Deep Link?
-
-Deep links are essential for modern apps to provide seamless navigation from external sources like web pages, notifications, or other apps. However, handling deep links can quickly become complex and hard to maintain as your app grows.
-
-Swift Deep Link solves this by providing:
-
-- **Clean Architecture** - Separation of concerns between URL parsing, routing, middleware, and action handling
-- **Type Safety** - Generic-based design ensures compile-time safety
-- **Middleware Pipeline** - Composable middleware chain for security, rate limiting, authentication, analytics, and more
-- **Extensibility** - Easy to add new deep link types without modifying existing code
-- **Testability** - Protocol-oriented design enables easy unit testing and mocking
-- **Modern Swift** - Built with Swift 6.2+ using async/await, actors, and strict Sendable compliance
-
-## Features
-
-| Feature | Description |
-|---------|-------------|
-| **Middleware Pipeline** | Composable chain: security, rate limiting, auth, analytics, logging, URL transformation, readiness gating |
-| **Builder Pattern** | Fluent, immutable API for coordinator configuration |
-| **Delegate System** | Observable lifecycle events with composite delegate support |
-| **Strategy Pattern** | Swappable behaviors for each middleware via protocol witnesses |
-| **Factory Methods** | Clean `.rateLimit()`, `.security()`, `.logging()` syntax |
-| **Functional Composition** | `compose()` functions for middleware and delegates |
-| **Readiness Queue** | Gate deep links until the app is ready, then drain and process |
-| **Thread Safety** | Actors, `OSAllocatedUnfairLock`, and strict `Sendable` conformance |
-| **Async/Await** | Full Swift Concurrency support throughout |
+- **Middleware pipeline** — security, rate limiting, auth, analytics, logging, URL transformation, readiness gating
+- **Builder pattern** — fluent, immutable coordinator configuration
+- **Strategy pattern** — swappable behaviors per middleware via protocol witnesses
+- **Factory methods** — clean `.rateLimit()`, `.security()`, `.logging()` syntax
+- **Functional composition** — `compose()` for middleware and delegates
+- **Thread safe** — actors, `OSAllocatedUnfairLock`, strict `Sendable`
 
 ## Installation
 
-### Swift Package Manager
-
-Add the following dependency to your `Package.swift`:
-
 ```swift
+// Package.swift
 dependencies: [
     .package(url: "https://github.com/AlfredoHernandez/swift-deep-links.git", from: "1.0.0")
 ]
-```
 
-Then add `"DeepLinks"` to your target's dependencies:
-
-```swift
+// Target
 .target(name: "YourApp", dependencies: ["DeepLinks"])
 ```
 
-Or add it through Xcode: **File > Add Package Dependencies** and enter the repository URL.
-
-## Quick Start
-
-### 1. Define Your Routes
+## Minimal Example
 
 ```swift
 import DeepLinks
 
+// 1. Route
 enum AppRoute: DeepLinkRoute {
     case profile(userID: String)
-    case product(productID: String, category: String)
-    case settings(section: String)
-
-    var id: String {
-        switch self {
-        case .profile(let userID): "profile_\(userID)"
-        case .product(let productID, _): "product_\(productID)"
-        case .settings(let section): "settings_\(section)"
-        }
-    }
+    var id: String { "profile_\(userID)" }
+    private var userID: String { if case .profile(let id) = self { id } else { "" } }
 }
-```
 
-### 2. Create Parsers
-
-```swift
+// 2. Parser
 final class ProfileParser: DeepLinkParser {
     typealias Route = AppRoute
-
     func parse(from url: URL) async throws -> [AppRoute] {
-        let deepLinkURL = try DeepLinkURL(url: url)
-        guard deepLinkURL.host == "profile" else {
-            throw DeepLinkError.unsupportedHost(deepLinkURL.host)
-        }
-        guard let userID = deepLinkURL.queryParameters["userID"] else {
-            throw DeepLinkError.missingRequiredParameter("userID")
-        }
-        return [.profile(userID: userID)]
+        let parsed = try DeepLinkURL(url: url)
+        guard parsed.host == "profile" else { throw DeepLinkError.unsupportedHost(parsed.host) }
+        guard let id = parsed.queryParameters["userID"] else { throw DeepLinkError.missingRequiredParameter("userID") }
+        return [.profile(userID: id)]
     }
 }
-```
 
-### 3. Implement a Handler
-
-```swift
+// 3. Handler
 final class AppHandler: DeepLinkHandler {
     typealias Route = AppRoute
-    private let router: NavigationRouter
-
-    init(router: NavigationRouter) {
-        self.router = router
-    }
-
-    func handle(_ route: AppRoute) async throws {
-        await MainActor.run {
-            switch route {
-            case .profile(let userID):
-                router.push(to: .profile(userID: userID))
-            case .product(let productID, let category):
-                router.push(to: .product(productID: productID, category: category))
-            case .settings(let section):
-                router.push(to: .settings(section: section))
-            }
-        }
-    }
+    func handle(_ route: AppRoute) async throws { print("Navigating to \(route.id)") }
 }
+
+// 4. Wire it up
+let coordinator = DeepLinkCoordinator(
+    routing: DefaultDeepLinkRouting(parsers: [ProfileParser()]),
+    handler: AppHandler()
+)
+let result = await coordinator.handle(url: URL(string: "myapp://profile?userID=42")!)
+print(result.summary) // "Successfully processed 1 route(s) in 0.001s"
 ```
 
-### 4. Set Up the Coordinator with the Builder
+## Full Setup with Builder
+
+For production apps, use the builder with middleware and delegates:
 
 ```swift
 let coordinator = try await DeepLinkCoordinatorBuilder<AppRoute>()
-    .routing(DefaultDeepLinkRouting(parsers: [ProfileParser(), ProductParser()]))
+    .routing(DefaultDeepLinkRouting(parsers: [
+        ProfileParser(), ProductParser(), SettingsParser()
+    ]))
     .handler(AppHandler(router: navigationRouter))
     .middleware(
         .security(allowedSchemes: ["myapp"], allowedHosts: ["profile", "product"]),
@@ -141,7 +88,7 @@ let coordinator = try await DeepLinkCoordinatorBuilder<AppRoute>()
     .build()
 ```
 
-### 5. Handle Deep Links in SwiftUI
+Integrate with SwiftUI:
 
 ```swift
 @main
@@ -160,46 +107,39 @@ struct MyApp: App {
 
 ## Middleware
 
-The middleware pipeline processes URLs in order before they reach the router. Each middleware can pass through, transform, or stop the URL.
+URLs flow through middleware in order before reaching the router. Each middleware can pass through, transform, or stop the URL.
 
 ```
-URL -> Security -> RateLimit -> Auth -> Transform -> Analytics -> Logging -> Router
+URL → Security → RateLimit → Auth → Transform → Analytics → Logging → Router
 ```
 
-| Middleware | Purpose | Factory Method |
-|-----------|---------|----------------|
-| **Security** | Validate schemes, hosts, block patterns | `.security(allowedSchemes:allowedHosts:blockedPatterns:strategy:)` |
-| **Rate Limit** | Prevent abuse with sliding/fixed windows | `.rateLimit(maxRequests:timeWindow:persistence:strategy:)` |
-| **Authentication** | Gate protected routes on auth state | `.authentication(provider:protectedHosts:strategy:)` |
-| **URL Transformation** | Normalize and transform URLs | `.urlTransformation(transformer:strategy:)` |
-| **Analytics** | Track deep link events | `.analytics(provider:strategy:)` |
-| **Logging** | Log deep link processing | `.logging(provider:logLevel:format:)` |
-| **Readiness** | Queue URLs until app is ready | `.readiness(queue:)` |
+| Middleware | Purpose |
+|-----------|---------|
+| **Security** | Validate schemes, hosts, block patterns |
+| **Rate Limit** | Prevent abuse (sliding window, fixed window) |
+| **Authentication** | Gate protected routes on auth state |
+| **URL Transformation** | Normalize and transform URLs |
+| **Analytics** | Track deep link events |
+| **Logging** | Log processing (single-line, JSON, detailed) |
+| **Readiness** | Queue URLs until app is ready |
 
-Each middleware supports multiple **strategies** (e.g., `.slidingWindow`, `.fixedWindow`, `.permissive` for rate limiting). See the [API Reference](./docs/api-reference-en.md) for details.
+Each middleware supports multiple **strategies** (e.g., `.standard`, `.strict`, `.permissive`). See the [API Reference](./docs/api-reference-en.md) for all options.
 
-## Readiness Middleware
+### Readiness Gating
 
-Gate deep link processing until your app is ready (e.g., after onboarding, auth, or initial setup):
+Queue deep links until your app is ready, then drain and process:
 
 ```swift
 let queue = DeepLinkReadinessQueue(maxQueueSize: 50)
 
-let coordinator = try await DeepLinkCoordinatorBuilder<AppRoute>()
-    .routing(routing)
-    .handler(handler)
-    .middleware(.readiness(queue: queue))
-    .build()
+// Add to middleware stack
+.middleware(.readiness(queue: queue))
 
-// Deep links arriving now are queued...
-
-// When the app is ready, drain and process:
+// When the app is ready:
 let pending = queue.markReady()
-for url in pending {
-    await coordinator.handle(url: url)
-}
+for url in pending { await coordinator.handle(url: url) }
 
-// To re-gate (e.g., on logout):
+// On logout — re-gate:
 queue.reset()
 ```
 
@@ -215,87 +155,29 @@ Observe the coordinator lifecycle without modifying it:
 ))
 ```
 
-| Delegate | Events Tracked |
-|----------|---------------|
-| **Logging** | Logs all processing events via OSLog |
-| **Analytics** | Tracks `deep_link_attempted`, `deep_link_processed`, `deep_link_failed` |
-| **Notification** | Shows `UserNotifications` for success/error/info |
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                   DeepLinkCoordinator                   │
-│                                                         │
-│  URL ──► MiddlewareCoordinator ──► Routing ──► Handler  │
-│              │                        │                 │
-│              ▼                        ▼                 │
-│    ┌──────────────────┐    ┌──────────────────┐         │
-│    │ Security         │    │ Parser 1         │         │
-│    │ RateLimit        │    │ Parser 2         │         │
-│    │ Authentication   │    │ Parser N         │         │
-│    │ URLTransformation│    └──────────────────┘         │
-│    │ Analytics        │                                 │
-│    │ Logging          │    Delegate ──► willProcess     │
-│    │ Readiness        │              ──► didProcess     │
-│    └──────────────────┘              ──► didFail        │
-└─────────────────────────────────────────────────────────┘
-```
-
-For detailed architecture diagrams, see:
-- [Architecture Diagram](./docs/architecture-diagram.md) - Complete flow from URL to navigation
-- [Core Package Architecture](./docs/core-architecture-diagram.md) - Internal component interactions
-
 ## Documentation
 
-- [How to Use DeepLink](./docs/how-to-use-deeplink-en.md) - Complete implementation guide
-- [API Reference](./docs/api-reference-en.md) - Detailed API documentation
-- [FAQ](./docs/faq.md) - Frequently asked questions
+- [How to Use DeepLink](./docs/how-to-use-deeplink-en.md) — step-by-step implementation guide
+- [API Reference](./docs/api-reference-en.md) — complete type and method reference
+- [Architecture Diagram](./docs/architecture-diagram.md) — system flow with Mermaid
+- [FAQ](./docs/faq.md) — common questions
 
 ## Sample App
 
-The [Sample App](./DeepLinkSample/) demonstrates:
-- Multiple deep link types (profile, product, settings, info, alerts)
-- SwiftUI integration with NavigationStack, sheets, and alerts
-- Full middleware pipeline (security, rate limit, auth, analytics, logging)
-- **Readiness Middleware showcase** with configurable drain delay and random deep links
-- Custom deep link tester for manual URL testing
-- MVVM architecture with the Observation framework
+The [Sample App](./DeepLinkSample/) demonstrates all features: multiple route types, full middleware pipeline, readiness showcase with configurable drain delay, and a custom URL tester. Built with MVVM and the Observation framework.
 
 ## Requirements
 
-- iOS 16.0+ / macOS 13.0+
-- Swift 6.2+
-- Xcode 16.0+
-
-## Testing
-
-```bash
-swift test
-```
-
-Run the sample app:
-
-```bash
-open DeepLinkSample/DeepLinkSample.xcodeproj
-```
-
-## License
-
-Copyright © 2025 Jesús Alfredo Hernández Alarcón. All rights reserved.
+iOS 16+ / macOS 13+ · Swift 6.2+ · Xcode 16+
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+1. Fork → 2. Branch → 3. Commit → 4. PR
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+## License
+
+Copyright © 2026 Jesús Alfredo Hernández Alarcón. All rights reserved.
 
 ## Author
 
-**Jesús Alfredo Hernández Alarcón**
-- GitHub: [@AlfredoHernandez](https://github.com/AlfredoHernandez)
-- X: [@alfredohdzdev](https://x.com/alfredohdzdev)
+**Jesús Alfredo Hernández Alarcón** · [GitHub](https://github.com/AlfredoHernandez) · [X](https://x.com/alfredohdzdev)
