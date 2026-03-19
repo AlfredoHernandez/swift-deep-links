@@ -8,371 +8,195 @@ import Testing
 
 @Suite("RateLimitMiddleware Tests")
 struct RateLimitMiddlewareTests {
-	@Test("RateLimitMiddleware allows requests within limit")
-	func rateLimitMiddleware_allowsRequestsWithinLimit() async throws {
-		let testURL = try #require(URL(string: "testapp://test"))
-		let persistence = InMemoryRateLimitPersistence()
-		let middleware = RateLimitMiddleware(
-			maxRequests: 3,
-			timeWindow: 60.0,
-			persistence: persistence,
-		)
+	@Test("intercept delivers URL within request limit")
+	func intercept_deliversURLWithinRequestLimit() async throws {
+		let (sut, _) = makeSUT(maxRequests: 3)
 
-		// Make 3 requests (within limit)
 		for _ in 0 ..< 3 {
-			let result = try await middleware.intercept(testURL)
+			let result = try await sut.intercept(testURL)
 			#expect(result == testURL)
 		}
 	}
 
-	@Test("RateLimitMiddleware blocks requests exceeding limit")
-	func rateLimitMiddleware_blocksRequestsExceedingLimit() async throws {
-		let testURL = try #require(URL(string: "testapp://test"))
-		let persistence = InMemoryRateLimitPersistence()
-		let middleware = RateLimitMiddleware(
-			maxRequests: 2,
-			timeWindow: 60.0,
-			persistence: persistence,
-		)
+	@Test("intercept throws rate limit exceeded when over limit")
+	func intercept_throwsRateLimitExceededWhenOverLimit() async throws {
+		let (sut, _) = makeSUT(maxRequests: 2)
 
-		// Make 2 requests (within limit)
 		for _ in 0 ..< 2 {
-			let result = try await middleware.intercept(testURL)
-			#expect(result == testURL)
+			_ = try await sut.intercept(testURL)
 		}
 
-		// Third request should be blocked
-		do {
-			_ = try await middleware.intercept(testURL)
-			#expect(Bool(false), "Expected rate limit error")
-		} catch let error as DeepLinkError {
-			#expect(error == .rateLimitExceeded(2, 60.0))
+		await #expect(throws: DeepLinkError.rateLimitExceeded(2, 60.0)) {
+			try await sut.intercept(testURL)
 		}
 	}
 
-	@Test("RateLimitMiddleware resets count after time window")
-	func rateLimitMiddleware_resetsCountAfterTimeWindow() async throws {
-		let testURL = try #require(URL(string: "testapp://test"))
-		let persistence = InMemoryRateLimitPersistence()
-		let middleware = RateLimitMiddleware(
-			maxRequests: 1,
-			timeWindow: 0.1, // Very short window
-			persistence: persistence,
-		)
+	@Test("intercept resets count after time window expires")
+	func intercept_resetsCountAfterTimeWindowExpires() async throws {
+		let (sut, _) = makeSUT(maxRequests: 1, timeWindow: 0.1)
 
-		// First request should succeed
-		let result1 = try await middleware.intercept(testURL)
+		let result1 = try await sut.intercept(testURL)
 		#expect(result1 == testURL)
 
-		// Wait for time window to expire
 		try await Task.sleep(nanoseconds: 150_000_000) // 0.15 seconds
 
-		// Second request should now succeed
-		let result2 = try await middleware.intercept(testURL)
+		let result2 = try await sut.intercept(testURL)
 		#expect(result2 == testURL)
 	}
 
-	@Test("RateLimitMiddleware persists state across instances")
-	func rateLimitMiddleware_persistsStateAcrossInstances() async throws {
-		let testURL = try #require(URL(string: "testapp://test"))
-		let userDefaults = try #require(UserDefaults(suiteName: "test.ratelimit"))
-		let requestsKey = "test.requests"
+	@Test("intercept persists state across middleware instances")
+	func intercept_persistsStateAcrossMiddlewareInstances() async throws {
+		let persistence = try UserDefaultsRateLimitPersistence(
+			userDefaults: #require(UserDefaults(suiteName: "test.ratelimit.\(UUID().uuidString)")),
+			key: "test.requests.\(UUID().uuidString)",
+		)
 
-		// Clear any existing data
-		userDefaults.removeObject(forKey: requestsKey)
-
-		// Create shared persistence for both instances
-		let persistence = UserDefaultsRateLimitPersistence(userDefaults: userDefaults, key: requestsKey)
-
-		// Create first middleware instance and make requests
 		let middleware1 = RateLimitMiddleware(
 			maxRequests: 2,
 			timeWindow: 60.0,
 			persistence: persistence,
 		)
 
-		// Make 2 requests (within limit)
 		for _ in 0 ..< 2 {
-			let result = try await middleware1.intercept(testURL)
-			#expect(result == testURL)
+			_ = try await middleware1.intercept(testURL)
 		}
 
-		// Create second middleware instance (simulating app restart)
 		let middleware2 = RateLimitMiddleware(
 			maxRequests: 2,
 			timeWindow: 60.0,
 			persistence: persistence,
 		)
 
-		// Third request should be blocked (rate limit exceeded)
-		do {
-			_ = try await middleware2.intercept(testURL)
-			#expect(Bool(false), "Expected rate limit error")
-		} catch let error as DeepLinkError {
-			#expect(error == .rateLimitExceeded(2, 60.0))
-		}
-
-		// Clean up
-		await persistence.clearRequests()
-	}
-
-	@Test("RateLimitMiddleware accepts custom queue")
-	func rateLimitMiddleware_acceptsCustomQueue() async throws {
-		let testURL = try #require(URL(string: "testapp://test"))
-		let persistence = InMemoryRateLimitPersistence()
-
-		let middleware = RateLimitMiddleware(
-			maxRequests: 1,
-			timeWindow: 60.0,
-			persistence: persistence,
-		)
-
-		// First request should succeed
-		let result = try await middleware.intercept(testURL)
-		#expect(result == testURL)
-
-		// Second request should be blocked
-		do {
-			_ = try await middleware.intercept(testURL)
-			#expect(Bool(false), "Expected rate limit error")
-		} catch let error as DeepLinkError {
-			#expect(error == .rateLimitExceeded(1, 60.0))
+		await #expect(throws: DeepLinkError.rateLimitExceeded(2, 60.0)) {
+			try await middleware2.intercept(testURL)
 		}
 	}
 
-	@Test("RateLimitMiddleware works with custom persistence implementation")
-	func rateLimitMiddleware_worksWithCustomPersistenceImplementation() async throws {
-		let testURL = try #require(URL(string: "testapp://test"))
-		let customPersistence = InMemoryRateLimitPersistence()
-		let middleware = RateLimitMiddleware(
-			maxRequests: 2,
-			timeWindow: 60.0,
-			persistence: customPersistence,
-		)
+	@Test("intercept persists timestamps on successful requests")
+	func intercept_persistsTimestampsOnSuccessfulRequests() async throws {
+		let (sut, persistence) = makeSUT(maxRequests: 2)
 
-		// Make 2 requests (within limit)
 		for _ in 0 ..< 2 {
-			let result = try await middleware.intercept(testURL)
-			#expect(result == testURL)
+			_ = try await sut.intercept(testURL)
 		}
 
-		// Third request should be blocked
-		do {
-			_ = try await middleware.intercept(testURL)
-			#expect(Bool(false), "Expected rate limit error")
-		} catch let error as DeepLinkError {
-			#expect(error == .rateLimitExceeded(2, 60.0))
-		}
-
-		// Verify persistence was used
-		let storedTimestamps = await customPersistence.loadRequests()
+		let storedTimestamps = await persistence.loadRequests()
 		#expect(storedTimestamps.count == 2)
 	}
 
 	// MARK: - Strategy Tests
 
-	@Test("SlidingWindow strategy tracks requests in rolling window")
-	func slidingWindowStrategy_tracksRequestsInRollingWindow() async throws {
-		let testURL = try #require(URL(string: "testapp://test"))
-		let persistence = InMemoryRateLimitPersistence()
-		let middleware = RateLimitMiddleware(
-			maxRequests: 3,
-			timeWindow: 1.0, // 1 second window
-			persistence: persistence,
-			strategy: .slidingWindow,
-		)
+	@Test("intercept with sliding window tracks requests in rolling window")
+	func intercept_withSlidingWindow_tracksRequestsInRollingWindow() async throws {
+		let (sut, _) = makeSUT(maxRequests: 3, timeWindow: 1.0, strategy: .slidingWindow)
 
-		// Make 3 requests (within limit)
 		for _ in 0 ..< 3 {
-			let result = try await middleware.intercept(testURL)
+			let result = try await sut.intercept(testURL)
 			#expect(result == testURL)
 		}
 
-		// Fourth request should be blocked
-		do {
-			_ = try await middleware.intercept(testURL)
-			#expect(Bool(false), "Expected rate limit error")
-		} catch let error as DeepLinkError {
-			#expect(error == .rateLimitExceeded(3, 1.0))
+		await #expect(throws: DeepLinkError.rateLimitExceeded(3, 1.0)) {
+			try await sut.intercept(testURL)
 		}
 	}
 
-	@Test("SlidingWindow strategy removes old requests automatically")
-	func slidingWindowStrategy_removesOldRequestsAutomatically() async throws {
-		let testURL = try #require(URL(string: "testapp://test"))
-		let persistence = InMemoryRateLimitPersistence()
-		let middleware = RateLimitMiddleware(
-			maxRequests: 2,
-			timeWindow: 0.2, // Very short window
-			persistence: persistence,
-			strategy: .slidingWindow,
-		)
+	@Test("intercept with sliding window removes old requests automatically")
+	func intercept_withSlidingWindow_removesOldRequestsAutomatically() async throws {
+		let (sut, _) = makeSUT(maxRequests: 2, timeWindow: 0.2, strategy: .slidingWindow)
 
-		// Make 2 requests (within limit)
 		for _ in 0 ..< 2 {
-			let result = try await middleware.intercept(testURL)
-			#expect(result == testURL)
+			_ = try await sut.intercept(testURL)
 		}
 
-		// Third request should be blocked
-		do {
-			_ = try await middleware.intercept(testURL)
-			#expect(Bool(false), "Expected rate limit error")
-		} catch let error as DeepLinkError {
-			#expect(error == .rateLimitExceeded(2, 0.2))
+		await #expect(throws: DeepLinkError.rateLimitExceeded(2, 0.2)) {
+			try await sut.intercept(testURL)
 		}
 
-		// Wait for window to slide
 		try await Task.sleep(nanoseconds: 250_000_000) // 0.25 seconds
 
-		// Now should allow requests again
-		let result = try await middleware.intercept(testURL)
+		let result = try await sut.intercept(testURL)
 		#expect(result == testURL)
 	}
 
-	@Test("FixedWindow strategy resets at window boundaries")
-	func fixedWindowStrategy_resetsAtWindowBoundaries() async throws {
-		let testURL = try #require(URL(string: "testapp://test"))
-		let persistence = InMemoryRateLimitPersistence()
-		let middleware = RateLimitMiddleware(
-			maxRequests: 2,
-			timeWindow: 1.0, // 1 second fixed window
-			persistence: persistence,
-			strategy: .fixedWindow,
-		)
+	@Test("intercept with fixed window resets at window boundaries")
+	func intercept_withFixedWindow_resetsAtWindowBoundaries() async throws {
+		let (sut, _) = makeSUT(maxRequests: 2, timeWindow: 1.0, strategy: .fixedWindow)
 
-		// Make 2 requests (within limit)
 		for _ in 0 ..< 2 {
-			let result = try await middleware.intercept(testURL)
-			#expect(result == testURL)
+			_ = try await sut.intercept(testURL)
 		}
 
-		// Third request should be blocked
-		do {
-			_ = try await middleware.intercept(testURL)
-			#expect(Bool(false), "Expected rate limit error")
-		} catch let error as DeepLinkError {
-			#expect(error == .rateLimitExceeded(2, 1.0))
+		await #expect(throws: DeepLinkError.rateLimitExceeded(2, 1.0)) {
+			try await sut.intercept(testURL)
 		}
 
-		// Wait for fixed window to reset (just over 1 second)
 		try await Task.sleep(nanoseconds: 1_100_000_000) // 1.1 seconds
 
-		// Should allow requests again at new window boundary
-		let result = try await middleware.intercept(testURL)
+		let result = try await sut.intercept(testURL)
 		#expect(result == testURL)
 	}
 
-	@Test("FixedWindow strategy allows burst at window transitions")
-	func fixedWindowStrategy_allowsBurstAtWindowTransitions() async throws {
-		let testURL = try #require(URL(string: "testapp://test"))
-		let persistence = InMemoryRateLimitPersistence()
-		let middleware = RateLimitMiddleware(
-			maxRequests: 2,
-			timeWindow: 1.0, // 1 second fixed window
-			persistence: persistence,
-			strategy: .fixedWindow,
-		)
+	@Test("intercept with fixed window allows full burst after window reset")
+	func intercept_withFixedWindow_allowsFullBurstAfterWindowReset() async throws {
+		let (sut, _) = makeSUT(maxRequests: 2, timeWindow: 1.0, strategy: .fixedWindow)
 
-		// Use up the limit in current window
 		for _ in 0 ..< 2 {
-			let result = try await middleware.intercept(testURL)
-			#expect(result == testURL)
+			_ = try await sut.intercept(testURL)
 		}
 
-		// Wait for window to reset
 		try await Task.sleep(nanoseconds: 1_100_000_000) // 1.1 seconds
 
-		// Should allow full burst again (characteristic of fixed window)
 		for _ in 0 ..< 2 {
-			let result = try await middleware.intercept(testURL)
+			let result = try await sut.intercept(testURL)
 			#expect(result == testURL)
 		}
 	}
 
-	@Test("Permissive strategy allows all requests")
-	func permissiveStrategy_allowsAllRequests() async throws {
-		let testURL = try #require(URL(string: "testapp://test"))
-		let persistence = InMemoryRateLimitPersistence()
-		let middleware = RateLimitMiddleware(
-			maxRequests: 1, // Very restrictive limit
-			timeWindow: 60.0,
-			persistence: persistence,
-			strategy: .permissive,
-		)
+	@Test("intercept with permissive strategy allows all requests")
+	func intercept_withPermissiveStrategy_allowsAllRequests() async throws {
+		let (sut, persistence) = makeSUT(maxRequests: 1, strategy: .permissive)
 
-		// Should allow unlimited requests despite restrictive settings
 		for _ in 0 ..< 10 {
-			let result = try await middleware.intercept(testURL)
+			let result = try await sut.intercept(testURL)
 			#expect(result == testURL)
 		}
 
-		// Verify no persistence operations were performed
 		let storedTimestamps = await persistence.loadRequests()
 		#expect(storedTimestamps.isEmpty)
 	}
 
-	@Test("Permissive strategy ignores rate limit settings")
-	func permissiveStrategy_ignoresRateLimitSettings() async throws {
-		let testURL = try #require(URL(string: "testapp://test"))
+	@Test("intercept with permissive strategy ignores impossible limits")
+	func intercept_withPermissiveStrategy_ignoresImpossibleLimits() async throws {
 		let persistence = InMemoryRateLimitPersistence()
-		let middleware = RateLimitMiddleware(
-			maxRequests: 0, // Impossible limit
-			timeWindow: 0.0, // Invalid window
+		let sut = RateLimitMiddleware(
+			maxRequests: 0,
+			timeWindow: 0.0,
 			persistence: persistence,
 			strategy: .permissive,
 		)
 
-		// Should still allow requests despite impossible settings
-		let result = try await middleware.intercept(testURL)
+		let result = try await sut.intercept(testURL)
 		#expect(result == testURL)
 	}
 
-	@Test("Strategy comparison: slidingWindow vs fixedWindow basic behavior")
-	func strategyComparison_slidingWindowVsFixedWindowBasicBehavior() async throws {
-		let testURL = try #require(URL(string: "testapp://test"))
-		let persistence1 = InMemoryRateLimitPersistence()
-		let persistence2 = InMemoryRateLimitPersistence()
+	// MARK: - Helpers
 
-		let slidingMiddleware = RateLimitMiddleware(
-			maxRequests: 2,
-			timeWindow: 1.0,
-			persistence: persistence1,
-			strategy: .slidingWindow,
+	private var testURL: URL {
+		URL(string: "testapp://test")!
+	}
+
+	private func makeSUT(
+		maxRequests: Int = 100,
+		timeWindow: TimeInterval = 60.0,
+		strategy: RateLimitStrategy = .slidingWindow,
+	) -> (sut: RateLimitMiddleware, persistence: InMemoryRateLimitPersistence) {
+		let persistence = InMemoryRateLimitPersistence()
+		let sut = RateLimitMiddleware(
+			maxRequests: maxRequests,
+			timeWindow: timeWindow,
+			persistence: persistence,
+			strategy: strategy,
 		)
-
-		let fixedMiddleware = RateLimitMiddleware(
-			maxRequests: 2,
-			timeWindow: 1.0,
-			persistence: persistence2,
-			strategy: .fixedWindow,
-		)
-
-		// Both should allow 2 requests initially
-		for _ in 0 ..< 2 {
-			let slidingResult = try await slidingMiddleware.intercept(testURL)
-			let fixedResult = try await fixedMiddleware.intercept(testURL)
-			#expect(slidingResult == testURL)
-			#expect(fixedResult == testURL)
-		}
-
-		// Both should block the third request
-		do {
-			_ = try await slidingMiddleware.intercept(testURL)
-			#expect(Bool(false), "Expected sliding window to block")
-		} catch let error as DeepLinkError {
-			#expect(error == .rateLimitExceeded(2, 1.0))
-		}
-
-		do {
-			_ = try await fixedMiddleware.intercept(testURL)
-			#expect(Bool(false), "Expected fixed window to block")
-		} catch let error as DeepLinkError {
-			#expect(error == .rateLimitExceeded(2, 1.0))
-		}
-
-		// Both strategies should behave the same initially
-		// The key difference is in how they handle window resets over time
-		// This test verifies that both strategies correctly enforce rate limits
+		return (sut, persistence)
 	}
 }

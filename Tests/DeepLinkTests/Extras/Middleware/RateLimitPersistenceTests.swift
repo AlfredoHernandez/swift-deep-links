@@ -6,82 +6,135 @@
 import Foundation
 import Testing
 
-@Suite("RateLimitPersistence Tests")
+@Suite("UserDefaultsRateLimitPersistence Tests")
 struct RateLimitPersistenceTests {
-	@Test("UserDefaultsRateLimitPersistence saves and loads requests")
-	func userDefaultsRateLimitPersistence_savesAndLoadsRequests() async throws {
-		let userDefaults = try #require(UserDefaults(suiteName: "test.persistence"))
-		let key = "test.requests"
-		userDefaults.removeObject(forKey: key)
+	private static let fixedDate = Date(timeIntervalSince1970: 1_234_568_000.0)
 
-		let persistence = UserDefaultsRateLimitPersistence(userDefaults: userDefaults, key: key)
+	@Test("loadRequests delivers previously saved timestamps")
+	func loadRequests_deliversPreviouslySavedTimestamps() async {
+		let sut = makeSUT()
 		let testTimestamps: [TimeInterval] = [1_234_567_890.0, 1_234_567_891.0, 1_234_567_892.0]
 
-		// Save requests
-		await persistence.saveRequests(testTimestamps)
+		await sut.saveRequests(testTimestamps)
 
-		// Load requests
-		let loadedTimestamps = await persistence.loadRequests()
+		let loadedTimestamps = await sut.loadRequests()
 
 		#expect(loadedTimestamps == testTimestamps)
-
-		// Clean up
-		await persistence.clearRequests()
 	}
 
-	@Test("UserDefaultsRateLimitPersistence returns empty array when no data exists")
-	func userDefaultsRateLimitPersistence_returnsEmptyArrayWhenNoDataExists() async throws {
-		let userDefaults = try #require(UserDefaults(suiteName: "test.persistence.empty"))
-		let key = "test.requests.empty"
-		userDefaults.removeObject(forKey: key)
+	@Test("loadRequests delivers empty on no stored data")
+	func loadRequests_deliversEmptyOnNoStoredData() async {
+		let sut = makeSUT()
 
-		let persistence = UserDefaultsRateLimitPersistence(userDefaults: userDefaults, key: key)
-		let loadedTimestamps = await persistence.loadRequests()
+		let loadedTimestamps = await sut.loadRequests()
 
 		#expect(loadedTimestamps.isEmpty)
 	}
 
-	@Test("UserDefaultsRateLimitPersistence clears requests")
-	func userDefaultsRateLimitPersistence_clearsRequests() async throws {
-		let userDefaults = try #require(UserDefaults(suiteName: "test.persistence.clear"))
-		let key = "test.requests.clear"
-		userDefaults.removeObject(forKey: key)
-
-		let persistence = UserDefaultsRateLimitPersistence(userDefaults: userDefaults, key: key)
-		let testTimestamps: [TimeInterval] = [1_234_567_890.0, 1_234_567_891.0]
-
-		// Save requests
-		await persistence.saveRequests(testTimestamps)
-
-		// Verify data exists
-		let loadedTimestamps = await persistence.loadRequests()
-		#expect(loadedTimestamps == testTimestamps)
-
-		// Clear requests
-		await persistence.clearRequests()
-
-		// Verify data is cleared
-		let clearedTimestamps = await persistence.loadRequests()
-		#expect(clearedTimestamps.isEmpty)
-	}
-
-	@Test("UserDefaultsRateLimitPersistence handles invalid data gracefully")
-	func userDefaultsRateLimitPersistence_handlesInvalidDataGracefully() async throws {
-		let userDefaults = try #require(UserDefaults(suiteName: "test.persistence.invalid"))
-		let key = "test.requests.invalid"
-		userDefaults.removeObject(forKey: key)
-
-		// Store invalid data
+	@Test("loadRequests delivers empty on invalid stored data")
+	func loadRequests_deliversEmptyOnInvalidStoredData() async throws {
+		let key = "test.requests.\(UUID().uuidString)"
+		let userDefaults = try #require(UserDefaults(suiteName: "test.persistence.\(UUID().uuidString)"))
 		let invalidData = "invalid json data".data(using: .utf8)!
 		userDefaults.set(invalidData, forKey: key)
 
-		let persistence = UserDefaultsRateLimitPersistence(userDefaults: userDefaults, key: key)
-		let loadedTimestamps = await persistence.loadRequests()
+		let sut = UserDefaultsRateLimitPersistence(userDefaults: userDefaults, key: key)
+		let loadedTimestamps = await sut.loadRequests()
 
-		// Should return empty array for invalid data
 		#expect(loadedTimestamps.isEmpty)
+	}
 
-		// Clean up
-		await persistence.clearRequests()
+	@Test("clearRequests removes all stored timestamps")
+	func clearRequests_removesAllStoredTimestamps() async {
+		let sut = makeSUT()
+		await sut.saveRequests([1_234_567_890.0, 1_234_567_891.0])
+
+		await sut.clearRequests()
+
+		let loadedTimestamps = await sut.loadRequests()
+		#expect(loadedTimestamps.isEmpty)
+	}
+
+	// MARK: - Pruning Tests
+
+	@Test("loadRequests prunes expired timestamps")
+	func loadRequests_prunesExpiredTimestamps() async {
+		let now = Self.fixedDate
+		let sut = makeSUT(maxAge: 60, dateProvider: { now })
+
+		let expiredTimestamp = now.timeIntervalSince1970 - 120 // 2 minutes ago
+		let validTimestamp = now.timeIntervalSince1970 - 30 // 30 seconds ago
+
+		await sut.saveRequests([expiredTimestamp, validTimestamp])
+
+		let loadedTimestamps = await sut.loadRequests()
+
+		#expect(loadedTimestamps == [validTimestamp])
+	}
+
+	@Test("loadRequests delivers empty when all timestamps expired")
+	func loadRequests_deliversEmptyWhenAllTimestampsExpired() async {
+		let now = Self.fixedDate
+		let sut = makeSUT(maxAge: 60, dateProvider: { now })
+
+		let expiredTimestamps: [TimeInterval] = [
+			now.timeIntervalSince1970 - 300,
+			now.timeIntervalSince1970 - 200,
+			now.timeIntervalSince1970 - 100,
+		]
+
+		await sut.saveRequests(expiredTimestamps)
+
+		let loadedTimestamps = await sut.loadRequests()
+
+		#expect(loadedTimestamps.isEmpty)
+	}
+
+	@Test("loadRequests keeps all timestamps when none expired")
+	func loadRequests_keepsAllTimestampsWhenNoneExpired() async {
+		let now = Self.fixedDate
+		let sut = makeSUT(maxAge: 3600, dateProvider: { now })
+
+		let recentTimestamps: [TimeInterval] = [
+			now.timeIntervalSince1970 - 10,
+			now.timeIntervalSince1970 - 5,
+			now.timeIntervalSince1970 - 1,
+		]
+
+		await sut.saveRequests(recentTimestamps)
+
+		let loadedTimestamps = await sut.loadRequests()
+
+		#expect(loadedTimestamps == recentTimestamps)
+	}
+
+	@Test("loadRequests prunes timestamp exactly at maxAge boundary")
+	func loadRequests_prunesTimestampExactlyAtMaxAgeBoundary() async {
+		let now = Self.fixedDate
+		let sut = makeSUT(maxAge: 60, dateProvider: { now })
+
+		let exactBoundaryTimestamp = now.timeIntervalSince1970 - 60 // exactly maxAge ago
+		let validTimestamp = now.timeIntervalSince1970 - 30
+
+		await sut.saveRequests([exactBoundaryTimestamp, validTimestamp])
+
+		let loadedTimestamps = await sut.loadRequests()
+
+		#expect(loadedTimestamps == [validTimestamp], "Timestamp exactly at maxAge should be pruned (strict > comparison)")
+	}
+
+	// MARK: - Helpers
+
+	private func makeSUT(
+		maxAge: TimeInterval = 3600,
+		dateProvider: @escaping @Sendable () -> Date = { fixedDate },
+	) -> UserDefaultsRateLimitPersistence {
+		let key = "test.requests.\(UUID().uuidString)"
+		return UserDefaultsRateLimitPersistence(
+			userDefaults: UserDefaults(suiteName: "test.persistence.\(UUID().uuidString)")!,
+			key: key,
+			maxAge: maxAge,
+			dateProvider: dateProvider,
+		)
 	}
 }
