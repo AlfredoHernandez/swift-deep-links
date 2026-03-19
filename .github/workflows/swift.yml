@@ -12,18 +12,16 @@ on:
 jobs:
   build:
 
-    runs-on: macos-15-xlarge
+    runs-on: macos-15
 
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Select Xcode Version
       run: sudo xcode-select -switch /Applications/Xcode_26.0.app
-    
-    - name: Enable github dependencies (SPM)
-      run: for ip in $(dig @8.8.8.8 github.com +short); do ssh-keyscan github.com,$ip; ssh-keyscan $ip; done 2>/dev/null >> ~/.ssh/known_hosts
+
     - name: Build
-      run: swift build -vv
-    
+      run: swift build -v
+
     - name: Run tests
-      run: swift test --parallel -vv
+      run: swift test --parallel -v
