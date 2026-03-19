@@ -2,7 +2,7 @@
 //  Copyright © 2026 Jesús Alfredo Hernández Alarcón. All rights reserved.
 //
 
-import DeepLink
+import DeepLinks
 
 /// A unified route type that combines all application navigation routes.
 ///

@@ -2,7 +2,7 @@
 //  Copyright © 2026 Jesús Alfredo Hernández Alarcón. All rights reserved.
 //
 
-import DeepLink
+import DeepLinks
 
 /// A deep link handler that processes `AppRoute` instances and triggers navigation actions.
 ///

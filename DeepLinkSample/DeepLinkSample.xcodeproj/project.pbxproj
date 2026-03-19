@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		38D6AB3B2E835AAE0087C691 /* DeepLink in Frameworks */ = {isa = PBXBuildFile; productRef = 38D6AB3A2E835AAE0087C691 /* DeepLink */; };
+		38D6AB3B2E835AAE0087C691 /* DeepLinks in Frameworks */ = {isa = PBXBuildFile; productRef = 38D6AB3A2E835AAE0087C691 /* DeepLinks */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -40,7 +40,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				38D6AB3B2E835AAE0087C691 /* DeepLink in Frameworks */,
+				38D6AB3B2E835AAE0087C691 /* DeepLinks in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -83,7 +83,7 @@
 			);
 			name = DeepLinkSample;
 			packageProductDependencies = (
-				38D6AB3A2E835AAE0087C691 /* DeepLink */,
+				38D6AB3A2E835AAE0087C691 /* DeepLinks */,
 			);
 			productName = DeepLinkSample;
 			productReference = 38D6AB092E835A030087C691 /* DeepLinkSample.app */;
@@ -365,9 +365,9 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		38D6AB3A2E835AAE0087C691 /* DeepLink */ = {
+		38D6AB3A2E835AAE0087C691 /* DeepLinks */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = DeepLink;
+			productName = DeepLinks;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

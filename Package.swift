@@ -3,16 +3,16 @@
 import PackageDescription
 
 let package = Package(
-	name: "swift-deep-link",
+	name: "swift-deep-links",
 	platforms: [
 		.iOS(.v16),
 		.macOS(.v13),
 	],
 	products: [
-		.library(name: "DeepLink", targets: ["DeepLink"]),
+		.library(name: "DeepLinks", targets: ["DeepLinks"]),
 	],
 	targets: [
-		.target(name: "DeepLink"),
-		.testTarget(name: "DeepLinkTests", dependencies: ["DeepLink"]),
+		.target(name: "DeepLinks"),
+		.testTarget(name: "DeepLinksTests", dependencies: ["DeepLinks"]),
 	],
 )

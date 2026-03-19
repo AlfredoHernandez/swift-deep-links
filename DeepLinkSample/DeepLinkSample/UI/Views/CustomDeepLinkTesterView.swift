@@ -2,7 +2,7 @@
 //  Copyright © 2026 Jesús Alfredo Hernández Alarcón. All rights reserved.
 //
 
-import DeepLink
+import DeepLinks
 import SwiftUI
 
 /// A view that provides a testing interface for custom deep links.

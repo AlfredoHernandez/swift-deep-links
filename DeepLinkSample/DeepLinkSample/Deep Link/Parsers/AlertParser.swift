@@ -2,7 +2,7 @@
 //  Copyright © 2026 Jesús Alfredo Hernández Alarcón. All rights reserved.
 //
 
-import DeepLink
+import DeepLinks
 import Foundation
 
 /// A parser that handles alert deep link URLs and converts them to `AppRoute` instances.
