@@ -43,7 +43,7 @@ Luego agrégalo a tu target:
 Primero, crea un enum que conforme al protocolo `DeepLinkRoute`:
 
 ```swift
-import DeepLink
+import DeepLinks
 
 enum AppRoute: DeepLinkRoute {
     case profile(userId: String)
@@ -88,7 +88,7 @@ struct SettingsParameters: Decodable {
 ### 1. Crear Parsers Individuales
 
 ```swift
-import DeepLink
+import DeepLinks
 
 final class ProfileParser: DeepLinkParser {
     typealias Route = AppRoute
@@ -150,7 +150,7 @@ final class ProductParser: DeepLinkParser {
 ### 1. Implementar Handlers de Rutas
 
 ```swift
-import DeepLink
+import DeepLinks
 
 final class AppDeepLinkHandler: DeepLinkHandler {
     typealias Route = AppRoute
@@ -201,7 +201,7 @@ final class NavigationCoordinator: ObservableObject {
 ### 1. Configurar Deep Link Routing
 
 ```swift
-import DeepLink
+import DeepLinks
 
 final class DeepLinkManager {
     private let routing: any DeepLinkRouting<AppRoute>
@@ -238,7 +238,7 @@ final class DeepLinkManager {
 
 ```swift
 import SwiftUI
-import DeepLink
+import DeepLinks
 
 @main
 struct MiApp: App {

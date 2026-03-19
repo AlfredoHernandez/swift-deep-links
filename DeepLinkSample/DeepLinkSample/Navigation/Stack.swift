@@ -1,8 +1,8 @@
 //
-//  Copyright © 2025 Jesús Alfredo Hernández Alarcón. All rights reserved.
+//  Copyright © 2026 Jesús Alfredo Hernández Alarcón. All rights reserved.
 //
 
-import DeepLink
+import DeepLinks
 
 /// Navigation stack routes for push-based navigation.
 ///
@@ -22,29 +22,29 @@ import DeepLink
 /// rather than modal presentations. They integrate with SwiftUI's `NavigationStack`
 /// and `navigationDestination` modifiers.
 enum Stack: DeepLinkRoute, Hashable {
-    /// Navigate to a product detail view
-    /// - Parameters:
-    ///   - productID: The unique identifier of the product
-    ///   - category: Optional category for additional context
-    case product(productID: String, category: String?)
+	/// Navigate to a product detail view
+	/// - Parameters:
+	///   - productID: The unique identifier of the product
+	///   - category: Optional category for additional context
+	case product(productID: String, category: String?)
 
-    /// Navigate to a specific settings section
-    /// - Parameter section: The settings section to display
-    case settings(section: String)
+	/// Navigate to a specific settings section
+	/// - Parameter section: The settings section to display
+	case settings(section: String)
 
-    /// Provides a unique identifier for each stack route.
-    ///
-    /// The identifier is constructed from the route parameters to ensure
-    /// uniqueness and enable proper navigation state management.
-    ///
-    /// - Returns: A unique string identifier for the route
-    var id: String {
-        switch self {
-        case let .product(productID, category):
-            "product_\(productID)_\(category ?? "")"
+	/// Provides a unique identifier for each stack route.
+	///
+	/// The identifier is constructed from the route parameters to ensure
+	/// uniqueness and enable proper navigation state management.
+	///
+	/// - Returns: A unique string identifier for the route
+	var id: String {
+		switch self {
+		case let .product(productID, category):
+			"product_\(productID)_\(category ?? "")"
 
-        case let .settings(section):
-            "settings_\(section)"
-        }
-    }
+		case let .settings(section):
+			"settings_\(section)"
+		}
+	}
 }

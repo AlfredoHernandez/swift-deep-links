@@ -1,11 +1,9 @@
 //
-//  Copyright © 2025 Jesús Alfredo Hernández Alarcón. All rights reserved.
+//  Copyright © 2026 Jesús Alfredo Hernández Alarcón. All rights reserved.
 //
 
-import Combine
-import DeepLink
+import DeepLinks
 import Foundation
-import Observation
 import OSLog
 
 /// ViewModel for managing deep link processing and app state.
@@ -21,140 +19,110 @@ import OSLog
 /// - Error handling and recovery
 @Observable
 final class DeepLinkViewModel {
-    // MARK: - Private Properties
+	// MARK: - Private Properties
 
-    private let deepLinkService: DeepLinkService
-    private let logger = Logger(subsystem: "swift-deep-link-sample-app", category: "DeepLinkViewModel")
+	private let deepLinkService: DeepLinkService
+	private let logger = Logger(subsystem: "swift-deep-link-sample-app", category: "DeepLinkViewModel")
+	private var processingTask: Task<Void, Never>?
+	private var coordinator: CoordinatorOf<AppRoute>?
 
-    // MARK: - Public Properties
+	// MARK: - Public Properties
 
-    /// The centralized navigation router that manages all navigation state
-    let navigationRouter = NavigationRouter()
+	/// The centralized navigation router that manages all navigation state
+	let navigationRouter = NavigationRouter()
 
-    /// Current processing state for UI feedback
-    var isProcessing = false
+	/// Current processing state for UI feedback
+	var isProcessing = false
 
-    /// Last processing result for debugging/display
-    var lastResult: DeepLinkResult<AppRoute>?
+	/// Last processing result for debugging/display
+	var lastResult: ResultOf<AppRoute>?
 
-    /// Processing error for user feedback
-    var processingError: Error?
+	/// Processing error for user feedback
+	var processingError: Error?
 
-    // MARK: - Initialization
+	// MARK: - Initialization
 
-    /// Creates a new DeepLinkViewModel with the specified deep link service.
-    ///
-    /// - Parameter deepLinkService: The service responsible for deep link processing
-    init(deepLinkService: DeepLinkService = DeepLinkService()) {
-        self.deepLinkService = deepLinkService
-    }
+	init() {
+		deepLinkService = DeepLinkService(navigationRouter: navigationRouter)
+	}
 
-    // MARK: - Public Interface
+	// MARK: - Public Interface
 
-    /// Processes a deep link URL through the complete pipeline.
-    ///
-    /// This method handles the entire deep link processing flow including:
-    /// - Coordinator creation and configuration
-    /// - URL processing through middleware
-    /// - Route execution
-    /// - Result handling and logging
-    ///
-    /// - Parameter url: The deep link URL to process
-    @MainActor
-    func processDeepLink(url: URL) async {
-        isProcessing = true
-        processingError = nil
+	/// Processes a deep link URL through the complete pipeline.
+	///
+	/// Cancels any in-flight processing before starting the new one.
+	/// The task is tracked internally so it can be cancelled if a new
+	/// deep link arrives before the previous one finishes.
+	///
+	/// - Parameter url: The deep link URL to process
+	func processDeepLink(url: URL) {
+		processingTask?.cancel()
+		processingTask = Task { @MainActor in
+			isProcessing = true
+			processingError = nil
 
-        do {
-            let coordinator = try await deepLinkService.createCoordinator(navigationRouter: navigationRouter)
-            let result = await coordinator.handle(url: url)
+			do {
+				let coordinator = try await getOrCreateCoordinator()
+				let result = await coordinator.handle(url: url)
 
-            lastResult = result
-            logDeepLinkResult(result)
+				guard !Task.isCancelled else { return }
 
-            if !result.wasSuccessful {
-                processingError = DeepLinkError.routeNotFound("Deep link processing failed")
-            }
-        } catch {
-            processingError = error
-            logger.error("Failed to process deep link: \(error)")
-        }
+				lastResult = result
+				logResult(result)
 
-        isProcessing = false
-    }
+				if !result.wasSuccessful {
+					processingError = result.errors.first
+				}
+			} catch {
+				guard !Task.isCancelled else { return }
+				processingError = error
+				logger.error("Failed to process deep link: \(error)")
+			}
 
-    /// Clears the current processing error.
-    @MainActor
-    func clearError() {
-        processingError = nil
-    }
+			isProcessing = false
+		}
+	}
 
-    /// Resets the processing state and clears all cached data.
-    @MainActor
-    func reset() {
-        isProcessing = false
-        lastResult = nil
-        processingError = nil
-    }
+	/// Clears the current processing error.
+	@MainActor
+	func clearError() {
+		processingError = nil
+	}
+
+	/// Resets the processing state and clears all cached data.
+	@MainActor
+	func reset() {
+		processingTask?.cancel()
+		processingTask = nil
+		coordinator = nil
+		isProcessing = false
+		lastResult = nil
+		processingError = nil
+	}
 }
 
 // MARK: - Private Methods
 
 private extension DeepLinkViewModel {
-    /// Logs detailed information about the deep link processing result.
-    ///
-    /// This method provides comprehensive logging of the deep link processing result,
-    /// including success/failure status, routes processed, execution time, and any errors.
-    /// The logs are formatted for easy reading in the console and include emojis for
-    /// quick visual identification of the processing status.
-    ///
-    /// - Parameter result: The result of the deep link processing
-    func logDeepLinkResult(_ result: DeepLinkResult<AppRoute>) {
-        let separator = String(repeating: "=", count: 50)
-        print("\n" + separator)
-        print("🔗 DEEP LINK PROCESSING RESULT")
-        print(separator)
+	func getOrCreateCoordinator() async throws -> CoordinatorOf<AppRoute> {
+		if let coordinator {
+			return coordinator
+		}
+		let newCoordinator = try await deepLinkService.createCoordinator()
+		coordinator = newCoordinator
+		return newCoordinator
+	}
 
-        // Basic information
-        print("📱 Original URL: \(result.originalURL.absoluteString)")
-        if let processedURL = result.processedURL {
-            print("⚙️  Processed URL: \(processedURL.absoluteString)")
-        } else {
-            print("⚠️  Processed URL: nil (stopped by middleware)")
-        }
+	func logResult(_ result: ResultOf<AppRoute>) {
+		let status = result.wasSuccessful ? "success" : "failed"
+		let routes = result.routes.map(\.id).joined(separator: ", ")
 
-        // Processing status
-        if result.wasSuccessful {
-            print("✅ Status: SUCCESS")
-        } else {
-            print("❌ Status: FAILED")
-        }
+		logger.info("Deep link processed: \(result.originalURL.absoluteString) [\(status)] routes=[\(routes)] time=\(String(format: "%.3f", result.executionTime))s")
 
-        // Routes information
-        print("🛣️  Routes Found: \(result.routes.count)")
-        if !result.routes.isEmpty {
-            for (index, route) in result.routes.enumerated() {
-                print("   \(index + 1). \(route.id)")
-            }
-        }
-
-        // Execution metrics
-        print("⏱️  Execution Time: \(String(format: "%.3f", result.executionTime))s")
-        print("✅ Successful Routes: \(result.successfulRoutes)")
-        print("❌ Failed Routes: \(result.failedRoutes)")
-
-        // Errors
-        if result.hasErrors {
-            print("🚨 Errors (\(result.errors.count)):")
-            for (index, error) in result.errors.enumerated() {
-                print("   \(index + 1). \(error.localizedDescription)")
-            }
-        } else {
-            print("✨ No Errors")
-        }
-
-        // Summary
-        print("📋 Summary: \(result.summary)")
-        print(separator + "\n")
-    }
+		if result.hasErrors {
+			for error in result.errors {
+				logger.error("Deep link error: \(error.localizedDescription)")
+			}
+		}
+	}
 }

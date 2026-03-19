@@ -1,8 +1,8 @@
 //
-//  Copyright © 2025 Jesús Alfredo Hernández Alarcón. All rights reserved.
+//  Copyright © 2026 Jesús Alfredo Hernández Alarcón. All rights reserved.
 //
 
-import DeepLink
+import DeepLinks
 
 /// Modal sheet presentation routes for overlay views.
 ///
@@ -22,31 +22,31 @@ import DeepLink
 /// rather than navigation stack pushes. They integrate with SwiftUI's `.sheet`
 /// modifier and provide a clean overlay experience.
 enum Sheet: Identifiable, DeepLinkRoute {
-    /// Present an information modal sheet
-    /// - Parameters:
-    ///   - title: The title of the information content
-    ///   - brief: A brief description or summary
-    case info(title: String, brief: String)
+	/// Present an information modal sheet
+	/// - Parameters:
+	///   - title: The title of the information content
+	///   - brief: A brief description or summary
+	case info(title: String, brief: String)
 
-    /// Present a user profile modal sheet
-    /// - Parameters:
-    ///   - userID: The unique identifier of the user
-    ///   - name: Optional display name of the user
-    case profile(userID: String, name: String?)
+	/// Present a user profile modal sheet
+	/// - Parameters:
+	///   - userID: The unique identifier of the user
+	///   - name: Optional display name of the user
+	case profile(userID: String, name: String?)
 
-    /// Provides a unique identifier for each sheet route.
-    ///
-    /// The identifier is constructed from the route parameters to ensure
-    /// uniqueness and enable proper sheet state management.
-    ///
-    /// - Returns: A unique string identifier for the route
-    var id: String {
-        switch self {
-        case let .info(title, brief):
-            "info_\(title)_\(brief)"
+	/// Provides a unique identifier for each sheet route.
+	///
+	/// The identifier is constructed from the route parameters to ensure
+	/// uniqueness and enable proper sheet state management.
+	///
+	/// - Returns: A unique string identifier for the route
+	var id: String {
+		switch self {
+		case let .info(title, brief):
+			"info_\(title)_\(brief)"
 
-        case let .profile(userID, name):
-            "profile_\(userID)_\(name ?? "")"
-        }
-    }
+		case let .profile(userID, name):
+			"profile_\(userID)_\(name ?? "")"
+		}
+	}
 }
