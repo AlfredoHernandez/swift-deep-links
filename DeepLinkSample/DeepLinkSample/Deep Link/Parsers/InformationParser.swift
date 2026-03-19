@@ -27,6 +27,6 @@ final class InformationParser: DeepLinkParser {
 
 	private func parseInfoData(from url: DeepLinkURL) throws -> [AppRoute] {
 		let data = try parameterParser.parse(InfoDeepLinkParameters.self, from: url.queryParameters)
-		return [.sheet(.info(title: data.brief, brief: data.title))]
+		return [.sheet(.info(title: data.title, brief: data.brief))]
 	}
 }

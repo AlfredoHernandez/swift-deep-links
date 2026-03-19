@@ -497,7 +497,7 @@ public extension AnalyticsStrategy {
 		if let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
 		   let queryItems = components.queryItems, !queryItems.isEmpty
 		{
-			let queryParams = Dictionary(uniqueKeysWithValues: queryItems.map { ($0.name, $0.value ?? "nil") })
+			let queryParams = Dictionary(queryItems.map { ($0.name, $0.value ?? "nil") }, uniquingKeysWith: { _, last in last })
 			parameters["query_parameters"] = queryParams
 		}
 

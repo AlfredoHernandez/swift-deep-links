@@ -141,7 +141,7 @@ struct DeepLinkCoordinatorTests {
 
 		let result = await coordinator.handle(url: url)
 
-		#expect(result.wasSuccessful) // Should be successful even when stopped by middleware
+		#expect(!result.wasSuccessful) // Middleware stopped processing — not a successful outcome
 		#expect(result.wasStoppedByMiddleware)
 		#expect(result.processedURL == nil)
 		#expect(result.routes.isEmpty)

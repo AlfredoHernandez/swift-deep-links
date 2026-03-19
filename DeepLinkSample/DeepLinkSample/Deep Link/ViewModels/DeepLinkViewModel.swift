@@ -71,7 +71,7 @@ final class DeepLinkViewModel {
 				logResult(result)
 
 				if !result.wasSuccessful {
-					processingError = DeepLinkError.routeNotFound("Deep link processing failed")
+					processingError = result.errors.first
 				}
 			} catch {
 				guard !Task.isCancelled else { return }

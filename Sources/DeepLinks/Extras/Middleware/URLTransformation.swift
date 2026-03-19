@@ -236,8 +236,9 @@ public extension URLTransformationStrategy {
 	static let selective = URLTransformationStrategy { url, transformer in
 		let urlString = url.absoluteString
 
-		// Check if URL needs transformation
-		let needsTransformation = urlString.contains("//") ||
+		// Check if URL needs transformation (inspect path, not full URL to avoid matching ://)
+		let path = url.path
+		let needsTransformation = path.contains("//") ||
 			urlString.contains("?&") ||
 			urlString.contains("&&") ||
 			urlString.hasSuffix("?") ||

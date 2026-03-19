@@ -208,7 +208,7 @@ public extension SecurityStrategy {
 		// Check blocked patterns
 		let urlString = url.absoluteString
 		for pattern in blockedPatterns {
-			if pattern.firstMatch(in: urlString, range: NSRange(location: 0, length: urlString.count)) != nil {
+			if pattern.firstMatch(in: urlString, range: NSRange(urlString.startIndex..., in: urlString)) != nil {
 				throw DeepLinkError.blockedURL(urlString)
 			}
 		}
@@ -232,7 +232,7 @@ public extension SecurityStrategy {
 		// Check blocked patterns
 		let urlString = url.absoluteString
 		for pattern in blockedPatterns {
-			if pattern.firstMatch(in: urlString, range: NSRange(location: 0, length: urlString.count)) != nil {
+			if pattern.firstMatch(in: urlString, range: NSRange(urlString.startIndex..., in: urlString)) != nil {
 				throw DeepLinkError.blockedURL(urlString)
 			}
 		}
@@ -262,7 +262,7 @@ public extension SecurityStrategy {
 		// Check blocked patterns only
 		let urlString = url.absoluteString
 		for pattern in blockedPatterns {
-			if pattern.firstMatch(in: urlString, range: NSRange(location: 0, length: urlString.count)) != nil {
+			if pattern.firstMatch(in: urlString, range: NSRange(urlString.startIndex..., in: urlString)) != nil {
 				throw DeepLinkError.blockedURL(urlString)
 			}
 		}
@@ -299,7 +299,7 @@ public extension SecurityStrategy {
 	static let patternOnly = SecurityStrategy { url, _, _, blockedPatterns in
 		let urlString = url.absoluteString
 		for pattern in blockedPatterns {
-			if pattern.firstMatch(in: urlString, range: NSRange(location: 0, length: urlString.count)) != nil {
+			if pattern.firstMatch(in: urlString, range: NSRange(urlString.startIndex..., in: urlString)) != nil {
 				throw DeepLinkError.blockedURL(urlString)
 			}
 		}

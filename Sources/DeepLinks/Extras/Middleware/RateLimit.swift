@@ -103,8 +103,8 @@ public final class RateLimitMiddleware: DeepLinkMiddleware {
 		persistence: RateLimitPersistence = UserDefaultsRateLimitPersistence(),
 		strategy: RateLimitStrategy = .slidingWindow,
 	) {
-		self.maxRequests = maxRequests
-		self.timeWindow = timeWindow
+		self.maxRequests = max(maxRequests, 0)
+		self.timeWindow = Swift.max(timeWindow, 0)
 		self.persistence = persistence
 		self.strategy = strategy
 	}

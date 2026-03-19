@@ -183,17 +183,19 @@ private extension DeepLinkCoordinator {
 		var failedRoutes = 0
 		var errors: [any Error] = []
 
-		for route in routes {
+		for (index, route) in routes.enumerated() {
 			do {
 				try await handler.handle(route)
 				successfulRoutes += 1
-
-				// Add delay between route executions for better UX
-				try? await Task.sleep(for: routeExecutionDelay)
 			} catch {
 				failedRoutes += 1
 				errors.append(error)
 				logger.error("Error handling route \(route.id): \(error)")
+			}
+
+			// Add delay between route executions for better UX
+			if index < routes.count - 1 {
+				try? await Task.sleep(for: routeExecutionDelay)
 			}
 		}
 

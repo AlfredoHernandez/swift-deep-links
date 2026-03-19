@@ -76,7 +76,7 @@ public struct DeepLinkResult<Route: DeepLinkRoute>: DeepLinkResultProtocol {
 		self.errors = errors
 		self.successfulRoutes = successfulRoutes
 		self.failedRoutes = failedRoutes
-		wasSuccessful = errors.isEmpty && failedRoutes == 0
+		wasSuccessful = processedURL != nil && errors.isEmpty && failedRoutes == 0
 	}
 }
 

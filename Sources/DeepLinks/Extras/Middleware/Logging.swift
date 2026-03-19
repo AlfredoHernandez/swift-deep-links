@@ -80,7 +80,7 @@ struct DeepLinkComponents {
 	/// - Returns: A dictionary with parameter names as keys and values as strings
 	var queryParametersDictionary: [String: String] {
 		guard let queryItems else { return [:] }
-		return Dictionary(uniqueKeysWithValues: queryItems.map { ($0.name, $0.value ?? "nil") })
+		return Dictionary(queryItems.map { ($0.name, $0.value ?? "nil") }, uniquingKeysWith: { _, last in last })
 	}
 }
 
