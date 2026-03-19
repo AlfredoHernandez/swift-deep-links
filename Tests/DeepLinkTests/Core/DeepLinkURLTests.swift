@@ -231,4 +231,45 @@ struct DeepLinkURLTests {
 
 		#expect(deepLinkURL.allQueryParameters["tags"] == ["new arrivals", "best sellers", "on sale"])
 	}
+
+	// MARK: - URL Length Validation Tests
+
+	@Test("DeepLinkURL init throws invalidURL when URL exceeds maxLength")
+	func deepLinkURL_init_throwsInvalidURLWhenExceedingMaxLength() throws {
+		let longParam = String(repeating: "a", count: 100)
+		let urlString = "myapp://test?\(longParam)=value"
+		let url = try #require(URL(string: urlString))
+
+		#expect(throws: DeepLinkError.invalidURL(url)) {
+			try DeepLinkURL(url: url, maxLength: 50)
+		}
+	}
+
+	@Test("DeepLinkURL init succeeds when URL is within maxLength")
+	func deepLinkURL_init_succeedsWhenWithinMaxLength() throws {
+		let url = try #require(URL(string: "myapp://test?key=value"))
+		let deepLinkURL = try DeepLinkURL(url: url, maxLength: 1000)
+
+		#expect(deepLinkURL.host == "test")
+	}
+
+	@Test("DeepLinkURL init succeeds when URL is exactly at maxLength")
+	func deepLinkURL_init_succeedsWhenExactlyAtMaxLength() throws {
+		let urlString = "myapp://test"
+		let url = try #require(URL(string: urlString))
+		let deepLinkURL = try DeepLinkURL(url: url, maxLength: urlString.count)
+
+		#expect(deepLinkURL.host == "test")
+	}
+
+	@Test("DeepLinkURL init throws when URL exceeds default maxLength")
+	func deepLinkURL_init_throwsWhenExceedingDefaultMaxLength() throws {
+		let longParam = String(repeating: "x", count: DeepLinkURL.defaultMaxLength)
+		let urlString = "myapp://test?\(longParam)"
+		let url = try #require(URL(string: urlString))
+
+		#expect(throws: DeepLinkError.invalidURL(url)) {
+			try DeepLinkURL(url: url)
+		}
+	}
 }

@@ -62,15 +62,28 @@ public struct DeepLinkURL {
 	/// ```
 	public let allQueryParameters: [String: [String]]
 
+	/// The default maximum URL length (8192 characters).
+	///
+	/// This limit prevents processing of excessively long URLs that could
+	/// impact performance or be used for abuse.
+	public static let defaultMaxLength = 8192
+
 	/// Creates a new `DeepLinkURL` from a standard `URL`.
 	///
 	/// This initializer parses the URL and extracts all relevant components.
-	/// It validates that the URL has both a scheme and host, throwing an error
-	/// if these required components are missing.
+	/// It validates that the URL has both a scheme and host, and that the URL
+	/// length does not exceed `maxLength`.
 	///
-	/// - Parameter url: The URL to parse
-	/// - Throws: `DeepLinkError.invalidURL` if the URL is malformed or missing required components
-	public init(url: URL) throws(DeepLinkError) {
+	/// - Parameters:
+	///   - url: The URL to parse
+	///   - maxLength: Maximum allowed URL length in characters. Defaults to ``defaultMaxLength``.
+	/// - Throws: `DeepLinkError.invalidURL` if the URL is malformed, missing required components,
+	///   or exceeds `maxLength`
+	public init(url: URL, maxLength: Int = Self.defaultMaxLength) throws(DeepLinkError) {
+		guard url.absoluteString.count <= maxLength else {
+			throw .invalidURL(url)
+		}
+
 		guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false), let scheme = components.scheme, let host = components.host else {
 			throw .invalidURL(url)
 		}

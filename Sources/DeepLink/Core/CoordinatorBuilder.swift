@@ -192,6 +192,10 @@ public final class CompositeDeepLinkDelegate: DeepLinkCoordinatorDelegate {
 
 	/// Creates a composite delegate with the provided delegates.
 	///
+	/// Each delegate is called sequentially in the order provided.
+	/// Delegate implementations should be lightweight and non-blocking,
+	/// as a slow delegate will delay all subsequent delegates in the chain.
+	///
 	/// - Parameter delegates: Array of delegates to combine
 	public init(delegates: [DeepLinkCoordinatorDelegate]) {
 		self.delegates = delegates

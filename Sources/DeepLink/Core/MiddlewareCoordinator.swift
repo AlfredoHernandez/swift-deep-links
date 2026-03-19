@@ -10,13 +10,30 @@ import Foundation
 /// allowing each middleware to intercept, transform, or stop the processing of
 /// deep link URLs before they reach the parsers.
 ///
+/// ## Execution Order
+///
+/// **Middleware order matters.** Each middleware receives the URL produced by the
+/// previous one. A middleware can stop the chain at any point by returning `nil`
+/// or throwing an error. Place middleware that should run first (e.g., security,
+/// rate limiting) before middleware that depends on a validated URL (e.g., analytics,
+/// logging).
+///
+/// Recommended order:
+/// 1. **Security** — reject disallowed schemes/hosts early
+/// 2. **Rate limiting** — prevent abuse before doing further work
+/// 3. **Authentication** — verify access for protected routes
+/// 4. **URL transformation** — normalize the URL
+/// 5. **Analytics** — track the (validated) deep link
+/// 6. **Logging** — log the final processed request
+///
 /// ## Usage Example
 ///
 /// ```swift
 /// let coordinator = DeepLinkMiddlewareCoordinator()
-/// await coordinator.add(AnalyticsMiddleware())
-/// await coordinator.add(AuthenticationMiddleware())
-/// await coordinator.add(RateLimitMiddleware())
+/// await coordinator.add(.security(allowedSchemes: ["myapp"]))
+/// await coordinator.add(.rateLimit(maxRequests: 10, timeWindow: 60))
+/// await coordinator.add(.authentication(provider: authProvider))
+/// await coordinator.add(.logging())
 ///
 /// let processedURL = try await coordinator.process(url)
 /// ```
