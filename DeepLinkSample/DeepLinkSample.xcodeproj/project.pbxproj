@@ -8,10 +8,23 @@
 
 /* Begin PBXBuildFile section */
 		38D6AB3B2E835AAE0087C691 /* DeepLinks in Frameworks */ = {isa = PBXBuildFile; productRef = 38D6AB3A2E835AAE0087C691 /* DeepLinks */; };
+		38D6AC0F2E836A010087C691 /* DeepLinksTesting in Frameworks */ = {isa = PBXBuildFile; productRef = 38D6AC0D2E836A010087C691 /* DeepLinksTesting */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		38D6AC0B2E836A010087C691 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 38D6AB012E835A030087C691 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 38D6AB082E835A030087C691;
+			remoteInfo = DeepLinkSample;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
+		38539B9A2F6C6EFB00B6BC85 /* DeepLinks.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = DeepLinks.xctestplan; sourceTree = "<group>"; };
 		38D6AB092E835A030087C691 /* DeepLinkSample.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DeepLinkSample.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		38D6AC022E836A010087C691 /* DeepLinkSampleTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DeepLinkSampleTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -33,6 +46,11 @@
 			path = DeepLinkSample;
 			sourceTree = "<group>";
 		};
+		38D6AC092E836A010087C691 /* DeepLinkSampleTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = DeepLinkSampleTests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -44,13 +62,23 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		38D6AC042E836A010087C691 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				38D6AC0F2E836A010087C691 /* DeepLinksTesting in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		38D6AB002E835A030087C691 = {
 			isa = PBXGroup;
 			children = (
+				38539B9A2F6C6EFB00B6BC85 /* DeepLinks.xctestplan */,
 				38D6AB0B2E835A030087C691 /* DeepLinkSample */,
+				38D6AC092E836A010087C691 /* DeepLinkSampleTests */,
 				38D6AB0A2E835A030087C691 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -59,6 +87,7 @@
 			isa = PBXGroup;
 			children = (
 				38D6AB092E835A030087C691 /* DeepLinkSample.app */,
+				38D6AC022E836A010087C691 /* DeepLinkSampleTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -89,6 +118,30 @@
 			productReference = 38D6AB092E835A030087C691 /* DeepLinkSample.app */;
 			productType = "com.apple.product-type.application";
 		};
+		38D6AC012E836A010087C691 /* DeepLinkSampleTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 38D6AC082E836A010087C691 /* Build configuration list for PBXNativeTarget "DeepLinkSampleTests" */;
+			buildPhases = (
+				38D6AC032E836A010087C691 /* Sources */,
+				38D6AC042E836A010087C691 /* Frameworks */,
+				38D6AC052E836A010087C691 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				38D6AC0A2E836A010087C691 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				38D6AC092E836A010087C691 /* DeepLinkSampleTests */,
+			);
+			name = DeepLinkSampleTests;
+			packageProductDependencies = (
+				38D6AC0D2E836A010087C691 /* DeepLinksTesting */,
+			);
+			productName = DeepLinkSampleTests;
+			productReference = 38D6AC022E836A010087C691 /* DeepLinkSampleTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -101,6 +154,10 @@
 				TargetAttributes = {
 					38D6AB082E835A030087C691 = {
 						CreatedOnToolsVersion = 26.0;
+					};
+					38D6AC012E836A010087C691 = {
+						CreatedOnToolsVersion = 26.0;
+						TestTargetID = 38D6AB082E835A030087C691;
 					};
 				};
 			};
@@ -122,12 +179,20 @@
 			projectRoot = "";
 			targets = (
 				38D6AB082E835A030087C691 /* DeepLinkSample */,
+				38D6AC012E836A010087C691 /* DeepLinkSampleTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		38D6AB072E835A030087C691 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		38D6AC052E836A010087C691 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -144,7 +209,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		38D6AC032E836A010087C691 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		38D6AC0A2E836A010087C691 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 38D6AB082E835A030087C691 /* DeepLinkSample */;
+			targetProxy = 38D6AC0B2E836A010087C691 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		38D6AB282E835A040087C691 /* Debug */ = {
@@ -334,6 +414,46 @@
 			};
 			name = Release;
 		};
+		38D6AC062E836A010087C691 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = HS399QXLRD;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = io.alfredohdz.DeepLinkSampleTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/DeepLinkSample.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/DeepLinkSample";
+			};
+			name = Debug;
+		};
+		38D6AC072E836A010087C691 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = HS399QXLRD;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = io.alfredohdz.DeepLinkSampleTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/DeepLinkSample.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/DeepLinkSample";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -355,6 +475,15 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		38D6AC082E836A010087C691 /* Build configuration list for PBXNativeTarget "DeepLinkSampleTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				38D6AC062E836A010087C691 /* Debug */,
+				38D6AC072E836A010087C691 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
@@ -368,6 +497,10 @@
 		38D6AB3A2E835AAE0087C691 /* DeepLinks */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = DeepLinks;
+		};
+		38D6AC0D2E836A010087C691 /* DeepLinksTesting */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DeepLinksTesting;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

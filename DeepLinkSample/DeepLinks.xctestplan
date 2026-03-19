@@ -1,0 +1,30 @@
+{
+  "configurations" : [
+    {
+      "id" : "B1224846-733D-47CF-97B7-3D319EBF6D63",
+      "name" : "Test Scheme Action",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "codeCoverage" : false,
+    "performanceAntipatternCheckerEnabled" : true,
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:DeepLinkSample.xcodeproj",
+      "identifier" : "38D6AB082E835A030087C691",
+      "name" : "DeepLinkSample"
+    }
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:DeepLinkSample.xcodeproj",
+        "identifier" : "38D6AC012E836A010087C691",
+        "name" : "DeepLinkSampleTests"
+      }
+    }
+  ],
+  "version" : 1
+}
