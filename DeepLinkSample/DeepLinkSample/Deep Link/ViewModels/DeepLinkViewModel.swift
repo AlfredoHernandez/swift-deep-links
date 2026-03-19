@@ -23,6 +23,7 @@ final class DeepLinkViewModel {
 
 	private let deepLinkService: DeepLinkService
 	private let logger = Logger(subsystem: "swift-deep-link-sample-app", category: "DeepLinkViewModel")
+	private var processingTask: Task<Void, Never>?
 
 	// MARK: - Public Properties
 
@@ -51,34 +52,37 @@ final class DeepLinkViewModel {
 
 	/// Processes a deep link URL through the complete pipeline.
 	///
-	/// This method handles the entire deep link processing flow including:
-	/// - Coordinator creation and configuration
-	/// - URL processing through middleware
-	/// - Route execution
-	/// - Result handling and logging
+	/// Cancels any in-flight processing before starting the new one.
+	/// The task is tracked internally so it can be cancelled if a new
+	/// deep link arrives before the previous one finishes.
 	///
 	/// - Parameter url: The deep link URL to process
-	@MainActor
-	func processDeepLink(url: URL) async {
-		isProcessing = true
-		processingError = nil
+	func processDeepLink(url: URL) {
+		processingTask?.cancel()
+		processingTask = Task { @MainActor in
+			isProcessing = true
+			processingError = nil
 
-		do {
-			let coordinator = try await deepLinkService.createCoordinator(navigationRouter: navigationRouter)
-			let result = await coordinator.handle(url: url)
+			do {
+				let coordinator = try await deepLinkService.createCoordinator(navigationRouter: navigationRouter)
+				let result = await coordinator.handle(url: url)
 
-			lastResult = result
-			logDeepLinkResult(result)
+				guard !Task.isCancelled else { return }
 
-			if !result.wasSuccessful {
-				processingError = DeepLinkError.routeNotFound("Deep link processing failed")
+				lastResult = result
+				logDeepLinkResult(result)
+
+				if !result.wasSuccessful {
+					processingError = DeepLinkError.routeNotFound("Deep link processing failed")
+				}
+			} catch {
+				guard !Task.isCancelled else { return }
+				processingError = error
+				logger.error("Failed to process deep link: \(error)")
 			}
-		} catch {
-			processingError = error
-			logger.error("Failed to process deep link: \(error)")
-		}
 
-		isProcessing = false
+			isProcessing = false
+		}
 	}
 
 	/// Clears the current processing error.
@@ -90,6 +94,8 @@ final class DeepLinkViewModel {
 	/// Resets the processing state and clears all cached data.
 	@MainActor
 	func reset() {
+		processingTask?.cancel()
+		processingTask = nil
 		isProcessing = false
 		lastResult = nil
 		processingError = nil

@@ -38,11 +38,7 @@ struct DeepLinkSampleApp: App {
 		WindowGroup {
 			MainView()
 				.environment(viewModel.navigationRouter)
-				.onOpenURL { url in
-					Task {
-						await viewModel.processDeepLink(url: url)
-					}
-				}
+				.onOpenURL(perform: viewModel.processDeepLink)
 		}
 	}
 }
