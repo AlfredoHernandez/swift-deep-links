@@ -2,7 +2,7 @@
 //  Copyright © 2026 Jesús Alfredo Hernández Alarcón. All rights reserved.
 //
 
-import Combine
+import Observation
 import SwiftUI
 
 /// A centralized navigation router that manages all navigation state in the app.
@@ -14,22 +14,23 @@ import SwiftUI
 /// - **Alert presentations**: System alerts
 ///
 /// ## Architecture:
-/// The router uses `@Published` properties to enable reactive UI updates
+/// The router uses the `@Observable` macro for reactive UI updates
 /// when navigation state changes. It integrates with SwiftUI's navigation
 /// system and provides a clean API for programmatic navigation.
 ///
 /// ## Usage:
-/// The router is typically injected as an `@EnvironmentObject` and used
+/// The router is typically injected via the environment and used
 /// throughout the app to trigger navigation actions and manage state.
-final class NavigationRouter: ObservableObject {
+@Observable
+final class NavigationRouter {
 	/// Currently presented sheet, if any
-	@Published var sheet: Sheet?
+	var sheet: Sheet?
 
 	/// Navigation stack path for stack-based navigation
-	@Published var stack: [Stack] = []
+	var stack: [Stack] = []
 
 	/// Currently presented alert, if any
-	@Published var alert: AlertItem?
+	var alert: AlertItem?
 
 	/// Represents an alert item with all necessary information for presentation.
 	///

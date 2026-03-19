@@ -2,10 +2,8 @@
 //  Copyright © 2026 Jesús Alfredo Hernández Alarcón. All rights reserved.
 //
 
-import Combine
 import DeepLink
 import Foundation
-import Observation
 import OSLog
 
 /// ViewModel for managing deep link processing and app state.

@@ -37,7 +37,7 @@ struct DeepLinkSampleApp: App {
 	var body: some Scene {
 		WindowGroup {
 			MainView()
-				.environmentObject(viewModel.navigationRouter)
+				.environment(viewModel.navigationRouter)
 				.onOpenURL { url in
 					Task {
 						await viewModel.processDeepLink(url: url)

@@ -27,11 +27,12 @@ import SwiftUI
 /// The view is designed to handle incoming deep links through the `NavigationRouter`
 /// and provides immediate visual feedback for all navigation actions.
 struct MainView: View {
-	@EnvironmentObject var navigationRouter: NavigationRouter
+	@Environment(NavigationRouter.self) var navigationRouter
 	@State private var showingInstructions = false
 
 	var body: some View {
-		NavigationStack(path: $navigationRouter.stack) {
+		@Bindable var router = navigationRouter
+		NavigationStack(path: $router.stack) {
 			ScrollView {
 				VStack(spacing: 24) {
 					HeaderView()
@@ -62,7 +63,7 @@ struct MainView: View {
 			})
 		}
 		// Deep link sheet presentations
-		.sheet(item: $navigationRouter.sheet) { sheet in
+		.sheet(item: $router.sheet) { sheet in
 			NavigationView {
 				switch sheet {
 				case let .info(title, brief):
@@ -74,7 +75,7 @@ struct MainView: View {
 			}
 		}
 		// Deep link alert presentations
-		.alert(item: $navigationRouter.alert) { alert in
+		.alert(item: $router.alert) { alert in
 			SwiftUI.Alert(
 				title: Text(alert.title),
 				message: Text(alert.message),
@@ -89,5 +90,5 @@ struct MainView: View {
 
 #Preview {
 	MainView()
-		.environmentObject(NavigationRouter())
+		.environment(NavigationRouter())
 }

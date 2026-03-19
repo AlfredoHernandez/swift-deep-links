@@ -18,7 +18,7 @@ import SwiftUI
 /// The view integrates with the `NavigationRouter` to handle navigation state
 /// and provides a comprehensive testing interface for deep link behaviors.
 struct DemoButtonsView: View {
-	@EnvironmentObject var navigationRouter: NavigationRouter
+	@Environment(NavigationRouter.self) var navigationRouter
 
 	var body: some View {
 		VStack(spacing: 16) {
@@ -94,6 +94,6 @@ struct DemoButtonsView: View {
 
 #Preview {
 	DemoButtonsView()
-		.environmentObject(NavigationRouter())
+		.environment(NavigationRouter())
 		.padding()
 }

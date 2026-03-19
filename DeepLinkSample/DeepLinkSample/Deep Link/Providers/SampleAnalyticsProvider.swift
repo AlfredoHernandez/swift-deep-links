@@ -4,6 +4,7 @@
 
 import DeepLink
 import Foundation
+import os
 
 /// Sample analytics provider for demonstration purposes.
 ///
@@ -16,7 +17,7 @@ import Foundation
 /// - Event tracking with parameters
 /// - Event history storage for testing
 /// - Debug logging of tracked events
-/// - Thread-safe operations
+/// - Thread-safe operations via `OSAllocatedUnfairLock`
 ///
 /// ## Usage:
 /// ```swift
@@ -26,64 +27,41 @@ import Foundation
 /// // For testing
 /// let events = analyticsProvider.getTrackedEvents()
 /// ```
-final class SampleAnalyticsProvider: AnalyticsProvider, @unchecked Sendable {
+final class SampleAnalyticsProvider: AnalyticsProvider, Sendable {
 	// MARK: - Private Properties
 
-	private var trackedEvents: [(event: String, parameters: [String: Any])] = []
-	private let queue = DispatchQueue(label: "com.sample.analytics", attributes: .concurrent)
+	private let state = OSAllocatedUnfairLock<[(event: String, parameters: [String: Any])]>(uncheckedState: [])
 
 	// MARK: - Public Interface
 
 	/// Tracks an analytics event with optional parameters.
 	///
-	/// This method simulates sending analytics data to a remote service.
-	/// In a real application, this would make network calls to your analytics service.
-	///
 	/// - Parameters:
 	///   - event: The name of the event to track
 	///   - parameters: Optional parameters associated with the event
 	func track(_ event: String, parameters: [String: Any]) async {
-		// Simulate async analytics tracking
 		try? await Task.sleep(nanoseconds: 5_000_000) // 5ms delay
-
-		await withCheckedContinuation { continuation in
-			queue.async(flags: .barrier) {
-				self.trackedEvents.append((event: event, parameters: parameters))
-				print("📊 Analytics: \(event) - \(parameters)")
-				continuation.resume()
-			}
-		}
+		state.withLockUnchecked { $0.append((event: event, parameters: parameters)) }
+		print("Analytics: \(event) - \(parameters)")
 	}
 
 	/// Gets all tracked events for testing/debugging purposes.
 	///
-	/// This method provides access to the event history for verification
-	/// and debugging during development and testing.
-	///
 	/// - Returns: An array of tracked events with their parameters
 	func getTrackedEvents() -> [(event: String, parameters: [String: Any])] {
-		queue.sync {
-			trackedEvents
-		}
+		state.withLockUnchecked { $0 }
 	}
 
 	/// Gets tracked events count.
 	///
 	/// - Returns: The number of events that have been tracked
 	func getTrackedEventsCount() -> Int {
-		queue.sync {
-			trackedEvents.count
-		}
+		state.withLockUnchecked(\.count)
 	}
 
 	/// Clears all tracked events.
-	///
-	/// This method is useful for testing scenarios where you need to start
-	/// with a clean event history.
 	func clearTrackedEvents() {
-		queue.async(flags: .barrier) {
-			self.trackedEvents.removeAll()
-		}
+		state.withLockUnchecked { $0.removeAll() }
 	}
 
 	/// Gets events filtered by event name.
@@ -91,8 +69,6 @@ final class SampleAnalyticsProvider: AnalyticsProvider, @unchecked Sendable {
 	/// - Parameter eventName: The name of the events to filter by
 	/// - Returns: An array of events matching the specified name
 	func getEvents(named eventName: String) -> [(event: String, parameters: [String: Any])] {
-		queue.sync {
-			trackedEvents.filter { $0.event == eventName }
-		}
+		state.withLockUnchecked { $0.filter { $0.event == eventName } }
 	}
 }

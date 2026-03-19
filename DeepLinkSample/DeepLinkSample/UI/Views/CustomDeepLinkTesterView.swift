@@ -2,7 +2,6 @@
 //  Copyright © 2026 Jesús Alfredo Hernández Alarcón. All rights reserved.
 //
 
-import Combine
 import DeepLink
 import SwiftUI
 
@@ -26,7 +25,7 @@ import SwiftUI
 /// - Validating URL parameters
 /// - Demonstrating the deep link system to stakeholders
 struct CustomDeepLinkTesterView: View {
-	@EnvironmentObject var navigationRouter: NavigationRouter
+	@Environment(NavigationRouter.self) var navigationRouter
 	@State private var customDeepLink = ""
 	@State private var showingCustomLinkAlert = false
 
@@ -102,6 +101,6 @@ struct CustomDeepLinkTesterView: View {
 
 #Preview {
 	CustomDeepLinkTesterView()
-		.environmentObject(NavigationRouter())
+		.environment(NavigationRouter())
 		.padding()
 }
