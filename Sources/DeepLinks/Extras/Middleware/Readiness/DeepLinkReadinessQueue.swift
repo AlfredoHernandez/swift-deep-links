@@ -55,7 +55,7 @@ public final class DeepLinkReadinessQueue: ReadinessQueue, Sendable {
 	///   When the limit is reached, the oldest URL is dropped. Pass `nil`
 	///   for unlimited queue size. Defaults to `nil`.
 	public init(maxQueueSize: Int? = nil) {
-		self.maxQueueSize = maxQueueSize
+		self.maxQueueSize = maxQueueSize.map { max(1, $0) }
 		state = OSAllocatedUnfairLock(initialState: State())
 	}
 
