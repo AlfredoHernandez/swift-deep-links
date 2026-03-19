@@ -37,6 +37,7 @@ struct MainView: View {
 				VStack(spacing: 24) {
 					HeaderView()
 					DemoButtonsView()
+					ReadinessShowcaseView()
 					DeepLinkExamplesView()
 					CustomDeepLinkTesterView()
 				}
