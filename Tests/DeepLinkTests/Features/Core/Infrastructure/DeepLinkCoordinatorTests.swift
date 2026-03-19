@@ -155,7 +155,7 @@ struct DeepLinkCoordinatorTests {
 	func deepLinkCoordinator_notifiesDelegateWhenProcessingStarts() async throws {
 		let routingStub = DeepLinkRoutingStub<TestRoute>()
 		let handlerSpy = DeepLinkHandlerSpy<TestRoute>()
-		let delegate = DelegateSpy()
+		let delegate = CoordinatorDelegateSpy()
 		let coordinator = DeepLinkCoordinator(routing: routingStub, handler: handlerSpy, delegate: delegate)
 		let url = try #require(URL(string: "test://delegate"))
 
@@ -171,7 +171,7 @@ struct DeepLinkCoordinatorTests {
 	func deepLinkCoordinator_notifiesDelegateWhenProcessingCompletesSuccessfully() async throws {
 		let routingStub = DeepLinkRoutingStub<TestRoute>()
 		let handlerSpy = DeepLinkHandlerSpy<TestRoute>()
-		let delegate = DelegateSpy()
+		let delegate = CoordinatorDelegateSpy()
 		let coordinator = DeepLinkCoordinator(routing: routingStub, handler: handlerSpy, delegate: delegate)
 		let url = try #require(URL(string: "test://delegate"))
 
@@ -188,7 +188,7 @@ struct DeepLinkCoordinatorTests {
 	func deepLinkCoordinator_notifiesDelegateWhenProcessingFails() async throws {
 		let routingStub = DeepLinkRoutingStub<TestRoute>()
 		let handlerSpy = DeepLinkHandlerSpy<TestRoute>()
-		let delegate = DelegateSpy()
+		let delegate = CoordinatorDelegateSpy()
 		let coordinator = DeepLinkCoordinator(routing: routingStub, handler: handlerSpy, delegate: delegate)
 		let url = try #require(URL(string: "test://delegate"))
 		routingStub.shouldThrowError = true
@@ -197,7 +197,7 @@ struct DeepLinkCoordinatorTests {
 
 		#expect(delegate.didFailCalls.count == 1)
 		#expect(delegate.didFailCalls.first?.url == url)
-		#expect(delegate.didFailCalls.first?.error is TestError)
+		#expect(delegate.didFailCalls.first?.error is DeepLinkError)
 	}
 
 	@Test("DeepLinkCoordinator works without delegate")
@@ -240,77 +240,10 @@ struct DeepLinkCoordinatorTests {
 
 	// MARK: - Test doubles
 
-	enum TestRoute: DeepLinkRoute, Equatable {
-		case route1
-		case route2
-		case route3
-
-		var id: String {
-			switch self {
-			case .route1: "route1"
-
-			case .route2: "route2"
-
-			case .route3: "route3"
-			}
-		}
-	}
-
-	final class DeepLinkRoutingStub<Route: DeepLinkRoute>: DeepLinkRouting, @unchecked Sendable {
-		var routesToReturn: [Route] = []
-		var shouldThrowError = false
-
-		func route(from _: URL) async throws -> [Route] {
-			if shouldThrowError {
-				throw TestError.routingError
-			}
-
-			return routesToReturn
-		}
-	}
-
-	final class DeepLinkHandlerSpy<Route: DeepLinkRoute & Equatable>: DeepLinkHandler, @unchecked Sendable {
-		private(set) var handledRoutes: [Route] = []
-		var shouldThrowError = false
-		var errorRoute: Route?
-
-		func handle(_ route: Route) async throws {
-			if shouldThrowError, errorRoute == route {
-				throw TestError.handlerError
-			}
-
-			handledRoutes.append(route)
-		}
-	}
-
-	enum TestError: Error {
-		case routingError
-		case handlerError
-	}
-
 	/// Middleware that always returns nil to stop processing
 	final class StoppingMiddleware: DeepLinkMiddleware {
 		func intercept(_: URL) async throws -> URL? {
-			nil // Always stops processing
-		}
-	}
-
-	/// Test delegate that tracks all delegate method calls
-	final class DelegateSpy: DeepLinkCoordinatorDelegate, @unchecked Sendable {
-		private(set) var willProcessCalls: [URL] = []
-		private(set) var didProcessCalls: [(url: URL, result: DeepLinkResultProtocol)] = []
-		private(set) var didFailCalls: [(url: URL, error: Error)] = []
-
-		func coordinator(_: AnyObject, willProcess url: URL) {
-			willProcessCalls.append(url)
-		}
-
-		func coordinator(_: AnyObject, didProcess url: URL, result: DeepLinkResultProtocol) {
-			didProcessCalls.append((url: url, result: result))
-		}
-
-		func coordinator(_: AnyObject, didFailProcessing url: URL, error: Error) {
-			didFailCalls.append((url: url, error: error))
+			nil
 		}
 	}
 }

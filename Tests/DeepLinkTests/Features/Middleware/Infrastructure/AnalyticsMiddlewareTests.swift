@@ -11,7 +11,7 @@ struct AnalyticsMiddlewareTests {
 	@Test("AnalyticsMiddleware tracks deep link events with correct parameters")
 	func analyticsMiddleware_tracksDeepLinkEventsWithCorrectParameters() async throws {
 		let testURL = try #require(URL(string: "testapp://product?productId=456&category=electronics"))
-		let analyticsSpy = AnalyticsSpy()
+		let analyticsSpy = AnalyticsProviderSpy()
 		let middleware = AnalyticsMiddleware(analyticsProvider: analyticsSpy)
 
 		let result = try await middleware.intercept(testURL)
@@ -30,7 +30,7 @@ struct AnalyticsMiddlewareTests {
 	@Test("AnalyticsMiddleware handles URLs with unknown scheme and host")
 	func analyticsMiddleware_handlesURLsWithUnknownSchemeAndHost() async throws {
 		let testURL = try #require(URL(string: "unknown://unknown"))
-		let analyticsSpy = AnalyticsSpy()
+		let analyticsSpy = AnalyticsProviderSpy()
 		let middleware = AnalyticsMiddleware(analyticsProvider: analyticsSpy)
 
 		let result = try await middleware.intercept(testURL)
@@ -48,7 +48,7 @@ struct AnalyticsMiddlewareTests {
 	@Test("AnalyticsMiddleware with detailed strategy tracks comprehensive URL information")
 	func analyticsMiddleware_withDetailedStrategy_tracksComprehensiveURLInformation() async throws {
 		let testURL = try #require(URL(string: "testapp://product/123?category=electronics&price=299.99"))
-		let analyticsSpy = AnalyticsSpy()
+		let analyticsSpy = AnalyticsProviderSpy()
 		let middleware = AnalyticsMiddleware(
 			analyticsProvider: analyticsSpy,
 			strategy: .detailed,
@@ -79,7 +79,7 @@ struct AnalyticsMiddlewareTests {
 	@Test("AnalyticsMiddleware with minimal strategy tracks only essential information")
 	func analyticsMiddleware_withMinimalStrategy_tracksOnlyEssentialInformation() async throws {
 		let testURL = try #require(URL(string: "testapp://product/123?category=electronics&price=299.99"))
-		let analyticsSpy = AnalyticsSpy()
+		let analyticsSpy = AnalyticsProviderSpy()
 		let middleware = AnalyticsMiddleware(
 			analyticsProvider: analyticsSpy,
 			strategy: .minimal,
@@ -105,7 +105,7 @@ struct AnalyticsMiddlewareTests {
 	@Test("AnalyticsMiddleware with performance strategy tracks timing information")
 	func analyticsMiddleware_withPerformanceStrategy_tracksTimingInformation() async throws {
 		let testURL = try #require(URL(string: "testapp://product/123"))
-		let analyticsSpy = AnalyticsSpy()
+		let analyticsSpy = AnalyticsProviderSpy()
 		let middleware = AnalyticsMiddleware(
 			analyticsProvider: analyticsSpy,
 			strategy: .performance,
@@ -136,7 +136,7 @@ struct AnalyticsMiddlewareTests {
 	@Test("AnalyticsMiddleware with standard strategy tracks basic URL information")
 	func analyticsMiddleware_withStandardStrategy_tracksBasicURLInformation() async throws {
 		let testURL = try #require(URL(string: "testapp://product/123?category=electronics"))
-		let analyticsSpy = AnalyticsSpy()
+		let analyticsSpy = AnalyticsProviderSpy()
 		let middleware = AnalyticsMiddleware(
 			analyticsProvider: analyticsSpy,
 			strategy: .standard,
@@ -165,7 +165,7 @@ struct AnalyticsMiddlewareTests {
 	@Test("AnalyticsMiddleware with detailed strategy handles URLs without path")
 	func analyticsMiddleware_withDetailedStrategy_handlesURLsWithoutPath() async throws {
 		let testURL = try #require(URL(string: "testapp://product?category=electronics"))
-		let analyticsSpy = AnalyticsSpy()
+		let analyticsSpy = AnalyticsProviderSpy()
 		let middleware = AnalyticsMiddleware(
 			analyticsProvider: analyticsSpy,
 			strategy: .detailed,
@@ -193,7 +193,7 @@ struct AnalyticsMiddlewareTests {
 	@Test("AnalyticsMiddleware with detailed strategy handles URLs without query parameters")
 	func analyticsMiddleware_withDetailedStrategy_handlesURLsWithoutQueryParameters() async throws {
 		let testURL = try #require(URL(string: "testapp://product/123"))
-		let analyticsSpy = AnalyticsSpy()
+		let analyticsSpy = AnalyticsProviderSpy()
 		let middleware = AnalyticsMiddleware(
 			analyticsProvider: analyticsSpy,
 			strategy: .detailed,
@@ -215,7 +215,7 @@ struct AnalyticsMiddlewareTests {
 	@Test("AnalyticsMiddleware with detailed strategy handles URLs with empty path")
 	func analyticsMiddleware_withDetailedStrategy_handlesURLsWithEmptyPath() async throws {
 		let testURL = try #require(URL(string: "testapp://product"))
-		let analyticsSpy = AnalyticsSpy()
+		let analyticsSpy = AnalyticsProviderSpy()
 		let middleware = AnalyticsMiddleware(
 			analyticsProvider: analyticsSpy,
 			strategy: .detailed,
@@ -318,20 +318,5 @@ struct AnalyticsMiddlewareTests {
 		// Test that it can be used as protocol
 		await provider.track("test_event", parameters: ["key": "value"])
 		// If no error is thrown, the test passes
-	}
-
-	// MARK: - Test Helpers
-
-	private final class AnalyticsSpy: AnalyticsProvider, @unchecked Sendable {
-		struct TrackedEvent {
-			let event: String
-			let parameters: [String: Any]
-		}
-
-		private(set) var trackedEvents: [TrackedEvent] = []
-
-		func track(_ event: String, parameters: [String: Any]) async {
-			trackedEvents.append(TrackedEvent(event: event, parameters: parameters))
-		}
 	}
 }

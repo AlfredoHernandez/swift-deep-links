@@ -145,7 +145,7 @@ struct DeepLinkMiddlewareCoordinatorTests {
 	@Test("AnalyticsMiddleware tracks deep link events")
 	func analyticsMiddleware_tracksDeepLinkEvents() async throws {
 		let testURL = try #require(URL(string: "testapp://product?productId=456"))
-		let analyticsProvider = AnalyticsSpy()
+		let analyticsProvider = AnalyticsProviderSpy()
 		let middleware = AnalyticsMiddleware(analyticsProvider: analyticsProvider)
 
 		let result = try await middleware.intercept(testURL)
@@ -205,7 +205,7 @@ struct DeepLinkMiddlewareCoordinatorTests {
 	@Test("AuthenticationMiddleware allows requests for unprotected hosts")
 	func authenticationMiddleware_allowsRequestsForUnprotectedHosts() async throws {
 		let testURL = try #require(URL(string: "testapp://public"))
-		let authProvider = AuthenticationStub(isAuthenticated: false)
+		let authProvider = AuthenticationProviderStub(isAuthenticated: false)
 		let middleware = AuthenticationMiddleware(
 			authProvider: authProvider,
 			protectedHosts: ["protected"],
@@ -219,7 +219,7 @@ struct DeepLinkMiddlewareCoordinatorTests {
 	@Test("AuthenticationMiddleware allows requests for protected hosts when authenticated")
 	func authenticationMiddleware_allowsRequestsForProtectedHostsWhenAuthenticated() async throws {
 		let testURL = try #require(URL(string: "testapp://protected"))
-		let authProvider = AuthenticationStub(isAuthenticated: true)
+		let authProvider = AuthenticationProviderStub(isAuthenticated: true)
 		let middleware = AuthenticationMiddleware(
 			authProvider: authProvider,
 			protectedHosts: ["protected"],
@@ -233,7 +233,7 @@ struct DeepLinkMiddlewareCoordinatorTests {
 	@Test("AuthenticationMiddleware blocks requests for protected hosts when not authenticated")
 	func authenticationMiddleware_blocksRequestsForProtectedHostsWhenNotAuthenticated() async throws {
 		let testURL = try #require(URL(string: "testapp://protected"))
-		let authProvider = AuthenticationStub(isAuthenticated: false)
+		let authProvider = AuthenticationProviderStub(isAuthenticated: false)
 		let middleware = AuthenticationMiddleware(
 			authProvider: authProvider,
 			protectedHosts: ["protected"],
@@ -419,18 +419,6 @@ struct DeepLinkMiddlewareCoordinatorTests {
 		}
 	}
 
-	private final class AuthenticationStub: AuthenticationProvider {
-		private let isAuthenticated: Bool
-
-		init(isAuthenticated: Bool) {
-			self.isAuthenticated = isAuthenticated
-		}
-
-		func isAuthenticated() async -> Bool {
-			isAuthenticated
-		}
-	}
-
 	private final class URLTransformerStub: URLTransformer {
 		private let transformedURL: URL
 
@@ -478,19 +466,6 @@ struct DeepLinkMiddlewareCoordinatorTests {
 				return false
 			}
 			return selfTime < otherTime
-		}
-	}
-
-	private final class AnalyticsSpy: AnalyticsProvider, @unchecked Sendable {
-		struct TrackedEvent {
-			let event: String
-			let parameters: [String: Any]
-		}
-
-		private(set) var trackedEvents: [TrackedEvent] = []
-
-		func track(_ event: String, parameters: [String: Any]) async {
-			trackedEvents.append(TrackedEvent(event: event, parameters: parameters))
 		}
 	}
 

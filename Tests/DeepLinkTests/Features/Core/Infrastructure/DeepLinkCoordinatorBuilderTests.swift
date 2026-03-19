@@ -136,7 +136,7 @@ struct DeepLinkCoordinatorBuilderTests {
 	func deepLinkCoordinatorBuilder_addingDelegate_addsSingleDelegateToCoordinator() async throws {
 		let routingStub = DeepLinkRoutingStub<TestRoute>()
 		let handlerSpy = DeepLinkHandlerSpy<TestRoute>()
-		let delegateSpy = DelegateSpy()
+		let delegateSpy = CoordinatorDelegateSpy()
 
 		let coordinator = try await DeepLinkCoordinatorBuilder<TestRoute>()
 			.addingRouting(routingStub)
@@ -157,7 +157,7 @@ struct DeepLinkCoordinatorBuilderTests {
 	func deepLinkCoordinatorBuilder_addingDelegateUsingClosure_addsDelegateToCoordinator() async throws {
 		let routingStub = DeepLinkRoutingStub<TestRoute>()
 		let handlerSpy = DeepLinkHandlerSpy<TestRoute>()
-		let delegateSpy = DelegateSpy()
+		let delegateSpy = CoordinatorDelegateSpy()
 
 		let coordinator = try await DeepLinkCoordinatorBuilder<TestRoute>()
 			.addingRouting(routingStub)
@@ -178,8 +178,8 @@ struct DeepLinkCoordinatorBuilderTests {
 	func deepLinkCoordinatorBuilder_addingDelegatesArray_createsCompositeDelegate() async throws {
 		let routingStub2 = DeepLinkRoutingStub<TestRoute>()
 		let handlerSpy2 = DeepLinkHandlerSpy<TestRoute>()
-		let delegate2 = DelegateSpy()
-		let delegate3 = DelegateSpy()
+		let delegate2 = CoordinatorDelegateSpy()
+		let delegate3 = CoordinatorDelegateSpy()
 
 		let coordinator2 = try await DeepLinkCoordinatorBuilder<TestRoute>()
 			.addingRouting(routingStub2)
@@ -206,8 +206,8 @@ struct DeepLinkCoordinatorBuilderTests {
 	func deepLinkCoordinatorBuilder_addingDelegatesMethod_worksCorrectly() async throws {
 		let routingStub = DeepLinkRoutingStub<TestRoute>()
 		let handlerSpy = DeepLinkHandlerSpy<TestRoute>()
-		let delegate1 = DelegateSpy()
-		let delegate2 = DelegateSpy()
+		let delegate1 = CoordinatorDelegateSpy()
+		let delegate2 = CoordinatorDelegateSpy()
 
 		_ = try await DeepLinkCoordinatorBuilder<TestRoute>()
 			.addingRouting(routingStub)
@@ -251,7 +251,7 @@ struct DeepLinkCoordinatorBuilderTests {
 		let handlerSpy = DeepLinkHandlerSpy<TestRoute>()
 		let middleware1 = MiddlewareSpy()
 		let middleware2 = MiddlewareSpy()
-		let delegate = DelegateSpy()
+		let delegate = CoordinatorDelegateSpy()
 
 		let coordinator = try await DeepLinkCoordinatorBuilder<TestRoute>()
 			.addingRouting(routingStub)
@@ -296,47 +296,6 @@ struct DeepLinkCoordinatorBuilderTests {
 
 // MARK: - Test Doubles
 
-private enum TestRoute: DeepLinkRoute, Equatable {
-	case route1
-	case route2
-	case route3
-
-	var id: String {
-		switch self {
-		case .route1: "route1"
-
-		case .route2: "route2"
-
-		case .route3: "route3"
-		}
-	}
-}
-
-private final class DeepLinkRoutingStub<Route: DeepLinkRoute>: DeepLinkRouting, @unchecked Sendable {
-	var routesToReturn: [Route] = []
-	var shouldThrowError = false
-
-	func route(from _: URL) async throws -> [Route] {
-		if shouldThrowError {
-			throw DeepLinkError.routeNotFound("Test error")
-		}
-		return routesToReturn
-	}
-}
-
-private final class DeepLinkHandlerSpy<Route: DeepLinkRoute & Equatable>: DeepLinkHandler, @unchecked Sendable {
-	private(set) var handledRoutes: [Route] = []
-	var shouldThrowError = false
-	var errorRoute: Route?
-
-	func handle(_ route: Route) async throws {
-		if shouldThrowError, errorRoute == route {
-			throw DeepLinkError.handlerError("Test handler error")
-		}
-		handledRoutes.append(route)
-	}
-}
-
 private final class MiddlewareSpy: DeepLinkMiddleware, @unchecked Sendable {
 	private(set) var requests: [URL] = []
 
@@ -355,24 +314,6 @@ private final class AdvancedMiddlewareSpy: AdvancedDeepLinkMiddleware, @unchecke
 	}
 }
 
-private final class DelegateSpy: DeepLinkCoordinatorDelegate, @unchecked Sendable {
-	private(set) var willProcessCalls: [URL] = []
-	private(set) var didProcessCalls: [(url: URL, result: DeepLinkResultProtocol)] = []
-	private(set) var didFailCalls: [(url: URL, error: Error)] = []
-
-	func coordinator(_: AnyObject, willProcess url: URL) {
-		willProcessCalls.append(url)
-	}
-
-	func coordinator(_: AnyObject, didProcess url: URL, result: DeepLinkResultProtocol) {
-		didProcessCalls.append((url: url, result: result))
-	}
-
-	func coordinator(_: AnyObject, didFailProcessing url: URL, error: Error) {
-		didFailCalls.append((url: url, error: error))
-	}
-}
-
 private final class AuthenticationProviderDummy: AuthenticationProvider {
 	func isAuthenticated() async -> Bool {
 		true
@@ -380,9 +321,7 @@ private final class AuthenticationProviderDummy: AuthenticationProvider {
 }
 
 private final class AnalyticsProviderDummy: AnalyticsProvider {
-	func track(_: String, parameters _: [String: Any]) async {
-		// Dummy implementation - does nothing
-	}
+	func track(_: String, parameters _: [String: Any]) async {}
 }
 
 private final class ErrorMiddleware: DeepLinkMiddleware {
