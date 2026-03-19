@@ -293,6 +293,89 @@ public final class JSONQueryParameterParser: QueryParameterParser, Sendable {
 }
 ```
 
+## Testing Utilities (`DeepLinksTesting` module)
+
+Add to your test target: `dependencies: ["DeepLinks", "DeepLinksTesting"]`
+
+### ImmediateRouting / ImmediateParser
+
+Return preconfigured routes without URL inspection. Support error simulation.
+
+```swift
+public struct ImmediateRouting<Route: DeepLinkRoute>: DeepLinkRouting, Sendable {
+    public init(routes: [Route])
+    public init(error: some Error)
+}
+
+public struct ImmediateParser<Route: DeepLinkRoute>: DeepLinkParser, Sendable {
+    public init(routes: [Route])
+    public init(error: some Error)
+}
+```
+
+### CollectingHandler
+
+Accumulates handled routes. Thread-safe via `OSAllocatedUnfairLock`.
+
+```swift
+public final class CollectingHandler<Route: DeepLinkRoute>: DeepLinkHandler, @unchecked Sendable {
+    public var handledRoutes: [Route] { get }
+}
+```
+
+### CollectingMiddleware / PassthroughMiddleware
+
+```swift
+public final class CollectingMiddleware: DeepLinkMiddleware, @unchecked Sendable {
+    public var interceptedURLs: [URL] { get }  // passes through and records
+}
+
+public struct PassthroughMiddleware: DeepLinkMiddleware, Sendable { }  // no-op
+```
+
+### CollectingDelegate
+
+`@MainActor`-isolated. Accumulates lifecycle events.
+
+```swift
+@MainActor
+public final class CollectingDelegate: DeepLinkCoordinatorDelegate {
+    public var willProcessURLs: [URL] { get }
+    public var processedEvents: [ProcessedEvent] { get }  // .url, .result
+    public var failedEvents: [FailedEvent] { get }        // .url, .error
+}
+```
+
+### CollectingAnalyticsProvider
+
+Thread-safe. Converts `[String: Any]` parameters to `[String: String]`.
+
+```swift
+public final class CollectingAnalyticsProvider: AnalyticsProvider, @unchecked Sendable {
+    public var trackedEvents: [TrackedEvent] { get }  // .name, .parameters
+}
+```
+
+### FixedAuthenticationProvider
+
+```swift
+public struct FixedAuthenticationProvider: AuthenticationProvider, Sendable {
+    public init(isAuthenticated: Bool)
+}
+```
+
+### InMemoryRateLimitPersistence
+
+Actor-based in-memory persistence. No disk I/O.
+
+```swift
+public actor InMemoryRateLimitPersistence: RateLimitPersistence {
+    public func loadRequests() -> [TimeInterval]
+    public func saveRequests(_ timestamps: [TimeInterval])
+    public func clearRequests()
+}
+```
+
 ## Thread Safety
 
 - `DeepLinkCoordinator` — `Sendable` final class, immutable `let` properties

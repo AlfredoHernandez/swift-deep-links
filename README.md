@@ -23,8 +23,9 @@ dependencies: [
     .package(url: "https://github.com/AlfredoHernandez/swift-deep-links.git", from: "1.0.0")
 ]
 
-// Target
+// Targets
 .target(name: "YourApp", dependencies: ["DeepLinks"])
+.testTarget(name: "YourAppTests", dependencies: ["DeepLinks", "DeepLinksTesting"])
 ```
 
 ## Minimal Example
@@ -154,6 +155,31 @@ Observe the coordinator lifecycle without modifying it:
     .notification(showSuccess: true, showErrors: true, showInfo: false)
 ))
 ```
+
+## Testing
+
+The `DeepLinksTesting` module provides purpose-named test utilities:
+
+```swift
+import DeepLinksTesting
+
+let routing = ImmediateRouting<AppRoute>(routes: [.profile(userID: "42")])
+let handler = CollectingHandler<AppRoute>()
+let coordinator = DeepLinkCoordinator(routing: routing, handler: handler)
+
+await coordinator.handle(url: URL(string: "myapp://profile?userID=42")!)
+#expect(handler.handledRoutes == [.profile(userID: "42")])
+```
+
+| Type | Purpose |
+|------|---------|
+| `ImmediateRouting` / `ImmediateParser` | Return preconfigured routes |
+| `CollectingHandler` | Accumulate handled routes |
+| `CollectingMiddleware` / `PassthroughMiddleware` | Collect or pass URLs |
+| `CollectingDelegate` | Accumulate lifecycle events |
+| `CollectingAnalyticsProvider` | Accumulate analytics events |
+| `FixedAuthenticationProvider` | Fixed auth state |
+| `InMemoryRateLimitPersistence` | In-memory persistence |
 
 ## Documentation
 

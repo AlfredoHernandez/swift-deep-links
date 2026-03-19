@@ -277,26 +277,88 @@ queue.reset()
 
 ## Testing
 
-All core components are protocols, making testing straightforward:
+The `DeepLinksTesting` module provides ready-made test utilities. Add it to your test target:
 
 ```swift
-@Test("Coordinator handles product deep link")
+// Package.swift
+.testTarget(name: "MyAppTests", dependencies: ["DeepLinks", "DeepLinksTesting"])
+```
+
+### Test a Handler in Isolation
+
+```swift
+import DeepLinks
+import DeepLinksTesting
+import Testing
+
+@Test("Coordinator routes product deep link to handler")
 func coordinatorHandlesProduct() async throws {
-    let routing = RoutingStub(routes: [.product(productID: "123", category: "Books")])
-    let handler = HandlerSpy()
+    let routing = ImmediateRouting<AppRoute>(routes: [.product(productID: "123", category: "Books")])
+    let handler = CollectingHandler<AppRoute>()
     let coordinator = DeepLinkCoordinator(routing: routing, handler: handler)
 
     let result = await coordinator.handle(url: URL(string: "myapp://product?productID=123")!)
 
     #expect(result.wasSuccessful)
-    #expect(handler.handledRoutes.count == 1)
+    #expect(handler.handledRoutes == [.product(productID: "123", category: "Books")])
 }
 ```
 
-Use `.permissive` strategies in tests to bypass middleware:
+### Test Middleware Pipeline
+
+```swift
+@Test("Security middleware blocks unauthorized schemes")
+func securityBlocksUnauthorized() async throws {
+    let collecting = CollectingMiddleware()
+    let coordinator = DeepLinkMiddlewareCoordinator()
+    await coordinator.add(SecurityMiddleware(allowedSchemes: ["myapp"]))
+    await coordinator.add(collecting)
+
+    // https:// is not in allowed schemes — middleware stops the pipeline
+    await #expect(throws: DeepLinkError.self) {
+        try await coordinator.process(URL(string: "https://evil.com")!)
+    }
+    #expect(collecting.interceptedURLs.isEmpty)
+}
+```
+
+### Test with Delegates
+
+```swift
+@MainActor
+@Test("Delegate receives lifecycle events")
+func delegateReceivesEvents() async throws {
+    let delegate = CollectingDelegate()
+    let routing = ImmediateRouting<AppRoute>(routes: [.settings(section: "account")])
+    let handler = CollectingHandler<AppRoute>()
+    let coordinator = DeepLinkCoordinator(routing: routing, handler: handler, delegate: delegate)
+
+    await coordinator.handle(url: URL(string: "myapp://settings")!)
+
+    #expect(delegate.willProcessURLs.count == 1)
+    #expect(delegate.processedEvents.first?.result.wasSuccessful == true)
+}
+```
+
+### Available Test Utilities
+
+| Type | Purpose |
+|------|---------|
+| `ImmediateRouting<Route>` | Returns preconfigured routes without parsing |
+| `ImmediateParser<Route>` | Returns preconfigured routes for a single parser |
+| `CollectingHandler<Route>` | Accumulates handled routes for inspection |
+| `CollectingMiddleware` | Passes through and accumulates intercepted URLs |
+| `PassthroughMiddleware` | Always passes URLs through unchanged |
+| `CollectingDelegate` | Accumulates coordinator lifecycle events |
+| `CollectingAnalyticsProvider` | Accumulates tracked analytics events |
+| `FixedAuthenticationProvider` | Returns a fixed auth state (`true`/`false`) |
+| `InMemoryRateLimitPersistence` | In-memory rate limit persistence (actor) |
+
+Use `.permissive` strategies to bypass middleware in tests:
 
 ```swift
 let middleware = RateLimitMiddleware(strategy: .permissive)
+let auth = FixedAuthenticationProvider(isAuthenticated: true)
 ```
 
 ## Next Steps
