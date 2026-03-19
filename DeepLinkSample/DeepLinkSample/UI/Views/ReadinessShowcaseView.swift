@@ -28,6 +28,7 @@ struct ReadinessShowcaseView: View {
 
 			VStack(spacing: 12) {
 				statusBadge
+				drainDelayPicker
 				queuedURLsList
 				actionButtons
 			}
@@ -82,31 +83,35 @@ struct ReadinessShowcaseView: View {
 		}
 	}
 
+	private var drainDelayPicker: some View {
+		HStack {
+			Text("Drain delay")
+				.font(.caption)
+				.foregroundColor(.secondary)
+			Spacer()
+			Picker("Delay", selection: $viewModel.drainDelaySeconds) {
+				Text("0s").tag(0.0)
+				Text("0.5s").tag(0.5)
+				Text("1s").tag(1.0)
+				Text("2s").tag(2.0)
+			}
+			.pickerStyle(.segmented)
+			.frame(width: 200)
+		}
+	}
+
 	private var actionButtons: some View {
 		VStack(spacing: 8) {
-			HStack(spacing: 8) {
-				Button {
-					viewModel.sendDeepLink(host: "product", params: "productID=PROD-\(Int.random(in: 100 ... 999))&category=Electronics")
-				} label: {
-					Label("Queue Product", systemImage: "bag.circle")
-						.font(.caption)
-						.frame(maxWidth: .infinity)
-				}
-				.buttonStyle(.bordered)
-				.tint(.orange)
-				.disabled(viewModel.isReady)
-
-				Button {
-					viewModel.sendDeepLink(host: "info", params: "title=Queued&brief=This was queued")
-				} label: {
-					Label("Queue Info", systemImage: "info.circle")
-						.font(.caption)
-						.frame(maxWidth: .infinity)
-				}
-				.buttonStyle(.bordered)
-				.tint(.blue)
-				.disabled(viewModel.isReady)
+			Button {
+				viewModel.queueRandomDeepLink()
+			} label: {
+				Label("Queue Random Deep Link", systemImage: "shuffle.circle")
+					.font(.caption)
+					.frame(maxWidth: .infinity)
 			}
+			.buttonStyle(.bordered)
+			.tint(.purple)
+			.disabled(viewModel.isReady)
 
 			HStack(spacing: 8) {
 				Button {
