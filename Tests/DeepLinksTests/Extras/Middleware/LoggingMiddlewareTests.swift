@@ -7,10 +7,9 @@ import Foundation
 import os.log
 import Testing
 
-@Suite("LoggingMiddleware Tests")
 struct LoggingMiddlewareTests {
-	@Test("LoggingMiddleware logs URL details correctly")
-	func loggingMiddleware_logsURLDetailsCorrectly() async throws {
+	@Test
+	func `LoggingMiddleware logs URL details correctly`() async throws {
 		let testURL = try #require(URL(string: "testapp://profile?userId=123&name=John"))
 		let middleware = LoggingMiddleware()
 
@@ -19,8 +18,8 @@ struct LoggingMiddlewareTests {
 		#expect(result == testURL)
 	}
 
-	@Test("LoggingMiddleware handles URLs without query parameters")
-	func loggingMiddleware_handlesURLsWithoutQueryParameters() async throws {
+	@Test
+	func `LoggingMiddleware handles URLs without query parameters`() async throws {
 		let testURL = try #require(URL(string: "testapp://home"))
 		let middleware = LoggingMiddleware()
 
@@ -29,8 +28,8 @@ struct LoggingMiddlewareTests {
 		#expect(result == testURL)
 	}
 
-	@Test("LoggingMiddleware handles malformed URLs gracefully")
-	func loggingMiddleware_handlesMalformedURLsGracefully() async throws {
+	@Test
+	func `LoggingMiddleware handles malformed URLs gracefully`() async throws {
 		let testURL = try #require(URL(string: "testapp://"))
 		let middleware = LoggingMiddleware()
 
@@ -41,8 +40,8 @@ struct LoggingMiddlewareTests {
 
 	// MARK: - Strategy Tests
 
-	@Test("LoggingMiddleware with singleLine strategy logs URL details in single line")
-	func loggingMiddleware_withSingleLineStrategy_logsURLDetailsInSingleLine() async throws {
+	@Test
+	func `LoggingMiddleware with singleLine strategy logs URL details in single line`() async throws {
 		let testURL = try #require(URL(string: "testapp://product/123?category=electronics&price=299.99"))
 		let loggingProviderSpy = LoggingProviderSpy()
 		let middleware = LoggingMiddleware(
@@ -63,8 +62,8 @@ struct LoggingMiddlewareTests {
 		#expect(logMessage.contains("params=category=electronics&price=299.99"))
 	}
 
-	@Test("LoggingMiddleware with json strategy logs URL details in JSON format")
-	func loggingMiddleware_withJsonStrategy_logsURLDetailsInJSONFormat() async throws {
+	@Test
+	func `LoggingMiddleware with json strategy logs URL details in JSON format`() async throws {
 		let testURL = try #require(URL(string: "testapp://product/123?category=electronics&price=299.99"))
 		let loggingProviderSpy = LoggingProviderSpy()
 		let middleware = LoggingMiddleware(
@@ -94,8 +93,8 @@ struct LoggingMiddlewareTests {
 		#expect(params["price"] == "299.99")
 	}
 
-	@Test("LoggingMiddleware with minimal strategy logs only URL")
-	func loggingMiddleware_withMinimalStrategy_logsOnlyURL() async throws {
+	@Test
+	func `LoggingMiddleware with minimal strategy logs only URL`() async throws {
 		let testURL = try #require(URL(string: "testapp://product/123?category=electronics&price=299.99"))
 		let loggingProviderSpy = LoggingProviderSpy()
 		let middleware = LoggingMiddleware(
@@ -112,8 +111,8 @@ struct LoggingMiddlewareTests {
 		#expect(logMessage == "Deep link: testapp://product/123?category=electronics&price=299.99")
 	}
 
-	@Test("LoggingMiddleware with detailed strategy logs URL details in multiple lines")
-	func loggingMiddleware_withDetailedStrategy_logsURLDetailsInMultipleLines() async throws {
+	@Test
+	func `LoggingMiddleware with detailed strategy logs URL details in multiple lines`() async throws {
 		let testURL = try #require(URL(string: "testapp://product/123?category=electronics&price=299.99"))
 		let loggingProviderSpy = LoggingProviderSpy()
 		let middleware = LoggingMiddleware(
@@ -136,8 +135,8 @@ struct LoggingMiddlewareTests {
 
 	// MARK: - Edge Cases
 
-	@Test("LoggingMiddleware with singleLine strategy handles URLs without query parameters")
-	func loggingMiddleware_withSingleLineStrategy_handlesURLsWithoutQueryParameters() async throws {
+	@Test
+	func `LoggingMiddleware with singleLine strategy handles URLs without query parameters`() async throws {
 		let testURL = try #require(URL(string: "testapp://product/123"))
 		let loggingProviderSpy = LoggingProviderSpy()
 		let middleware = LoggingMiddleware(
@@ -158,8 +157,8 @@ struct LoggingMiddlewareTests {
 		#expect(!logMessage.contains("params=")) // Should not contain params
 	}
 
-	@Test("LoggingMiddleware with singleLine strategy handles URLs without path")
-	func loggingMiddleware_withSingleLineStrategy_handlesURLsWithoutPath() async throws {
+	@Test
+	func `LoggingMiddleware with singleLine strategy handles URLs without path`() async throws {
 		let testURL = try #require(URL(string: "testapp://product?category=electronics"))
 		let middleware = LoggingMiddleware(format: .singleLine)
 
@@ -168,8 +167,8 @@ struct LoggingMiddlewareTests {
 		#expect(result == testURL)
 	}
 
-	@Test("LoggingMiddleware with singleLine strategy handles URLs with empty path")
-	func loggingMiddleware_withSingleLineStrategy_handlesURLsWithEmptyPath() async throws {
+	@Test
+	func `LoggingMiddleware with singleLine strategy handles URLs with empty path`() async throws {
 		let testURL = try #require(URL(string: "testapp://product"))
 		let middleware = LoggingMiddleware(format: .singleLine)
 
@@ -178,8 +177,8 @@ struct LoggingMiddlewareTests {
 		#expect(result == testURL)
 	}
 
-	@Test("LoggingMiddleware with json strategy handles URLs without query parameters")
-	func loggingMiddleware_withJsonStrategy_handlesURLsWithoutQueryParameters() async throws {
+	@Test
+	func `LoggingMiddleware with json strategy handles URLs without query parameters`() async throws {
 		let testURL = try #require(URL(string: "testapp://product/123"))
 		let middleware = LoggingMiddleware(format: .json)
 
@@ -188,8 +187,8 @@ struct LoggingMiddlewareTests {
 		#expect(result == testURL)
 	}
 
-	@Test("LoggingMiddleware with json strategy handles URLs without path")
-	func loggingMiddleware_withJsonStrategy_handlesURLsWithoutPath() async throws {
+	@Test
+	func `LoggingMiddleware with json strategy handles URLs without path`() async throws {
 		let testURL = try #require(URL(string: "testapp://product?category=electronics"))
 		let middleware = LoggingMiddleware(format: .json)
 
@@ -198,8 +197,8 @@ struct LoggingMiddlewareTests {
 		#expect(result == testURL)
 	}
 
-	@Test("LoggingMiddleware with json strategy handles URLs with empty path")
-	func loggingMiddleware_withJsonStrategy_handlesURLsWithEmptyPath() async throws {
+	@Test
+	func `LoggingMiddleware with json strategy handles URLs with empty path`() async throws {
 		let testURL = try #require(URL(string: "testapp://product"))
 		let middleware = LoggingMiddleware(format: .json)
 
@@ -208,8 +207,8 @@ struct LoggingMiddlewareTests {
 		#expect(result == testURL)
 	}
 
-	@Test("LoggingMiddleware with detailed strategy handles URLs without query parameters")
-	func loggingMiddleware_withDetailedStrategy_handlesURLsWithoutQueryParameters() async throws {
+	@Test
+	func `LoggingMiddleware with detailed strategy handles URLs without query parameters`() async throws {
 		let testURL = try #require(URL(string: "testapp://product/123"))
 		let middleware = LoggingMiddleware(format: .detailed)
 
@@ -218,8 +217,8 @@ struct LoggingMiddlewareTests {
 		#expect(result == testURL)
 	}
 
-	@Test("LoggingMiddleware with detailed strategy handles URLs without path")
-	func loggingMiddleware_withDetailedStrategy_handlesURLsWithoutPath() async throws {
+	@Test
+	func `LoggingMiddleware with detailed strategy handles URLs without path`() async throws {
 		let testURL = try #require(URL(string: "testapp://product?category=electronics"))
 		let middleware = LoggingMiddleware(format: .detailed)
 
@@ -228,8 +227,8 @@ struct LoggingMiddlewareTests {
 		#expect(result == testURL)
 	}
 
-	@Test("LoggingMiddleware with detailed strategy handles URLs with empty path")
-	func loggingMiddleware_withDetailedStrategy_handlesURLsWithEmptyPath() async throws {
+	@Test
+	func `LoggingMiddleware with detailed strategy handles URLs with empty path`() async throws {
 		let testURL = try #require(URL(string: "testapp://product"))
 		let middleware = LoggingMiddleware(format: .detailed)
 
@@ -238,8 +237,8 @@ struct LoggingMiddlewareTests {
 		#expect(result == testURL)
 	}
 
-	@Test("LoggingMiddleware with minimal strategy handles URLs without query parameters")
-	func loggingMiddleware_withMinimalStrategy_handlesURLsWithoutQueryParameters() async throws {
+	@Test
+	func `LoggingMiddleware with minimal strategy handles URLs without query parameters`() async throws {
 		let testURL = try #require(URL(string: "testapp://product/123"))
 		let middleware = LoggingMiddleware(format: .minimal)
 
@@ -248,8 +247,8 @@ struct LoggingMiddlewareTests {
 		#expect(result == testURL)
 	}
 
-	@Test("LoggingMiddleware with minimal strategy handles URLs without path")
-	func loggingMiddleware_withMinimalStrategy_handlesURLsWithoutPath() async throws {
+	@Test
+	func `LoggingMiddleware with minimal strategy handles URLs without path`() async throws {
 		let testURL = try #require(URL(string: "testapp://product?category=electronics"))
 		let middleware = LoggingMiddleware(format: .minimal)
 
@@ -258,8 +257,8 @@ struct LoggingMiddlewareTests {
 		#expect(result == testURL)
 	}
 
-	@Test("LoggingMiddleware with minimal strategy handles URLs with empty path")
-	func loggingMiddleware_withMinimalStrategy_handlesURLsWithEmptyPath() async throws {
+	@Test
+	func `LoggingMiddleware with minimal strategy handles URLs with empty path`() async throws {
 		let testURL = try #require(URL(string: "testapp://product"))
 		let middleware = LoggingMiddleware(format: .minimal)
 
@@ -270,8 +269,8 @@ struct LoggingMiddlewareTests {
 
 	// MARK: - Default Behavior Tests
 
-	@Test("LoggingMiddleware with default format uses singleLine strategy")
-	func loggingMiddleware_withDefaultFormat_usesSingleLineStrategy() async throws {
+	@Test
+	func `LoggingMiddleware with default format uses singleLine strategy`() async throws {
 		let testURL = try #require(URL(string: "testapp://product/123?category=electronics"))
 		let middleware = LoggingMiddleware() // Uses default format
 
@@ -280,8 +279,8 @@ struct LoggingMiddlewareTests {
 		#expect(result == testURL)
 	}
 
-	@Test("LoggingMiddleware with custom log level works correctly")
-	func loggingMiddleware_withCustomLogLevel_worksCorrectly() async throws {
+	@Test
+	func `LoggingMiddleware with custom log level works correctly`() async throws {
 		let testURL = try #require(URL(string: "testapp://product/123"))
 		let middleware = LoggingMiddleware(
 			logLevel: .debug,
@@ -293,8 +292,8 @@ struct LoggingMiddlewareTests {
 		#expect(result == testURL)
 	}
 
-	@Test("LoggingMiddleware with custom logging provider works correctly")
-	func loggingMiddleware_withCustomLoggingProvider_worksCorrectly() async throws {
+	@Test
+	func `LoggingMiddleware with custom logging provider works correctly`() async throws {
 		let testURL = try #require(URL(string: "testapp://product/123"))
 		let middleware = LoggingMiddleware(
 			format: .singleLine,
@@ -307,8 +306,8 @@ struct LoggingMiddlewareTests {
 
 	// MARK: - Thread Safety Tests
 
-	@Test("LoggingMiddleware is thread-safe")
-	func loggingMiddleware_isThreadSafe() async throws {
+	@Test
+	func `LoggingMiddleware is thread-safe`() async throws {
 		let testURL = try #require(URL(string: "testapp://product/123"))
 
 		// Test concurrent access
@@ -331,8 +330,8 @@ struct LoggingMiddlewareTests {
 		}
 	}
 
-	@Test("LoggingMiddleware with different formats is thread-safe")
-	func loggingMiddleware_withDifferentFormats_isThreadSafe() async throws {
+	@Test
+	func `LoggingMiddleware with different formats is thread-safe`() async throws {
 		let testURL = try #require(URL(string: "testapp://product/123"))
 
 		// Test concurrent access with different formats

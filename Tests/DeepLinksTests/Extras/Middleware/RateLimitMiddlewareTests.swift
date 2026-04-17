@@ -6,10 +6,9 @@
 import Foundation
 import Testing
 
-@Suite("RateLimitMiddleware Tests")
 struct RateLimitMiddlewareTests {
-	@Test("intercept delivers URL within request limit")
-	func intercept_deliversURLWithinRequestLimit() async throws {
+	@Test
+	func `intercept delivers URL within request limit`() async throws {
 		let (sut, _) = makeSUT(maxRequests: 3)
 
 		for _ in 0 ..< 3 {
@@ -18,8 +17,8 @@ struct RateLimitMiddlewareTests {
 		}
 	}
 
-	@Test("intercept throws rate limit exceeded when over limit")
-	func intercept_throwsRateLimitExceededWhenOverLimit() async throws {
+	@Test
+	func `intercept throws rate limit exceeded when over limit`() async throws {
 		let (sut, _) = makeSUT(maxRequests: 2)
 
 		for _ in 0 ..< 2 {
@@ -31,8 +30,8 @@ struct RateLimitMiddlewareTests {
 		}
 	}
 
-	@Test("intercept resets count after time window expires")
-	func intercept_resetsCountAfterTimeWindowExpires() async throws {
+	@Test
+	func `intercept resets count after time window expires`() async throws {
 		let (sut, _) = makeSUT(maxRequests: 1, timeWindow: 0.1)
 
 		let result1 = try await sut.intercept(testURL)
@@ -44,8 +43,8 @@ struct RateLimitMiddlewareTests {
 		#expect(result2 == testURL)
 	}
 
-	@Test("intercept persists state across middleware instances")
-	func intercept_persistsStateAcrossMiddlewareInstances() async throws {
+	@Test
+	func `intercept persists state across middleware instances`() async throws {
 		let persistence = try UserDefaultsRateLimitPersistence(
 			userDefaults: #require(UserDefaults(suiteName: "test.ratelimit.\(UUID().uuidString)")),
 			key: "test.requests.\(UUID().uuidString)",
@@ -72,8 +71,8 @@ struct RateLimitMiddlewareTests {
 		}
 	}
 
-	@Test("intercept persists timestamps on successful requests")
-	func intercept_persistsTimestampsOnSuccessfulRequests() async throws {
+	@Test
+	func `intercept persists timestamps on successful requests`() async throws {
 		let (sut, persistence) = makeSUT(maxRequests: 2)
 
 		for _ in 0 ..< 2 {
@@ -86,8 +85,8 @@ struct RateLimitMiddlewareTests {
 
 	// MARK: - Strategy Tests
 
-	@Test("intercept with sliding window tracks requests in rolling window")
-	func intercept_withSlidingWindow_tracksRequestsInRollingWindow() async throws {
+	@Test
+	func `intercept with sliding window tracks requests in rolling window`() async throws {
 		let (sut, _) = makeSUT(maxRequests: 3, timeWindow: 1.0, strategy: .slidingWindow)
 
 		for _ in 0 ..< 3 {
@@ -100,8 +99,8 @@ struct RateLimitMiddlewareTests {
 		}
 	}
 
-	@Test("intercept with sliding window removes old requests automatically")
-	func intercept_withSlidingWindow_removesOldRequestsAutomatically() async throws {
+	@Test
+	func `intercept with sliding window removes old requests automatically`() async throws {
 		let (sut, _) = makeSUT(maxRequests: 2, timeWindow: 0.2, strategy: .slidingWindow)
 
 		for _ in 0 ..< 2 {
@@ -118,8 +117,8 @@ struct RateLimitMiddlewareTests {
 		#expect(result == testURL)
 	}
 
-	@Test("intercept with fixed window resets at window boundaries")
-	func intercept_withFixedWindow_resetsAtWindowBoundaries() async throws {
+	@Test
+	func `intercept with fixed window resets at window boundaries`() async throws {
 		let (sut, _) = makeSUT(maxRequests: 2, timeWindow: 1.0, strategy: .fixedWindow)
 
 		for _ in 0 ..< 2 {
@@ -136,8 +135,8 @@ struct RateLimitMiddlewareTests {
 		#expect(result == testURL)
 	}
 
-	@Test("intercept with fixed window allows full burst after window reset")
-	func intercept_withFixedWindow_allowsFullBurstAfterWindowReset() async throws {
+	@Test
+	func `intercept with fixed window allows full burst after window reset`() async throws {
 		let (sut, _) = makeSUT(maxRequests: 2, timeWindow: 1.0, strategy: .fixedWindow)
 
 		for _ in 0 ..< 2 {
@@ -152,8 +151,8 @@ struct RateLimitMiddlewareTests {
 		}
 	}
 
-	@Test("intercept with permissive strategy allows all requests")
-	func intercept_withPermissiveStrategy_allowsAllRequests() async throws {
+	@Test
+	func `intercept with permissive strategy allows all requests`() async throws {
 		let (sut, persistence) = makeSUT(maxRequests: 1, strategy: .permissive)
 
 		for _ in 0 ..< 10 {
@@ -165,8 +164,8 @@ struct RateLimitMiddlewareTests {
 		#expect(storedTimestamps.isEmpty)
 	}
 
-	@Test("intercept with permissive strategy ignores impossible limits")
-	func intercept_withPermissiveStrategy_ignoresImpossibleLimits() async throws {
+	@Test
+	func `intercept with permissive strategy ignores impossible limits`() async throws {
 		let persistence = InMemoryRateLimitPersistence()
 		let sut = RateLimitMiddleware(
 			maxRequests: 0,

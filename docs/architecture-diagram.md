@@ -26,6 +26,7 @@ graph TB
             Transform[URLTransformationMiddleware<br/>URL Normalization]
             Analytics[AnalyticsMiddleware<br/>Usage Tracking]
             Logging[LoggingMiddleware<br/>Event Logging]
+            Readiness[ReadinessMiddleware<br/>App Readiness Gating]
         end
         
         subgraph "Parsing System"
@@ -87,7 +88,8 @@ graph TB
     Auth --> Transform
     Transform --> Analytics
     Analytics --> Logging
-    
+    Logging --> Readiness
+
     %% Routing System
     Routing --> Parser1
     Routing --> Parser2
@@ -136,7 +138,7 @@ graph TB
     classDef support fill:#f1f8e9,stroke:#33691e,stroke-width:2px
     
     class Coordinator,Routing,Handler coreComponent
-    class MiddlewareCoord,RateLimit,Security,Auth,Transform,Analytics,Logging middleware
+    class MiddlewareCoord,RateLimit,Security,Auth,Transform,Analytics,Logging,Readiness middleware
     class Parser1,Parser2,Parser3,Parser4,Parser5,ParamParser parser
     class Route1,Route2,Route3,Route4,Route5 route
     class LoggingDelegate,AnalyticsDelegate,NotificationDelegate delegate
@@ -160,6 +162,7 @@ Middleware pipeline that processes URLs in sequential order:
 4. **URL Transformation** → Normalizes and standardizes URLs
 5. **Analytics** → Tracks usage and deep link metrics
 6. **Logging** → Records events for debugging and monitoring
+7. **Readiness** → Queues deep links until the app is ready, then drains them for reprocessing
 
 ### 🟢 Parsing System (Green)
 - **Specific parsers** for each type of deep link (Profile, Product, Settings, etc.)

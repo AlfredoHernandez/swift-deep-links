@@ -6,12 +6,11 @@
 import Foundation
 import Testing
 
-@Suite("Functional Composition Tests")
 struct CompositionTests {
 	// MARK: - Delegate Composition Tests
 
-	@Test("compose with variadic delegates creates composite delegate")
-	@MainActor func compose_withVariadicDelegates_createsCompositeDelegate() {
+	@Test
+	@MainActor func `compose with variadic delegates creates composite delegate`() {
 		let provider = DefaultAnalyticsProvider()
 
 		let composite = compose(
@@ -23,8 +22,8 @@ struct CompositionTests {
 		#expect(composite is CompositeDeepLinkDelegate)
 	}
 
-	@Test("compose with array of delegates creates composite delegate")
-	@MainActor func compose_withArrayOfDelegates_createsCompositeDelegate() {
+	@Test
+	@MainActor func `compose with array of delegates creates composite delegate`() {
 		let provider = DefaultAnalyticsProvider()
 
 		let delegates: [DeepLinkCoordinatorDelegate] = [
@@ -38,8 +37,8 @@ struct CompositionTests {
 		#expect(composite is CompositeDeepLinkDelegate)
 	}
 
-	@Test("composed delegate executes all delegates in order")
-	@MainActor func composedDelegate_executesAllDelegatesInOrder() throws {
+	@Test
+	@MainActor func `composed delegate executes all delegates in order`() throws {
 		let spy1 = DelegateSpy()
 		let spy2 = DelegateSpy()
 		let spy3 = DelegateSpy()
@@ -55,8 +54,8 @@ struct CompositionTests {
 		#expect(spy3.willProcessCalled == true)
 	}
 
-	@Test("composed delegate works with coordinator")
-	@MainActor func composedDelegate_worksWithCoordinator() async throws {
+	@Test
+	@MainActor func `composed delegate works with coordinator`() async throws {
 		let provider = DefaultAnalyticsProvider()
 		let routing = TestRouting()
 		let handler = TestHandler()
@@ -79,8 +78,8 @@ struct CompositionTests {
 
 	// MARK: - Middleware Composition Tests
 
-	@Test("compose with variadic middleware creates array")
-	func compose_withVariadicMiddleware_createsArray() {
+	@Test
+	func `compose with variadic middleware creates array`() {
 		let provider = DefaultAnalyticsProvider()
 
 		let middleware = compose(
@@ -95,8 +94,8 @@ struct CompositionTests {
 		#expect(middleware[2] is RateLimitMiddleware)
 	}
 
-	@Test("compose with array of middleware returns same array")
-	func compose_withArrayOfMiddleware_returnsSameArray() {
+	@Test
+	func `compose with array of middleware returns same array`() {
 		let provider = DefaultAnalyticsProvider()
 
 		let middlewareList: [any DeepLinkMiddleware] = [
@@ -111,8 +110,8 @@ struct CompositionTests {
 		#expect(composed[1] is AnalyticsMiddleware)
 	}
 
-	@Test("composed middleware works with coordinator builder")
-	func composedMiddleware_worksWithCoordinatorBuilder() async throws {
+	@Test
+	func `composed middleware works with coordinator builder`() async throws {
 		let provider = DefaultAnalyticsProvider()
 		let routing = TestRouting()
 		let handler = TestHandler()
@@ -134,23 +133,23 @@ struct CompositionTests {
 		#expect(result.routes.count == 1)
 	}
 
-	@Test("compose with single delegate works correctly")
-	@MainActor func compose_withSingleDelegate_worksCorrectly() {
+	@Test
+	@MainActor func `compose with single delegate works correctly`() {
 		let composite = compose(.logging())
 
 		#expect(composite is CompositeDeepLinkDelegate)
 	}
 
-	@Test("compose middleware with single item works correctly")
-	func composeMiddleware_withSingleItem_worksCorrectly() {
+	@Test
+	func `compose middleware with single item works correctly`() {
 		let middleware: [any DeepLinkMiddleware] = compose(.logging())
 
 		#expect(middleware.count == 1)
 		#expect(middleware[0] is LoggingMiddleware)
 	}
 
-	@Test("compose with empty array creates empty composite")
-	@MainActor func compose_withEmptyArray_createsEmptyComposite() throws {
+	@Test
+	@MainActor func `compose with empty array creates empty composite`() throws {
 		let delegates: [DeepLinkCoordinatorDelegate] = []
 		let composite = compose(delegates)
 

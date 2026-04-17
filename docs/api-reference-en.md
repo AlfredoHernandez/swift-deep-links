@@ -1,266 +1,43 @@
 # API Reference
 
-Complete API documentation for the DeepLink library.
-
-## Core Components
+## Core Protocols
 
 ### DeepLinkRoute
 
-The base protocol that all route types must conform to.
-
 ```swift
-public protocol DeepLinkRoute {
+public protocol DeepLinkRoute: Sendable {
     var id: String { get }
 }
 ```
 
-**Requirements:**
-- `id: String` - A unique identifier for the route
-
-### DeepLinkURL
-
-A structured representation of a deep link URL with parsed components.
-
-```swift
-public struct DeepLinkURL {
-    public let url: URL
-    public let scheme: String
-    public let host: String
-    public let path: String
-    public let queryParameters: [String: String]
-    
-    public init(url: URL) throws(DeepLinkError)
-}
-```
-
-**Properties:**
-- `url: URL` - The original URL
-- `scheme: String` - The URL scheme (e.g., "myapp")
-- `host: String` - The URL host (e.g., "profile")
-- `path: String` - The URL path component
-- `queryParameters: [String: String]` - Query parameters as a dictionary
-
-**Methods:**
-- `init(url: URL)` - Creates a new DeepLinkURL from a standard URL
-
-### DeepLinkError
-
-Error types for deep link operations.
-
-```swift
-public enum DeepLinkError: Error, Equatable {
-    case invalidURL(URL)
-    case unsupportedHost(String)
-    case routeNotFound(String)
-    case missingRequiredParameter(String)
-}
-```
-
-**Cases:**
-- `invalidURL(URL)` - The URL is malformed or missing required components
-- `unsupportedHost(String)` - The URL host is not supported
-- `routeNotFound(String)` - No parser could handle the URL
-- `missingRequiredParameter(String)` - A required parameter is missing
-
-## Parsing
-
 ### DeepLinkParser
 
-Protocol for parsing URLs into route objects.
-
 ```swift
-public protocol DeepLinkParser {
+public protocol DeepLinkParser<Route>: Sendable {
     associatedtype Route: DeepLinkRoute
-    
-    func parse(from url: URL) throws -> [Route]
+    func parse(from url: URL) async throws -> [Route]
 }
 ```
-
-**Requirements:**
-- `parse(from url: URL) throws -> [Route]` - Parse a URL into route objects
-
-### QueryParameterParser
-
-Protocol for parsing query parameters into strongly-typed objects.
-
-```swift
-public protocol QueryParameterParser {
-    func parse<T: Decodable>(_ type: T.Type, from parameters: [String: String]) throws -> T
-}
-```
-
-**Requirements:**
-- `parse<T: Decodable>(_ type: T.Type, from parameters: [String: String]) throws -> T` - Parse parameters into a Decodable type
-
-### JSONQueryParameterParser
-
-Default implementation of QueryParameterParser using JSON encoding/decoding.
-
-```swift
-public final class JSONQueryParameterParser: QueryParameterParser {
-    public init(jsonDecoder: JSONDecoder = JSONDecoder())
-    
-    public func parse<T: Decodable>(_ type: T.Type, from parameters: [String: String]) throws -> T
-}
-```
-
-**Methods:**
-- `init(jsonDecoder: JSONDecoder)` - Initialize with a custom JSON decoder
-- `parse<T: Decodable>(_ type: T.Type, from parameters: [String: String]) throws -> T` - Parse parameters using JSON decoding
-
-## Routing
-
-### DeepLinkRouting
-
-Protocol for routing URLs to appropriate parsers.
-
-```swift
-public protocol DeepLinkRouting {
-    associatedtype Route: DeepLinkRoute
-    
-    func route(from url: URL) async throws -> [Route]
-}
-```
-
-**Requirements:**
-- `route(from url: URL) async throws -> [Route]` - Route a URL to appropriate parsers
-
-### DefaultDeepLinkRouting
-
-Default implementation that tries multiple parsers until one succeeds.
-
-```swift
-public final class DefaultDeepLinkRouting<Route: DeepLinkRoute>: DeepLinkRouting {
-    public init(parsers: [any DeepLinkParser<Route>])
-    
-    public func route(from url: URL) async throws -> [Route]
-}
-```
-
-**Methods:**
-- `init(parsers: [any DeepLinkParser<Route>])` - Initialize with an array of parsers
-- `route(from url: URL) async throws -> [Route]` - Try parsers in sequence until one succeeds
-
-## Handling
 
 ### DeepLinkHandler
 
-Protocol for handling parsed route objects.
-
 ```swift
-public protocol DeepLinkHandler {
+public protocol DeepLinkHandler<Route>: Sendable {
     associatedtype Route: DeepLinkRoute
-    
     func handle(_ route: Route) async throws
 }
 ```
 
-**Requirements:**
-- `handle(_ route: Route) async throws` - Handle a parsed route
-
-## Coordination
-
-### DeepLinkCoordinator
-
-Main orchestrator that coordinates the deep link handling flow.
+### DeepLinkRouting
 
 ```swift
-public final class DeepLinkCoordinator<Route: DeepLinkRoute>: @unchecked Sendable {
-    public init(routing: any DeepLinkRouting<Route>, handler: any DeepLinkHandler<Route>)
-    
-    public func handle(url: URL) async
+public protocol DeepLinkRouting<Route>: Sendable {
+    associatedtype Route: DeepLinkRoute
+    func route(from url: URL) async throws -> [Route]
 }
 ```
-
-**Methods:**
-- `init(routing: any DeepLinkRouting<Route>, handler: any DeepLinkHandler<Route>)` - Initialize with routing and handler
-- `handle(url: URL) async` - Handle a deep link URL through the complete flow
-
-## Usage Examples
-
-### Basic Route Definition
-
-```swift
-enum AppRoute: DeepLinkRoute {
-    case profile(userId: String)
-    case product(productId: String)
-    
-    var id: String {
-        switch self {
-        case .profile(let userId): "profile-\(userId)"
-        case .product(let productId): "product-\(productId)"
-        }
-    }
-}
-```
-
-### Custom Parser Implementation
-
-```swift
-final class ProfileParser: DeepLinkParser {
-    typealias Route = AppRoute
-    
-    func parse(from url: URL) throws -> [AppRoute] {
-        let deepLinkURL = try DeepLinkURL(url: url)
-        
-        switch deepLinkURL.host {
-        case "profile":
-            guard let userId = deepLinkURL.queryParameters["userId"] else {
-                throw DeepLinkError.missingRequiredParameter("userId")
-            }
-            return [.profile(userId: userId)]
-        default:
-            throw DeepLinkError.unsupportedHost(deepLinkURL.host)
-        }
-    }
-}
-```
-
-### Custom Handler Implementation
-
-```swift
-final class AppDeepLinkHandler: DeepLinkHandler {
-    typealias Route = AppRoute
-    private let navigationService: NavigationService
-    
-    init(navigationService: NavigationService) {
-        self.navigationService = navigationService
-    }
-    
-    func handle(_ route: AppRoute) async throws {
-        switch route {
-        case .profile(let userId):
-            await navigationService.navigateToProfile(userId: userId)
-        case .product(let productId):
-            await navigationService.navigateToProduct(productId: productId)
-        }
-    }
-}
-```
-
-### Complete Setup
-
-```swift
-let parsers: [any DeepLinkParser<AppRoute>] = [
-    ProfileParser(),
-    ProductParser()
-]
-
-let routing = DefaultDeepLinkRouting<AppRoute>(parsers: parsers)
-let handler = AppDeepLinkHandler(navigationService: navigationService)
-let coordinator = DeepLinkCoordinator(routing: routing, handler: handler)
-
-// Handle a deep link
-await coordinator.handle(url: deepLinkURL)
-```
-
-## Middleware System
-
-The library provides a powerful middleware system for intercepting and processing deep links before they reach the parsers.
 
 ### DeepLinkMiddleware
-
-Basic middleware protocol for intercepting URLs:
 
 ```swift
 public protocol DeepLinkMiddleware: Sendable {
@@ -268,80 +45,7 @@ public protocol DeepLinkMiddleware: Sendable {
 }
 ```
 
-### DeepLinkMiddlewareCoordinator
-
-Coordinates the execution of middleware in sequence:
-
-```swift
-let coordinator = DeepLinkMiddlewareCoordinator()
-coordinator.add(AnalyticsMiddleware())
-coordinator.add(AuthenticationMiddleware())
-coordinator.add(RateLimitMiddleware())
-
-let processedURL = try await coordinator.process(url)
-```
-
-### Common Middleware
-
-The library includes several built-in middleware implementations:
-
-#### LoggingMiddleware
-Logs all deep link attempts for debugging:
-
-```swift
-coordinator.add(LoggingMiddleware())
-```
-
-#### AnalyticsMiddleware
-Tracks deep link usage for analytics:
-
-```swift
-let analyticsProvider = CustomAnalyticsProvider()
-coordinator.add(AnalyticsMiddleware(analyticsProvider: analyticsProvider))
-```
-
-#### RateLimitMiddleware
-Prevents abuse by limiting requests:
-
-```swift
-coordinator.add(RateLimitMiddleware(maxRequests: 100, timeWindow: 60.0))
-```
-
-#### AuthenticationMiddleware
-Validates authentication for protected routes:
-
-```swift
-let authProvider = CustomAuthenticationProvider()
-coordinator.add(AuthenticationMiddleware(
-    authProvider: authProvider,
-    protectedHosts: ["profile", "settings"]
-))
-```
-
-#### SecurityMiddleware
-Validates URLs against security policies:
-
-```swift
-let securityMiddleware = SecurityMiddleware(
-    allowedSchemes: ["myapp"],
-    allowedHosts: ["profile", "product"],
-    blockedPatterns: [maliciousPattern]
-)
-coordinator.add(securityMiddleware)
-```
-
-#### URLTransformationMiddleware
-Transforms URLs before processing:
-
-```swift
-coordinator.add(URLTransformationMiddleware(
-    transformer: URLNormalizationTransformer()
-))
-```
-
-### Advanced Middleware
-
-For more control over the processing flow:
+### AdvancedDeepLinkMiddleware
 
 ```swift
 public protocol AdvancedDeepLinkMiddleware: Sendable {
@@ -356,63 +60,327 @@ public enum MiddlewareResult {
 }
 ```
 
-### Integration with DeepLinkCoordinator
+## Core Types
 
-The `DeepLinkCoordinator` automatically includes middleware support:
+### DeepLinkCoordinator
+
+The main orchestrator. Thread-safe `Sendable` final class with immutable properties.
 
 ```swift
-let coordinator = DeepLinkCoordinator(routing: routing, handler: handler)
+public final class DeepLinkCoordinator<Route: DeepLinkRoute>: Sendable {
+    public init(
+        routing: any DeepLinkRouting<Route>,
+        handler: any DeepLinkHandler<Route>,
+        middlewareCoordinator: DeepLinkMiddlewareCoordinator = .init(),
+        routeExecutionDelay: Duration = .milliseconds(500),
+        delegate: (any DeepLinkCoordinatorDelegate)? = nil
+    )
 
-// Add middleware
-coordinator.add(AnalyticsMiddleware())
-coordinator.add(AuthenticationMiddleware())
+    @discardableResult
+    public func handle(url: URL) async -> DeepLinkResult<Route>
 
-// Handle deep links (middleware runs automatically)
-await coordinator.handle(url: deepLinkURL)
+    public func add(_ middleware: any DeepLinkMiddleware) async
+    public func add(_ middleware: any AdvancedDeepLinkMiddleware) async
+    public func removeAllMiddleware() async
+    public func removeMiddleware(_ type: (some DeepLinkMiddleware).Type) async
+}
 ```
 
-## Error Handling
+**Type aliases:**
+- `CoordinatorOf<Route>` = `DeepLinkCoordinator<Route>`
+- `ResultOf<Route>` = `DeepLinkResult<Route>`
 
-The library provides comprehensive error handling through the `DeepLinkError` enum:
+### DeepLinkCoordinatorBuilder
+
+Fluent, immutable builder for coordinator configuration.
 
 ```swift
-do {
-    await coordinator.handle(url: url)
-} catch let error as DeepLinkError {
-    switch error {
-    case .invalidURL(let url):
-        print("Invalid URL: \(url)")
-    case .unsupportedHost(let host):
-        print("Unsupported host: \(host)")
-    case .routeNotFound(let host):
-        print("No parser found for host: \(host)")
-    case .missingRequiredParameter(let parameter):
-        print("Missing required parameter: \(parameter)")
-    case .rateLimitExceeded(let count, let interval):
-        print("Rate limit exceeded: \(count) requests in \(interval) seconds")
-    case .securityViolation(let reason):
-        print("Security violation: \(reason)")
-    case .unauthorizedAccess(let resource):
-        print("Unauthorized access to: \(resource)")
-    case .blockedURL(let url):
-        print("Blocked URL: \(url)")
-    }
-} catch {
-    print("Unexpected error: \(error)")
+public struct DeepLinkCoordinatorBuilder<Route: DeepLinkRoute>: Sendable {
+    public init()
+    public func routing(_ routing: any DeepLinkRouting<Route>) -> Self
+    public func handler(_ handler: any DeepLinkHandler<Route>) -> Self
+    public func middleware(_ middleware: any DeepLinkMiddleware...) -> Self
+    public func advancedMiddleware(_ middleware: any AdvancedDeepLinkMiddleware...) -> Self
+    public func delegate(_ delegate: DeepLinkCoordinatorDelegate...) -> Self
+    public func build() async throws -> DeepLinkCoordinator<Route>
+}
+```
+
+### DeepLinkResult
+
+```swift
+public struct DeepLinkResult<Route: DeepLinkRoute>: DeepLinkResultProtocol {
+    public let originalURL: URL
+    public let processedURL: URL?
+    public let routes: [Route]
+    public let executionTime: TimeInterval
+    public let errors: [any Error]
+    public let wasSuccessful: Bool
+    public let successfulRoutes: Int
+    public let failedRoutes: Int
+
+    // Convenience
+    public var wasStoppedByMiddleware: Bool
+    public var hasRoutes: Bool
+    public var hasErrors: Bool
+    public var firstError: (any Error)?
+    public var summary: String
+}
+```
+
+### DeepLinkURL
+
+```swift
+public struct DeepLinkURL {
+    public let url: URL
+    public let scheme: String
+    public let host: String
+    public let path: String
+    public let queryParameters: [String: String]
+    public let allQueryParameters: [String: [String]]
+
+    public static let defaultMaxLength: Int  // 8192
+
+    public init(url: URL, maxLength: Int = defaultMaxLength) throws(DeepLinkError)
+}
+```
+
+### DeepLinkError
+
+```swift
+public enum DeepLinkError: Error, Equatable, LocalizedError {
+    case invalidURL(URL)
+    case unsupportedScheme(String)
+    case unsupportedHost(String)
+    case missingRequiredParameter(String)
+    case invalidParameterValue(String, String)
+    case routeNotFound(String)
+    case handlerError(String)
+    case missingRequiredConfiguration(String)
+    case rateLimitExceeded(Int, TimeInterval)
+    case securityViolation(String)
+    case unauthorizedAccess(String)
+    case blockedURL(String)
+}
+```
+
+### DefaultDeepLinkRouting
+
+Tries parsers in sequence until one succeeds.
+
+```swift
+public struct DefaultDeepLinkRouting<Route: DeepLinkRoute>: DeepLinkRouting, Sendable {
+    public init(parsers: [any DeepLinkParser<Route>])
+    public func route(from url: URL) async throws -> [Route]
+}
+```
+
+### DeepLinkMiddlewareCoordinator
+
+Actor for thread-safe middleware management.
+
+```swift
+public actor DeepLinkMiddlewareCoordinator {
+    public init()
+    public func add(_ middleware: any DeepLinkMiddleware)
+    public func add(_ middleware: any AdvancedDeepLinkMiddleware)
+    public func removeAll()
+    public func remove<T: DeepLinkMiddleware>(_: T.Type)
+    public func process(_ url: URL) async throws -> URL?
+}
+```
+
+## Middleware Factory Methods
+
+All middleware can be created using static factory methods on `DeepLinkMiddleware`:
+
+```swift
+.security(allowedSchemes:allowedHosts:blockedPatterns:strategy:)
+.rateLimit(maxRequests:timeWindow:persistence:strategy:)
+.authentication(provider:protectedHosts:strategy:)
+.urlTransformation(transformer:strategy:)
+.analytics(provider:strategy:)
+.logging(provider:logLevel:format:)
+.readiness(queue:)
+```
+
+### Strategies
+
+| Middleware | Strategies |
+|-----------|-----------|
+| `SecurityStrategy` | `.standard`, `.strict`, `.permissive`, `.schemeOnly`, `.hostOnly`, `.patternOnly`, `.whitelist` |
+| `RateLimitStrategy` | `.slidingWindow`, `.fixedWindow`, `.permissive` |
+| `AuthenticationStrategy` | `.standard`, `.strict`, `.permissive`, `.schemeBased` |
+| `LoggingFormat` | `.singleLine`, `.json`, `.minimal`, `.detailed` |
+| `AnalyticsStrategy` | `.standard`, `.detailed`, `.minimal`, `.performance` |
+| `URLTransformationStrategy` | `.standard`, `.conditional`, `.safe`, `.aggressive`, `.selective`, `.passthrough`, `.validation`, `.batch` |
+
+## Readiness
+
+### ReadinessQueue Protocol
+
+```swift
+public protocol ReadinessQueue: ReadinessCondition {
+    func enqueue(_ url: URL) -> URL?
+    func markReady() -> [URL]
+    var pendingCount: Int { get }
+    func reset()
+}
+```
+
+### DeepLinkReadinessQueue
+
+Thread-safe queue backed by `OSAllocatedUnfairLock`. Compiler-verified `Sendable`.
+
+```swift
+public final class DeepLinkReadinessQueue: ReadinessQueue, Sendable {
+    public init(maxQueueSize: Int? = nil)  // clamped to min 1
+    public var isReady: Bool { get }
+    public func enqueue(_ url: URL) -> URL?
+    public func markReady() -> [URL]       // idempotent
+    public var pendingCount: Int { get }
+    public func reset()                    // re-gates, discards pending
+}
+```
+
+## Delegates
+
+### DeepLinkCoordinatorDelegate
+
+`@MainActor`-isolated protocol. All methods have default empty implementations.
+
+```swift
+@MainActor
+public protocol DeepLinkCoordinatorDelegate: AnyObject, Sendable {
+    func coordinator(_ coordinator: AnyObject, willProcess url: URL)
+    func coordinator(_ coordinator: AnyObject, didProcess url: URL, result: DeepLinkResultProtocol)
+    func coordinator(_ coordinator: AnyObject, didFailProcessing url: URL, error: Error)
+}
+```
+
+### Delegate Factory Methods
+
+```swift
+.logging(enableDebugLogging:)
+.analytics(provider:)
+.notification(showSuccess:showErrors:showInfo:)
+```
+
+### Composition Functions
+
+```swift
+@MainActor public func compose(_ delegates: DeepLinkCoordinatorDelegate...) -> CompositeDeepLinkDelegate
+public func compose(_ middleware: any DeepLinkMiddleware...) -> [any DeepLinkMiddleware]
+```
+
+## Parsing
+
+### QueryParameterParser
+
+```swift
+public protocol QueryParameterParser: Sendable {
+    func parse<T: Decodable>(_ type: T.Type, from parameters: [String: String]) throws -> T
+}
+```
+
+### JSONQueryParameterParser
+
+```swift
+public final class JSONQueryParameterParser: QueryParameterParser, Sendable {
+    public init()
+    public func parse<T: Decodable>(_ type: T.Type, from parameters: [String: String]) throws -> T
+    public func parse<T: Decodable>(_ type: T.Type, fromAll parameters: [String: [String]]) throws -> T
+}
+```
+
+## Testing Utilities (`DeepLinksTesting` module)
+
+Add to your test target: `dependencies: ["DeepLinks", "DeepLinksTesting"]`
+
+### ImmediateRouting / ImmediateParser
+
+Return preconfigured routes without URL inspection. Support error simulation.
+
+```swift
+public struct ImmediateRouting<Route: DeepLinkRoute>: DeepLinkRouting, Sendable {
+    public init(routes: [Route])
+    public init(error: some Error)
+}
+
+public struct ImmediateParser<Route: DeepLinkRoute>: DeepLinkParser, Sendable {
+    public init(routes: [Route])
+    public init(error: some Error)
+}
+```
+
+### CollectingHandler
+
+Accumulates handled routes. Thread-safe via `OSAllocatedUnfairLock`.
+
+```swift
+public final class CollectingHandler<Route: DeepLinkRoute>: DeepLinkHandler, @unchecked Sendable {
+    public var handledRoutes: [Route] { get }
+}
+```
+
+### CollectingMiddleware / PassthroughMiddleware
+
+```swift
+public final class CollectingMiddleware: DeepLinkMiddleware, @unchecked Sendable {
+    public var interceptedURLs: [URL] { get }  // passes through and records
+}
+
+public struct PassthroughMiddleware: DeepLinkMiddleware, Sendable { }  // no-op
+```
+
+### CollectingDelegate
+
+`@MainActor`-isolated. Accumulates lifecycle events.
+
+```swift
+@MainActor
+public final class CollectingDelegate: DeepLinkCoordinatorDelegate {
+    public var willProcessURLs: [URL] { get }
+    public var processedEvents: [ProcessedEvent] { get }  // .url, .result
+    public var failedEvents: [FailedEvent] { get }        // .url, .error
+}
+```
+
+### CollectingAnalyticsProvider
+
+Thread-safe. Converts `[String: Any]` parameters to `[String: String]`.
+
+```swift
+public final class CollectingAnalyticsProvider: AnalyticsProvider, @unchecked Sendable {
+    public var trackedEvents: [TrackedEvent] { get }  // .name, .parameters
+}
+```
+
+### FixedAuthenticationProvider
+
+```swift
+public struct FixedAuthenticationProvider: AuthenticationProvider, Sendable {
+    public init(isAuthenticated: Bool)
+}
+```
+
+### InMemoryRateLimitPersistence
+
+Actor-based in-memory persistence. No disk I/O.
+
+```swift
+public actor InMemoryRateLimitPersistence: RateLimitPersistence {
+    public func loadRequests() -> [TimeInterval]
+    public func saveRequests(_ timestamps: [TimeInterval])
+    public func clearRequests()
 }
 ```
 
 ## Thread Safety
 
-All components are designed to be thread-safe:
-
-- `DeepLinkCoordinator` is marked as `@unchecked Sendable`
-- All operations are performed asynchronously
-- No shared mutable state between components
-
-## Performance Considerations
-
-- Parsers are tried in sequence until one succeeds
-- Failed parsers are logged but don't stop the process
-- URL validation happens before parsing attempts
-- Consider caching parsed results for frequently accessed URLs
+- `DeepLinkCoordinator` — `Sendable` final class, immutable `let` properties
+- `DeepLinkMiddlewareCoordinator` — `actor`
+- `DeepLinkReadinessQueue` — `OSAllocatedUnfairLock`, compiler-verified `Sendable`
+- `UserDefaultsRateLimitPersistence` — `actor`
+- All protocols — `Sendable`
+- Delegates — `@MainActor`-isolated

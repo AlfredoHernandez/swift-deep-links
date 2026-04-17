@@ -175,7 +175,7 @@ public struct DeepLinkCoordinatorBuilder<Route: DeepLinkRoute>: Sendable {
 
 // MARK: - Supporting Types
 
-private enum MiddlewareEntry: Sendable {
+private enum MiddlewareEntry {
 	case standard(any DeepLinkMiddleware)
 	case advanced(any AdvancedDeepLinkMiddleware)
 }

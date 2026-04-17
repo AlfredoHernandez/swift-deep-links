@@ -1,451 +1,368 @@
 # How to Use DeepLink
 
-A comprehensive guide to implementing deep links in your iOS app using the DeepLink library.
+A step-by-step guide to implementing deep link handling in your app.
 
 ## Table of Contents
 
-1. [Installation](#installation)
-2. [Basic Setup](#basic-setup)
-3. [Creating Routes](#creating-routes)
-4. [Implementing Parsers](#implementing-parsers)
-5. [Creating Handlers](#creating-handlers)
-6. [Setting Up Routing](#setting-up-routing)
-7. [Integrating with SwiftUI](#integrating-with-swiftui)
-8. [Advanced Usage](#advanced-usage)
-9. [Best Practices](#best-practices)
-10. [Troubleshooting](#troubleshooting)
+1. [Core Concepts](#core-concepts)
+2. [Define Routes](#1-define-routes)
+3. [Create Parsers](#2-create-parsers)
+4. [Implement a Handler](#3-implement-a-handler)
+5. [Configure the Coordinator](#4-configure-the-coordinator)
+6. [Integrate with SwiftUI](#5-integrate-with-swiftui)
+7. [Middleware](#middleware)
+8. [Delegates](#delegates)
+9. [Readiness Gating](#readiness-gating)
+10. [Testing](#testing)
 
-## Installation
+## Core Concepts
 
-### Swift Package Manager
+The library has four core protocols:
 
-Add the DeepLink package to your project:
+| Protocol | Responsibility |
+|----------|---------------|
+| `DeepLinkRoute` | Defines navigation destinations |
+| `DeepLinkParser` | Converts a `URL` into routes |
+| `DeepLinkHandler` | Executes the action for a route |
+| `DeepLinkMiddleware` | Intercepts URLs before routing |
 
-```swift
-dependencies: [
-    .package(url: "https://github.com/AlfredoHdz/swift-deep-link.git", from: "1.0.0")
-]
+The `DeepLinkCoordinator` orchestrates the flow:
+
+```text
+URL → Middleware → Routing (Parsers) → Handler → Navigation
 ```
 
-Then add it to your target:
-
-```swift
-.target(
-    name: "YourApp",
-    dependencies: ["DeepLink"]
-)
-```
-
-## Basic Setup
-
-### 1. Define Your Routes
-
-First, create an enum that conforms to `DeepLinkRoute`:
+## 1. Define Routes
 
 ```swift
 import DeepLinks
 
 enum AppRoute: DeepLinkRoute {
-    case profile(userId: String)
-    case product(productId: String, category: String)
+    case profile(userID: String)
+    case product(productID: String, category: String)
     case settings(section: String)
-    
+
     var id: String {
         switch self {
-        case .profile(let userId):
-            return "profile-\(userId)"
-        case .product(let productId, let category):
-            return "product-\(productId)-\(category)"
-        case .settings(let section):
-            return "settings-\(section)"
+        case .profile(let userID): "profile_\(userID)"
+        case .product(let productID, _): "product_\(productID)"
+        case .settings(let section): "settings_\(section)"
         }
     }
 }
 ```
 
-### 2. Create Parameter Models
+## 2. Create Parsers
 
-Define models for your URL parameters:
+One parser per route type. `DefaultDeepLinkRouting` tries them in order until one succeeds.
 
 ```swift
-struct ProfileParameters: Decodable {
-    let userId: String
-    let name: String?
-}
+final class ProfileParser: DeepLinkParser {
+    typealias Route = AppRoute
 
+    func parse(from url: URL) async throws -> [AppRoute] {
+        let deepLinkURL = try DeepLinkURL(url: url)
+        guard deepLinkURL.host == "profile" else {
+            throw DeepLinkError.unsupportedHost(deepLinkURL.host)
+        }
+        guard let userID = deepLinkURL.queryParameters["userID"] else {
+            throw DeepLinkError.missingRequiredParameter("userID")
+        }
+        return [.profile(userID: userID)]
+    }
+}
+```
+
+For complex parameters, use `JSONQueryParameterParser`:
+
+```swift
 struct ProductParameters: Decodable {
-    let productId: String
+    let productID: String
     let category: String
 }
 
-struct SettingsParameters: Decodable {
-    let section: String
-}
-```
-
-## Implementing Parsers
-
-### 1. Create Individual Parsers
-
-```swift
-import DeepLinks
-
-final class ProfileParser: DeepLinkParser {
-    typealias Route = AppRoute
-    private let parameterParser: any QueryParameterParser
-    
-    init(parameterParser: any QueryParameterParser = JSONQueryParameterParser()) {
-        self.parameterParser = parameterParser
-    }
-    
-    func parse(from url: URL) throws -> [AppRoute] {
-        let deepLinkURL = try DeepLinkURL(url: url)
-        
-        switch deepLinkURL.host {
-        case "profile":
-            return try parseProfileData(from: deepLinkURL)
-        default:
-            throw DeepLinkError.unsupportedHost(deepLinkURL.host)
-        }
-    }
-    
-    private func parseProfileData(from url: DeepLinkURL) throws -> [AppRoute] {
-        let data = try parameterParser.parse(ProfileParameters.self, from: url.queryParameters)
-        return [.profile(userId: data.userId)]
-    }
-}
-```
-
-### 2. Create Additional Parsers
-
-```swift
 final class ProductParser: DeepLinkParser {
     typealias Route = AppRoute
-    private let parameterParser: any QueryParameterParser
-    
-    init(parameterParser: any QueryParameterParser = JSONQueryParameterParser()) {
-        self.parameterParser = parameterParser
-    }
-    
-    func parse(from url: URL) throws -> [AppRoute] {
+    private let parser = JSONQueryParameterParser()
+
+    func parse(from url: URL) async throws -> [AppRoute] {
         let deepLinkURL = try DeepLinkURL(url: url)
-        
-        switch deepLinkURL.host {
-        case "product":
-            return try parseProductData(from: deepLinkURL)
-        default:
+        guard deepLinkURL.host == "product" else {
             throw DeepLinkError.unsupportedHost(deepLinkURL.host)
         }
-    }
-    
-    private func parseProductData(from url: DeepLinkURL) throws -> [AppRoute] {
-        let data = try parameterParser.parse(ProductParameters.self, from: url.queryParameters)
-        return [.product(productId: data.productId, category: data.category)]
+        let params = try parser.parse(ProductParameters.self, from: deepLinkURL.queryParameters)
+        return [.product(productID: params.productID, category: params.category)]
     }
 }
 ```
 
-## Creating Handlers
+## 3. Implement a Handler
 
-### 1. Implement Route Handlers
+The handler receives parsed routes and triggers navigation:
 
 ```swift
-import DeepLinks
-
-final class AppDeepLinkHandler: DeepLinkHandler {
+final class AppHandler: DeepLinkHandler {
     typealias Route = AppRoute
-    private let navigationCoordinator: NavigationCoordinator
-    
-    init(navigationCoordinator: NavigationCoordinator) {
-        self.navigationCoordinator = navigationCoordinator
+    private let router: NavigationRouter
+
+    init(router: NavigationRouter) {
+        self.router = router
     }
-    
+
     func handle(_ route: AppRoute) async throws {
-        switch route {
-        case .profile(let userId):
-            await navigationCoordinator.navigateToProfile(userId: userId)
-            
-        case .product(let productId, let category):
-            await navigationCoordinator.navigateToProduct(productId: productId, category: category)
-            
-        case .settings(let section):
-            await navigationCoordinator.navigateToSettings(section: section)
+        await MainActor.run {
+            switch route {
+            case let .profile(userID):
+                router.sheet = .profile(userID: userID)
+            case let .product(productID, category):
+                router.push(to: .product(productID: productID, category: category))
+            case let .settings(section):
+                router.push(to: .settings(section: section))
+            }
         }
     }
 }
 ```
 
-### 2. Navigation Coordinator
+## 4. Configure the Coordinator
+
+Use the builder for a fluent setup with middleware and delegates:
 
 ```swift
-@MainActor
-final class NavigationCoordinator: ObservableObject {
-    @Published var currentRoute: AppRoute?
-    
-    func navigateToProfile(userId: String) async {
-        currentRoute = .profile(userId: userId)
-    }
-    
-    func navigateToProduct(productId: String, category: String) async {
-        currentRoute = .product(productId: productId, category: category)
-    }
-    
-    func navigateToSettings(section: String) async {
-        currentRoute = .settings(section: section)
-    }
-}
+let coordinator = try await DeepLinkCoordinatorBuilder<AppRoute>()
+    .routing(DefaultDeepLinkRouting(parsers: [
+        ProfileParser(),
+        ProductParser(),
+        SettingsParser(),
+    ]))
+    .handler(AppHandler(router: navigationRouter))
+    .middleware(
+        .security(allowedSchemes: ["myapp"]),
+        .rateLimit(maxRequests: 10, timeWindow: 60),
+        .authentication(provider: authProvider, protectedHosts: ["profile"]),
+        .logging()
+    )
+    .delegate(compose(
+        .logging(enableDebugLogging: true),
+        .analytics(provider: analyticsProvider)
+    ))
+    .build()
 ```
 
-## Setting Up Routing
-
-### 1. Configure Deep Link Routing
+Or create one directly without the builder:
 
 ```swift
-import DeepLinks
-
-final class DeepLinkManager {
-    private let routing: any DeepLinkRouting<AppRoute>
-    private let handler: any DeepLinkHandler<AppRoute>
-    private let coordinator: DeepLinkCoordinator<AppRoute>
-    
-    init(navigationCoordinator: NavigationCoordinator) {
-        // Create parsers
-        let parsers: [any DeepLinkParser<AppRoute>] = [
-            ProfileParser(),
-            ProductParser(),
-            SettingsParser()
-        ]
-        
-        // Create routing
-        self.routing = DefaultDeepLinkRouting<AppRoute>(parsers: parsers)
-        
-        // Create handler
-        self.handler = AppDeepLinkHandler(navigationCoordinator: navigationCoordinator)
-        
-        // Create coordinator
-        self.coordinator = DeepLinkCoordinator(routing: routing, handler: handler)
-    }
-    
-    func handle(url: URL) async {
-        await coordinator.handle(url: url)
-    }
-}
+let coordinator = DeepLinkCoordinator(
+    routing: DefaultDeepLinkRouting(parsers: [ProfileParser()]),
+    handler: AppHandler(router: navigationRouter)
+)
 ```
 
-## Integrating with SwiftUI
-
-### 1. App Integration
+## 5. Integrate with SwiftUI
 
 ```swift
-import SwiftUI
-import DeepLinks
+@Observable
+final class AppViewModel {
+    let navigationRouter = NavigationRouter()
+    private var coordinator: CoordinatorOf<AppRoute>?
+
+    func processDeepLink(url: URL) {
+        Task {
+            let coordinator = try await getOrCreateCoordinator()
+            await coordinator.handle(url: url)
+        }
+    }
+}
 
 @main
 struct MyApp: App {
-    @StateObject private var navigationCoordinator = NavigationCoordinator()
-    @State private var deepLinkManager: DeepLinkManager?
-    
+    @State private var viewModel = AppViewModel()
+
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environmentObject(navigationCoordinator)
-                .onAppear {
-                    deepLinkManager = DeepLinkManager(navigationCoordinator: navigationCoordinator)
-                }
-                .onOpenURL { url in
-                    Task {
-                        await deepLinkManager?.handle(url: url)
-                    }
-                }
+                .environment(viewModel.navigationRouter)
+                .onOpenURL(perform: viewModel.processDeepLink)
         }
     }
 }
 ```
 
-### 2. Content View with Navigation
+## Middleware
+
+Middleware processes URLs before routing. Each can pass through, transform, or stop the URL.
+
+```text
+URL → Security → RateLimit → Auth → Transform → Analytics → Logging → Router
+```
+
+### Built-in Middleware
 
 ```swift
-import SwiftUI
+.middleware(
+    .security(allowedSchemes: ["myapp"], allowedHosts: ["profile", "product"]),
+    .rateLimit(maxRequests: 10, timeWindow: 60, strategy: .slidingWindow),
+    .authentication(provider: authProvider, protectedHosts: ["profile"]),
+    .urlTransformation(transformer: URLNormalizationTransformer()),
+    .analytics(provider: analyticsProvider),
+    .logging(format: .detailed),
+    .readiness(queue: readinessQueue)
+)
+```
 
-struct ContentView: View {
-    @EnvironmentObject var navigationCoordinator: NavigationCoordinator
-    
-    var body: some View {
-        NavigationStack {
-            VStack {
-                Text("Welcome to My App")
-                
-                Button("Go to Profile") {
-                    Task {
-                        await navigationCoordinator.navigateToProfile(userId: "123")
-                    }
-                }
-                
-                Button("Go to Product") {
-                    Task {
-                        await navigationCoordinator.navigateToProduct(productId: "PROD-001", category: "Electronics")
-                    }
-                }
-            }
-            .navigationDestination(item: $navigationCoordinator.currentRoute) { route in
-                switch route {
-                case .profile(let userId):
-                    ProfileView(userId: userId)
-                case .product(let productId, let category):
-                    ProductView(productId: productId, category: category)
-                case .settings(let section):
-                    SettingsView(section: section)
-                }
-            }
-        }
+### Custom Middleware
+
+```swift
+final class MyMiddleware: DeepLinkMiddleware {
+    func intercept(_ url: URL) async throws -> URL? {
+        // Return URL to continue, modified URL to transform, nil to stop
+        return url
     }
 }
 ```
 
-## Advanced Usage
+### Middleware Strategies
 
-### 1. Custom Query Parameter Parser
+Each middleware supports swappable strategies:
+
+| Middleware | Strategies |
+|-----------|-----------|
+| **Security** | `.standard`, `.strict`, `.permissive`, `.schemeOnly`, `.hostOnly`, `.patternOnly`, `.whitelist` |
+| **Rate Limit** | `.slidingWindow`, `.fixedWindow`, `.permissive` |
+| **Authentication** | `.standard`, `.strict`, `.permissive`, `.schemeBased` |
+| **Logging** | `.singleLine`, `.json`, `.minimal`, `.detailed` |
+| **Analytics** | `.standard`, `.detailed`, `.minimal`, `.performance` |
+
+## Delegates
+
+Observe the coordinator lifecycle:
 
 ```swift
-final class CustomParameterParser: QueryParameterParser {
-    func parse<T: Decodable>(_ type: T.Type, from parameters: [String: String]) throws -> T {
-        // Custom parsing logic
-        let data = try JSONSerialization.data(withJSONObject: parameters)
-        return try JSONDecoder().decode(type, from: data)
+.delegate(compose(
+    .logging(enableDebugLogging: true),
+    .analytics(provider: analyticsProvider),
+    .notification(showSuccess: true, showErrors: true, showInfo: false)
+))
+```
+
+### Custom Delegate
+
+```swift
+final class MyDelegate: DeepLinkCoordinatorDelegate {
+    func coordinator(_ coordinator: AnyObject, willProcess url: URL) { }
+    func coordinator(_ coordinator: AnyObject, didProcess url: URL, result: DeepLinkResultProtocol) { }
+    func coordinator(_ coordinator: AnyObject, didFailProcessing url: URL, error: Error) { }
+}
+```
+
+## Readiness Gating
+
+Queue deep links until your app is ready:
+
+```swift
+let queue = DeepLinkReadinessQueue(maxQueueSize: 50)
+
+// Add to middleware stack
+.middleware(.readiness(queue: queue))
+
+// When the app is ready:
+let pending = queue.markReady()
+for url in pending {
+    await coordinator.handle(url: url)
+}
+
+// On logout — re-gate:
+queue.reset()
+```
+
+## Testing
+
+The `DeepLinksTesting` module provides ready-made test utilities. Add it to your test target:
+
+```swift
+// Package.swift
+.testTarget(name: "MyAppTests", dependencies: ["DeepLinks", "DeepLinksTesting"])
+```
+
+### Test a Handler in Isolation
+
+```swift
+import DeepLinks
+import DeepLinksTesting
+import Testing
+
+@Test("Coordinator routes product deep link to handler")
+func coordinatorHandlesProduct() async throws {
+    let routing = ImmediateRouting<AppRoute>(routes: [.product(productID: "123", category: "Books")])
+    let handler = CollectingHandler<AppRoute>()
+    let coordinator = DeepLinkCoordinator(routing: routing, handler: handler)
+
+    let result = await coordinator.handle(url: URL(string: "myapp://product?productID=123")!)
+
+    #expect(result.wasSuccessful)
+    #expect(handler.handledRoutes == [.product(productID: "123", category: "Books")])
+}
+```
+
+### Test Middleware Pipeline
+
+```swift
+@Test("Security middleware blocks unauthorized schemes")
+func securityBlocksUnauthorized() async throws {
+    let collecting = CollectingMiddleware()
+    let coordinator = DeepLinkMiddlewareCoordinator()
+    await coordinator.add(SecurityMiddleware(allowedSchemes: ["myapp"]))
+    await coordinator.add(collecting)
+
+    // https:// is not in allowed schemes — middleware stops the pipeline
+    await #expect(throws: DeepLinkError.self) {
+        try await coordinator.process(URL(string: "https://evil.com")!)
     }
+    #expect(collecting.interceptedURLs.isEmpty)
 }
 ```
 
-### 2. Multiple Route Handling
+### Test with Delegates
 
 ```swift
-final class MultiRouteParser: DeepLinkParser {
-    typealias Route = AppRoute
-    
-    func parse(from url: URL) throws -> [AppRoute] {
-        let deepLinkURL = try DeepLinkURL(url: url)
-        
-        switch deepLinkURL.host {
-        case "dashboard":
-            // Return multiple routes for dashboard
-            return [
-                .profile(userId: "current-user"),
-                .settings(section: "preferences")
-            ]
-        default:
-            throw DeepLinkError.unsupportedHost(deepLinkURL.host)
-        }
-    }
+@MainActor
+@Test("Delegate receives lifecycle events")
+func delegateReceivesEvents() async throws {
+    let delegate = CollectingDelegate()
+    let routing = ImmediateRouting<AppRoute>(routes: [.settings(section: "account")])
+    let handler = CollectingHandler<AppRoute>()
+    let coordinator = DeepLinkCoordinator(routing: routing, handler: handler, delegate: delegate)
+
+    await coordinator.handle(url: URL(string: "myapp://settings")!)
+
+    #expect(delegate.willProcessURLs.count == 1)
+    #expect(delegate.processedEvents.first?.result.wasSuccessful == true)
 }
 ```
 
-### 3. Error Handling
+### Available Test Utilities
+
+| Type | Purpose |
+|------|---------|
+| `ImmediateRouting<Route>` | Returns preconfigured routes without parsing |
+| `ImmediateParser<Route>` | Returns preconfigured routes for a single parser |
+| `CollectingHandler<Route>` | Accumulates handled routes for inspection |
+| `CollectingMiddleware` | Passes through and accumulates intercepted URLs |
+| `PassthroughMiddleware` | Always passes URLs through unchanged |
+| `CollectingDelegate` | Accumulates coordinator lifecycle events |
+| `CollectingAnalyticsProvider` | Accumulates tracked analytics events |
+| `FixedAuthenticationProvider` | Returns a fixed auth state (`true`/`false`) |
+| `InMemoryRateLimitPersistence` | In-memory rate limit persistence (actor) |
+
+Use `.permissive` strategies to bypass middleware in tests:
 
 ```swift
-final class ErrorHandlingParser: DeepLinkParser {
-    typealias Route = AppRoute
-    
-    func parse(from url: URL) throws -> [AppRoute] {
-        do {
-            let deepLinkURL = try DeepLinkURL(url: url)
-            // Parse logic
-            return [.profile(userId: "default")]
-        } catch {
-            // Log error and return default route
-            print("Error parsing URL: \(error)")
-            return [.profile(userId: "default")]
-        }
-    }
-}
-```
-
-## Best Practices
-
-### 1. URL Structure
-
-Use consistent URL structures:
-
-```
-myapp://profile?userId=123&name=John
-myapp://product?productId=PROD-001&category=Electronics
-myapp://settings?section=account
-```
-
-### 2. Error Handling
-
-Always handle parsing errors gracefully:
-
-```swift
-func handle(url: URL) async {
-    do {
-        await coordinator.handle(url: url)
-    } catch {
-        // Handle error appropriately
-        print("Deep link error: \(error)")
-    }
-}
-```
-
-### 3. Testing
-
-Test your deep link implementation:
-
-```swift
-func testProfileDeepLink() async throws {
-    let url = URL(string: "myapp://profile?userId=123")!
-    let result = try await parser.parse(from: url)
-    
-    XCTAssertEqual(result.count, 1)
-    XCTAssertEqual(result.first, .profile(userId: "123"))
-}
-```
-
-### 4. Performance
-
-- Use lazy initialization for parsers
-- Cache parsed results when appropriate
-- Avoid blocking the main thread
-
-## Troubleshooting
-
-### Common Issues
-
-1. **URL not being handled**
-   - Check URL scheme registration in Info.plist
-   - Verify parser host matching
-   - Ensure proper error handling
-
-2. **Parameters not parsed correctly**
-   - Check parameter model structure
-   - Verify URL encoding
-   - Test with different parameter combinations
-
-3. **Navigation not working**
-   - Ensure handler is properly implemented
-   - Check navigation coordinator setup
-   - Verify SwiftUI navigation structure
-
-### Debug Tips
-
-1. Enable logging in your parsers
-2. Test URLs in the simulator
-3. Use the sample app as reference
-4. Check the test suite for examples
-
-## Example URLs
-
-Test your implementation with these URLs:
-
-```
-myapp://profile?userId=123&name=John%20Doe
-myapp://product?productId=PROD-001&category=Electronics
-myapp://settings?section=account
-myapp://dashboard
+let middleware = RateLimitMiddleware(strategy: .permissive)
+let auth = FixedAuthenticationProvider(isAuthenticated: true)
 ```
 
 ## Next Steps
 
-1. Explore the [Sample App](../DeepLinkSample/) for a complete implementation
-2. Check the [API Reference](./api-reference-en.md) for detailed documentation
-3. Review the [Tests](../Tests/) for usage examples
-4. Contribute to the project on [GitHub](https://github.com/AlfredoHdz/swift-deep-link)
+- Explore the [Sample App](../DeepLinkSample/) for a complete implementation
+- Check the [API Reference](./api-reference-en.md) for all types and methods
+- Review the [Tests](../Tests/) for more examples

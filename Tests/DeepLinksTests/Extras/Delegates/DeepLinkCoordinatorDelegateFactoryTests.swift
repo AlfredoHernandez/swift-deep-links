@@ -6,40 +6,39 @@
 import Foundation
 import Testing
 
-@Suite("DeepLinkCoordinatorDelegate Factory Methods Tests")
 @MainActor
 struct DeepLinkCoordinatorDelegateFactoryTests {
-	@Test("Analytics delegate factory method creates delegate with correct type")
-	func analytics_factoryMethod_createsDelegateWithCorrectType() {
+	@Test
+	func `Analytics delegate factory method creates delegate with correct type`() {
 		let provider = DefaultAnalyticsProvider()
 		let delegate: any DeepLinkCoordinatorDelegate = .analytics(provider: provider)
 
 		#expect(delegate is DeepLinkAnalyticsDelegate)
 	}
 
-	@Test("Logging delegate factory method creates delegate with correct type")
-	func logging_factoryMethod_createsDelegateWithCorrectType() {
+	@Test
+	func `Logging delegate factory method creates delegate with correct type`() {
 		let delegate: any DeepLinkCoordinatorDelegate = .logging()
 
 		#expect(delegate is DeepLinkLoggingDelegate)
 	}
 
-	@Test("Logging delegate factory method with debug enabled creates delegate")
-	func logging_factoryMethodWithDebugEnabled_createsDelegate() {
+	@Test
+	func `Logging delegate factory method with debug enabled creates delegate`() {
 		let delegate: any DeepLinkCoordinatorDelegate = .logging(enableDebugLogging: true)
 
 		#expect(delegate is DeepLinkLoggingDelegate)
 	}
 
-	@Test("Notification delegate factory method creates delegate with correct type")
-	func notification_factoryMethod_createsDelegateWithCorrectType() {
+	@Test
+	func `Notification delegate factory method creates delegate with correct type`() {
 		let delegate: any DeepLinkCoordinatorDelegate = .notification()
 
 		#expect(delegate is DeepLinkNotificationDelegate)
 	}
 
-	@Test("Notification delegate factory method with all parameters creates delegate")
-	func notification_factoryMethodWithAllParameters_createsDelegate() {
+	@Test
+	func `Notification delegate factory method with all parameters creates delegate`() {
 		let delegate: any DeepLinkCoordinatorDelegate = .notification(
 			showSuccess: true,
 			showErrors: true,
@@ -49,8 +48,8 @@ struct DeepLinkCoordinatorDelegateFactoryTests {
 		#expect(delegate is DeepLinkNotificationDelegate)
 	}
 
-	@Test("Factory methods can be used in arrays")
-	func factoryMethods_canBeUsedInArrays() {
+	@Test
+	func `Factory methods can be used in arrays`() {
 		let provider = DefaultAnalyticsProvider()
 
 		let delegates: [any DeepLinkCoordinatorDelegate] = [
@@ -65,8 +64,8 @@ struct DeepLinkCoordinatorDelegateFactoryTests {
 		#expect(delegates[2] is DeepLinkNotificationDelegate)
 	}
 
-	@Test("Factory methods work with DeepLinkCoordinatorBuilder")
-	func factoryMethods_workWithBuilder() async throws {
+	@Test
+	func `Factory methods work with DeepLinkCoordinatorBuilder`() async throws {
 		let provider = DefaultAnalyticsProvider()
 
 		let coordinator = try await DeepLinkCoordinatorBuilder<TestRoute>()

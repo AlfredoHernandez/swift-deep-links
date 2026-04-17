@@ -10,9 +10,12 @@ let package = Package(
 	],
 	products: [
 		.library(name: "DeepLinks", targets: ["DeepLinks"]),
+		.library(name: "DeepLinksTesting", targets: ["DeepLinksTesting"]),
 	],
 	targets: [
 		.target(name: "DeepLinks"),
+		.target(name: "DeepLinksTesting", dependencies: ["DeepLinks"]),
 		.testTarget(name: "DeepLinksTests", dependencies: ["DeepLinks"]),
+		.testTarget(name: "DeepLinksTestingTests", dependencies: ["DeepLinks", "DeepLinksTesting"]),
 	],
 )

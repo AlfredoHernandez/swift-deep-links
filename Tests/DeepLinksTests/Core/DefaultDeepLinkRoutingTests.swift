@@ -6,10 +6,9 @@
 import Foundation
 import Testing
 
-@Suite("DefaultDeepLinkRouting Tests")
 struct DefaultDeepLinkRoutingTests {
-	@Test("DefaultDeepLinkRouting route returns routes from first successful parser")
-	func defaultDeepLinkRouting_route_returnsRoutesFromFirstSuccessfulParser() async throws {
+	@Test
+	func `DefaultDeepLinkRouting route returns routes from first successful parser`() async throws {
 		let parser1 = DeepLinkParserStub<TestRoute>(shouldSucceed: false)
 		let parser2 = DeepLinkParserStub<TestRoute>(shouldSucceed: true, routes: [.route1, .route2])
 		let parser3 = DeepLinkParserStub<TestRoute>(shouldSucceed: true, routes: [.route3])
@@ -24,8 +23,8 @@ struct DefaultDeepLinkRoutingTests {
 		#expect(parser3.parseCalledWith == nil)
 	}
 
-	@Test("DefaultDeepLinkRouting route returns routes from second parser when first fails")
-	func defaultDeepLinkRouting_route_returnsRoutesFromSecondParserWhenFirstFails() async throws {
+	@Test
+	func `DefaultDeepLinkRouting route returns routes from second parser when first fails`() async throws {
 		let parser1 = DeepLinkParserStub<TestRoute>(shouldSucceed: false)
 		let parser2 = DeepLinkParserStub<TestRoute>(shouldSucceed: true, routes: [.route2])
 		let routing = DefaultDeepLinkRouting<TestRoute>(parsers: [parser1, parser2])
@@ -38,8 +37,8 @@ struct DefaultDeepLinkRoutingTests {
 		#expect(parser2.parseCalledWith == url)
 	}
 
-	@Test("DefaultDeepLinkRouting route returns empty routes array when parser succeeds with empty result")
-	func defaultDeepLinkRouting_route_returnsEmptyRoutesArrayWhenParserSucceedsWithEmptyResult() async throws {
+	@Test
+	func `DefaultDeepLinkRouting route returns empty routes array when parser succeeds with empty result`() async throws {
 		let parser = DeepLinkParserStub<TestRoute>(shouldSucceed: true, routes: [])
 		let routing = DefaultDeepLinkRouting<TestRoute>(parsers: [parser])
 		let url = try #require(URL(string: "test://empty"))
@@ -50,8 +49,8 @@ struct DefaultDeepLinkRoutingTests {
 		#expect(parser.parseCalledWith == url)
 	}
 
-	@Test("DefaultDeepLinkRouting route returns single route when parser succeeds with one route")
-	func defaultDeepLinkRouting_route_returnsSingleRouteWhenParserSucceedsWithOneRoute() async throws {
+	@Test
+	func `DefaultDeepLinkRouting route returns single route when parser succeeds with one route`() async throws {
 		let parser = DeepLinkParserStub<TestRoute>(shouldSucceed: true, routes: [.route1])
 		let routing = DefaultDeepLinkRouting<TestRoute>(parsers: [parser])
 		let url = try #require(URL(string: "test://single"))
@@ -62,8 +61,8 @@ struct DefaultDeepLinkRoutingTests {
 		#expect(parser.parseCalledWith == url)
 	}
 
-	@Test("DefaultDeepLinkRouting route returns multiple routes when parser succeeds with multiple routes")
-	func defaultDeepLinkRouting_route_returnsMultipleRoutesWhenParserSucceedsWithMultipleRoutes() async throws {
+	@Test
+	func `DefaultDeepLinkRouting route returns multiple routes when parser succeeds with multiple routes`() async throws {
 		let parser = DeepLinkParserStub<TestRoute>(shouldSucceed: true, routes: [.route1, .route2, .route3])
 		let routing = DefaultDeepLinkRouting<TestRoute>(parsers: [parser])
 		let url = try #require(URL(string: "test://multiple"))
@@ -74,8 +73,8 @@ struct DefaultDeepLinkRoutingTests {
 		#expect(parser.parseCalledWith == url)
 	}
 
-	@Test("DefaultDeepLinkRouting route throws routeNotFound error when all parsers fail")
-	func defaultDeepLinkRouting_route_throwsRouteNotFoundErrorWhenAllParsersFail() async throws {
+	@Test
+	func `DefaultDeepLinkRouting route throws routeNotFound error when all parsers fail`() async throws {
 		let parser1 = DeepLinkParserStub<TestRoute>(shouldSucceed: false)
 		let parser2 = DeepLinkParserStub<TestRoute>(shouldSucceed: false)
 		let parser3 = DeepLinkParserStub<TestRoute>(shouldSucceed: false)
@@ -94,8 +93,8 @@ struct DefaultDeepLinkRoutingTests {
 		#expect(parser3.parseCalledWith == url)
 	}
 
-	@Test("DefaultDeepLinkRouting route throws routeNotFound error when no parsers provided")
-	func defaultDeepLinkRouting_route_throwsRouteNotFoundErrorWhenNoParsersProvided() async throws {
+	@Test
+	func `DefaultDeepLinkRouting route throws routeNotFound error when no parsers provided`() async throws {
 		let routing = DefaultDeepLinkRouting<TestRoute>(parsers: [])
 		let url = try #require(URL(string: "test://noparsers"))
 
@@ -107,8 +106,8 @@ struct DefaultDeepLinkRoutingTests {
 		}
 	}
 
-	@Test("DefaultDeepLinkRouting route continues trying parsers after first failure")
-	func defaultDeepLinkRouting_route_continuesTryingParsersAfterFirstFailure() async throws {
+	@Test
+	func `DefaultDeepLinkRouting route continues trying parsers after first failure`() async throws {
 		let parser1 = DeepLinkParserStub<TestRoute>(shouldSucceed: false)
 		let parser2 = DeepLinkParserStub<TestRoute>(shouldSucceed: false)
 		let parser3 = DeepLinkParserStub<TestRoute>(shouldSucceed: true, routes: [.route3])
@@ -123,8 +122,8 @@ struct DefaultDeepLinkRoutingTests {
 		#expect(parser3.parseCalledWith == url)
 	}
 
-	@Test("DefaultDeepLinkRouting route stops at first successful parser")
-	func defaultDeepLinkRouting_route_stopsAtFirstSuccessfulParser() async throws {
+	@Test
+	func `DefaultDeepLinkRouting route stops at first successful parser`() async throws {
 		let parser1 = DeepLinkParserStub<TestRoute>(shouldSucceed: true, routes: [.route1])
 		let parser2 = DeepLinkParserStub<TestRoute>(shouldSucceed: true, routes: [.route2])
 		let parser3 = DeepLinkParserStub<TestRoute>(shouldSucceed: true, routes: [.route3])
@@ -139,8 +138,8 @@ struct DefaultDeepLinkRoutingTests {
 		#expect(parser3.parseCalledWith == nil)
 	}
 
-	@Test("DefaultDeepLinkRouting route handles single parser successfully")
-	func defaultDeepLinkRouting_route_handlesSingleParserSuccessfully() async throws {
+	@Test
+	func `DefaultDeepLinkRouting route handles single parser successfully`() async throws {
 		let parser = DeepLinkParserStub<TestRoute>(shouldSucceed: true, routes: [.route1, .route2])
 		let routing = DefaultDeepLinkRouting<TestRoute>(parsers: [parser])
 		let url = try #require(URL(string: "test://singleparser"))
@@ -151,8 +150,8 @@ struct DefaultDeepLinkRoutingTests {
 		#expect(parser.parseCalledWith == url)
 	}
 
-	@Test("DefaultDeepLinkRouting route handles single parser failure")
-	func defaultDeepLinkRouting_route_handlesSingleParserFailure() async throws {
+	@Test
+	func `DefaultDeepLinkRouting route handles single parser failure`() async throws {
 		let parser = DeepLinkParserStub<TestRoute>(shouldSucceed: false)
 		let routing = DefaultDeepLinkRouting<TestRoute>(parsers: [parser])
 		let url = try #require(URL(string: "test://singlefail"))
@@ -167,8 +166,8 @@ struct DefaultDeepLinkRoutingTests {
 		#expect(parser.parseCalledWith == url)
 	}
 
-	@Test("DefaultDeepLinkRouting route validates URL structure before parsing")
-	func defaultDeepLinkRouting_route_validatesURLStructureBeforeParsing() async throws {
+	@Test
+	func `DefaultDeepLinkRouting route validates URL structure before parsing`() async throws {
 		let parser = DeepLinkParserStub<TestRoute>(shouldSucceed: true, routes: [.route1])
 		let routing = DefaultDeepLinkRouting<TestRoute>(parsers: [parser])
 		let invalidURL = try #require(URL(string: "not-a-valid-url"))
@@ -183,8 +182,8 @@ struct DefaultDeepLinkRoutingTests {
 		#expect(parser.parseCalledWith == nil)
 	}
 
-	@Test("DefaultDeepLinkRouting route handles URL without scheme")
-	func defaultDeepLinkRouting_route_handlesURLWithoutScheme() async throws {
+	@Test
+	func `DefaultDeepLinkRouting route handles URL without scheme`() async throws {
 		let parser = DeepLinkParserStub<TestRoute>(shouldSucceed: true, routes: [.route1])
 		let routing = DefaultDeepLinkRouting<TestRoute>(parsers: [parser])
 		let urlWithoutScheme = try #require(URL(string: "//host/path"))
@@ -199,8 +198,8 @@ struct DefaultDeepLinkRoutingTests {
 		#expect(parser.parseCalledWith == nil)
 	}
 
-	@Test("DefaultDeepLinkRouting route handles URL with empty host")
-	func defaultDeepLinkRouting_route_handlesURLWithEmptyHost() async throws {
+	@Test
+	func `DefaultDeepLinkRouting route handles URL with empty host`() async throws {
 		let parser = DeepLinkParserStub<TestRoute>(shouldSucceed: true, routes: [.route1])
 		let routing = DefaultDeepLinkRouting<TestRoute>(parsers: [parser])
 		let urlWithEmptyHost = try #require(URL(string: "test://"))
@@ -211,8 +210,8 @@ struct DefaultDeepLinkRoutingTests {
 		#expect(parser.parseCalledWith == urlWithEmptyHost)
 	}
 
-	@Test("DefaultDeepLinkRouting route handles complex URL structure")
-	func defaultDeepLinkRouting_route_handlesComplexURLStructure() async throws {
+	@Test
+	func `DefaultDeepLinkRouting route handles complex URL structure`() async throws {
 		let parser = DeepLinkParserStub<TestRoute>(shouldSucceed: true, routes: [.route1])
 		let routing = DefaultDeepLinkRouting<TestRoute>(parsers: [parser])
 		let complexURL = try #require(URL(string: "myapp://user:pass@host:8080/path/to/resource?param1=value1&param2=value2#fragment"))
@@ -223,8 +222,8 @@ struct DefaultDeepLinkRoutingTests {
 		#expect(parser.parseCalledWith == complexURL)
 	}
 
-	@Test("DefaultDeepLinkRouting route handles URL with special characters")
-	func defaultDeepLinkRouting_route_handlesURLWithSpecialCharacters() async throws {
+	@Test
+	func `DefaultDeepLinkRouting route handles URL with special characters`() async throws {
 		let parser = DeepLinkParserStub<TestRoute>(shouldSucceed: true, routes: [.route1])
 		let routing = DefaultDeepLinkRouting<TestRoute>(parsers: [parser])
 		let specialURL = try #require(URL(string: "myapp://special?title=News%20%26%20Updates&emoji=🚀"))
