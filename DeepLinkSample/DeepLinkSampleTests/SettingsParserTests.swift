@@ -4,7 +4,6 @@
 
 @testable import DeepLinkSample
 import DeepLinks
-import DeepLinksTesting
 import Foundation
 import Testing
 
