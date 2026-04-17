@@ -5,10 +5,9 @@
 import DeepLinksTesting
 import Testing
 
-@Suite("InMemoryRateLimitPersistence")
 struct InMemoryRateLimitPersistenceTests {
-	@Test("starts with no timestamps")
-	func loadRequests_deliversEmptyOnInit() async {
+	@Test
+	func `starts with no timestamps`() async {
 		let sut = InMemoryRateLimitPersistence()
 
 		let timestamps = await sut.loadRequests()
@@ -16,8 +15,8 @@ struct InMemoryRateLimitPersistenceTests {
 		#expect(timestamps.isEmpty)
 	}
 
-	@Test("saves and loads timestamps")
-	func saveRequests_persistsTimestampsForRetrieval() async {
+	@Test
+	func `saves and loads timestamps`() async {
 		let sut = InMemoryRateLimitPersistence()
 
 		await sut.saveRequests([100, 200, 300])
@@ -26,8 +25,8 @@ struct InMemoryRateLimitPersistenceTests {
 		#expect(loaded == [100, 200, 300])
 	}
 
-	@Test("overwrites previously saved timestamps")
-	func saveRequests_overwritesPreviousTimestamps() async {
+	@Test
+	func `overwrites previously saved timestamps`() async {
 		let sut = InMemoryRateLimitPersistence()
 
 		await sut.saveRequests([100, 200])
@@ -37,8 +36,8 @@ struct InMemoryRateLimitPersistenceTests {
 		#expect(loaded == [300])
 	}
 
-	@Test("clears all timestamps")
-	func clearRequests_removesAllTimestamps() async {
+	@Test
+	func `clears all timestamps`() async {
 		let sut = InMemoryRateLimitPersistence()
 		await sut.saveRequests([100, 200])
 

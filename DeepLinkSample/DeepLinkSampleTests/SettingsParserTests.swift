@@ -8,11 +8,10 @@ import DeepLinksTesting
 import Foundation
 import Testing
 
-@Suite("SettingsParser")
 @MainActor
 struct SettingsParserTests {
-	@Test("Parse delivers settings route on valid settings URL")
-	func parse_deliversSettingsRoute_onValidSettingsURL() throws {
+	@Test
+	func `Parse delivers settings route on valid settings URL`() throws {
 		let sut = makeSUT()
 		let url = try #require(URL(string: "deeplink://settings?section=account"))
 
@@ -22,8 +21,8 @@ struct SettingsParserTests {
 		#expect(routes.first?.id == AppRoute.stack(.settings(section: "account")).id)
 	}
 
-	@Test("Parse throws unsupportedHost on non-settings host")
-	func parse_throwsUnsupportedHost_onNonSettingsHost() throws {
+	@Test
+	func `Parse throws unsupportedHost on non-settings host`() throws {
 		let sut = makeSUT()
 		let url = try #require(URL(string: "deeplink://unknown?section=account"))
 

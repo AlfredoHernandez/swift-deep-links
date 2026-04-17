@@ -5,17 +5,16 @@
 import DeepLinksTesting
 import Testing
 
-@Suite("CollectingAnalyticsProvider")
 struct CollectingAnalyticsProviderTests {
-	@Test("starts with no events")
-	func trackedEvents_deliversEmptyOnInit() {
+	@Test
+	func `starts with no events`() {
 		let sut = CollectingAnalyticsProvider()
 
 		#expect(sut.trackedEvents.isEmpty)
 	}
 
-	@Test("collects event with name and string-converted parameters")
-	func track_collectsEventWithParameters() {
+	@Test
+	func `collects event with name and string-converted parameters`() {
 		let sut = CollectingAnalyticsProvider()
 
 		sut.track("deep_link_opened", parameters: ["url": "myapp://test", "count": 42])
@@ -26,8 +25,8 @@ struct CollectingAnalyticsProviderTests {
 		#expect(sut.trackedEvents.first?.parameters["count"] == "42")
 	}
 
-	@Test("collects event with empty parameters")
-	func track_collectsEventWithEmptyParameters() {
+	@Test
+	func `collects event with empty parameters`() {
 		let sut = CollectingAnalyticsProvider()
 
 		sut.track("event", parameters: [:])
@@ -36,8 +35,8 @@ struct CollectingAnalyticsProviderTests {
 		#expect(sut.trackedEvents.first?.parameters.isEmpty == true)
 	}
 
-	@Test("collects multiple events in order")
-	func track_collectsMultipleEventsInOrder() {
+	@Test
+	func `collects multiple events in order`() {
 		let sut = CollectingAnalyticsProvider()
 
 		sut.track("first", parameters: [:])
@@ -47,8 +46,8 @@ struct CollectingAnalyticsProviderTests {
 		#expect(sut.trackedEvents.map(\.name) == ["first", "second", "third"])
 	}
 
-	@Test("is thread-safe under concurrent access")
-	func track_collectsAllEventsUnderConcurrentAccess() async {
+	@Test
+	func `is thread-safe under concurrent access`() async {
 		let sut = CollectingAnalyticsProvider()
 
 		await withTaskGroup(of: Void.self) { group in

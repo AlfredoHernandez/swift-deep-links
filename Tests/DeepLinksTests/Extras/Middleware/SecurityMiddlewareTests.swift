@@ -6,10 +6,9 @@
 import Foundation
 import Testing
 
-@Suite("SecurityMiddleware Tests")
 struct SecurityMiddlewareTests {
-	@Test("SecurityMiddleware allows requests with allowed schemes")
-	func securityMiddleware_allowsRequestsWithAllowedSchemes() async throws {
+	@Test
+	func `SecurityMiddleware allows requests with allowed schemes`() async throws {
 		let testURL = try #require(URL(string: "testapp://test"))
 		let middleware = SecurityMiddleware(
 			allowedSchemes: ["testapp", "myapp"],
@@ -22,8 +21,8 @@ struct SecurityMiddlewareTests {
 		#expect(result == testURL)
 	}
 
-	@Test("SecurityMiddleware blocks requests with disallowed schemes")
-	func securityMiddleware_blocksRequestsWithDisallowedSchemes() async throws {
+	@Test
+	func `SecurityMiddleware blocks requests with disallowed schemes`() async throws {
 		let testURL = try #require(URL(string: "http://test"))
 		let middleware = SecurityMiddleware(
 			allowedSchemes: ["testapp"],
@@ -39,8 +38,8 @@ struct SecurityMiddlewareTests {
 		}
 	}
 
-	@Test("SecurityMiddleware allows requests with allowed hosts")
-	func securityMiddleware_allowsRequestsWithAllowedHosts() async throws {
+	@Test
+	func `SecurityMiddleware allows requests with allowed hosts`() async throws {
 		let testURL = try #require(URL(string: "testapp://allowed"))
 		let middleware = SecurityMiddleware(
 			allowedSchemes: ["testapp"],
@@ -53,8 +52,8 @@ struct SecurityMiddlewareTests {
 		#expect(result == testURL)
 	}
 
-	@Test("SecurityMiddleware blocks requests with disallowed hosts")
-	func securityMiddleware_blocksRequestsWithDisallowedHosts() async throws {
+	@Test
+	func `SecurityMiddleware blocks requests with disallowed hosts`() async throws {
 		let testURL = try #require(URL(string: "testapp://disallowed"))
 		let middleware = SecurityMiddleware(
 			allowedSchemes: ["testapp"],
@@ -70,8 +69,8 @@ struct SecurityMiddlewareTests {
 		}
 	}
 
-	@Test("SecurityMiddleware blocks requests matching blocked patterns")
-	func securityMiddleware_blocksRequestsMatchingBlockedPatterns() async throws {
+	@Test
+	func `SecurityMiddleware blocks requests matching blocked patterns`() async throws {
 		let testURL = try #require(URL(string: "testapp://malicious"))
 		let blockedPattern = try NSRegularExpression(pattern: "malicious")
 		let middleware = SecurityMiddleware(
@@ -88,8 +87,8 @@ struct SecurityMiddlewareTests {
 		}
 	}
 
-	@Test("SecurityMiddleware allows requests when no hosts are specified")
-	func securityMiddleware_allowsRequestsWhenNoHostsAreSpecified() async throws {
+	@Test
+	func `SecurityMiddleware allows requests when no hosts are specified`() async throws {
 		let testURL = try #require(URL(string: "testapp://anyhost"))
 		let middleware = SecurityMiddleware(
 			allowedSchemes: ["testapp"],

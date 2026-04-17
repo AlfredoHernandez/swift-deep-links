@@ -8,11 +8,10 @@ import DeepLinksTesting
 import Foundation
 import Testing
 
-@Suite("ProfileParser")
 @MainActor
 struct ProfileParserTests {
-	@Test("Parse delivers profile route on valid profile URL with name")
-	func parse_deliversProfileRoute_onValidProfileURL() throws {
+	@Test
+	func `Parse delivers profile route on valid profile URL with name`() throws {
 		let sut = makeSUT()
 		let url = try #require(URL(string: "deeplink://profile?userID=123&name=John"))
 
@@ -22,8 +21,8 @@ struct ProfileParserTests {
 		#expect(routes.first?.id == AppRoute.sheet(.profile(userID: "123", name: "John")).id)
 	}
 
-	@Test("Parse throws unsupportedHost on non-profile host")
-	func parse_throwsUnsupportedHost_onNonProfileHost() throws {
+	@Test
+	func `Parse throws unsupportedHost on non-profile host`() throws {
 		let sut = makeSUT()
 		let url = try #require(URL(string: "deeplink://unknown?userID=1"))
 

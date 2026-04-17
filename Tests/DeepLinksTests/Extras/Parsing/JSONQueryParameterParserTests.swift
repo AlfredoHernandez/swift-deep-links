@@ -6,10 +6,9 @@
 import Foundation
 import Testing
 
-@Suite("JSONQueryParameterParser Tests")
 struct JSONQueryParameterParserTests {
-	@Test("JSONQueryParameterParser parse returns valid instance with simple parameters")
-	func jsonQueryParameterParser_parse_returnsValidInstanceWithSimpleParameters() throws {
+	@Test
+	func `JSONQueryParameterParser parse returns valid instance with simple parameters`() throws {
 		let parser = JSONQueryParameterParser()
 		let parameters = ["userID": "123", "name": "John Doe", "isActive": "true"]
 
@@ -26,8 +25,8 @@ struct JSONQueryParameterParserTests {
 		#expect(result.isActive == "true")
 	}
 
-	@Test("JSONQueryParameterParser parse returns valid instance with boolean parameters")
-	func jsonQueryParameterParser_parse_returnsValidInstanceWithBooleanParameters() throws {
+	@Test
+	func `JSONQueryParameterParser parse returns valid instance with boolean parameters`() throws {
 		let parser = JSONQueryParameterParser()
 		let parameters = ["isActive": "true", "isPremium": "false", "hasAccess": "1"]
 
@@ -44,8 +43,8 @@ struct JSONQueryParameterParserTests {
 		#expect(result.hasAccess == "1")
 	}
 
-	@Test("JSONQueryParameterParser parse returns valid instance with numeric parameters")
-	func jsonQueryParameterParser_parse_returnsValidInstanceWithNumericParameters() throws {
+	@Test
+	func `JSONQueryParameterParser parse returns valid instance with numeric parameters`() throws {
 		let parser = JSONQueryParameterParser()
 		let parameters = ["count": "42", "price": "29.99", "rating": "4.5"]
 
@@ -62,8 +61,8 @@ struct JSONQueryParameterParserTests {
 		#expect(result.rating == "4.5")
 	}
 
-	@Test("JSONQueryParameterParser parse returns valid instance with URL encoded parameters")
-	func jsonQueryParameterParser_parse_returnsValidInstanceWithURLEncodedParameters() throws {
+	@Test
+	func `JSONQueryParameterParser parse returns valid instance with URL encoded parameters`() throws {
 		let parser = JSONQueryParameterParser()
 		let parameters = ["title": "News & Updates", "description": "Latest information about our app", "category": "Technology"]
 
@@ -80,8 +79,8 @@ struct JSONQueryParameterParserTests {
 		#expect(result.category == "Technology")
 	}
 
-	@Test("JSONQueryParameterParser parse returns valid instance with special characters")
-	func jsonQueryParameterParser_parse_returnsValidInstanceWithSpecialCharacters() throws {
+	@Test
+	func `JSONQueryParameterParser parse returns valid instance with special characters`() throws {
 		let parser = JSONQueryParameterParser()
 		let parameters = ["symbol": "@#$%", "unicode": "ñáéíóú", "emoji": "🚀📱💻"]
 
@@ -98,8 +97,8 @@ struct JSONQueryParameterParserTests {
 		#expect(result.emoji == "🚀📱💻")
 	}
 
-	@Test("JSONQueryParameterParser parse returns valid instance with empty parameters")
-	func jsonQueryParameterParser_parse_returnsValidInstanceWithEmptyParameters() throws {
+	@Test
+	func `JSONQueryParameterParser parse returns valid instance with empty parameters`() throws {
 		let parser = JSONQueryParameterParser()
 		let parameters = ["empty": "", "normal": "value", "spaces": "   "]
 
@@ -116,8 +115,8 @@ struct JSONQueryParameterParserTests {
 		#expect(result.spaces == "   ")
 	}
 
-	@Test("JSONQueryParameterParser parse returns valid instance with single parameter")
-	func jsonQueryParameterParser_parse_returnsValidInstanceWithSingleParameter() throws {
+	@Test
+	func `JSONQueryParameterParser parse returns valid instance with single parameter`() throws {
 		let parser = JSONQueryParameterParser()
 		let parameters = ["userID": "123"]
 
@@ -130,8 +129,8 @@ struct JSONQueryParameterParserTests {
 		#expect(result.userID == "123")
 	}
 
-	@Test("JSONQueryParameterParser parse returns valid instance with many parameters")
-	func jsonQueryParameterParser_parse_returnsValidInstanceWithManyParameters() throws {
+	@Test
+	func `JSONQueryParameterParser parse returns valid instance with many parameters`() throws {
 		let parser = JSONQueryParameterParser()
 		let parameters = [
 			"param1": "value1", "param2": "value2", "param3": "value3",
@@ -160,8 +159,8 @@ struct JSONQueryParameterParserTests {
 		#expect(result.param10 == "value10")
 	}
 
-	@Test("JSONQueryParameterParser parse returns valid instance with custom JSON decoder")
-	func jsonQueryParameterParser_parse_returnsValidInstanceWithCustomJSONDecoder() throws {
+	@Test
+	func `JSONQueryParameterParser parse returns valid instance with custom JSON decoder`() throws {
 		let customDecoder = JSONDecoder()
 		let parser = JSONQueryParameterParser(jsonDecoder: customDecoder)
 		let parameters = ["userID": "123", "fullName": "John Doe"]
@@ -177,8 +176,8 @@ struct JSONQueryParameterParserTests {
 		#expect(result.fullName == "John Doe")
 	}
 
-	@Test("JSONQueryParameterParser parse returns valid instance with optional parameters")
-	func jsonQueryParameterParser_parse_returnsValidInstanceWithOptionalParameters() throws {
+	@Test
+	func `JSONQueryParameterParser parse returns valid instance with optional parameters`() throws {
 		let parser = JSONQueryParameterParser()
 		let parameters = ["required": "value", "optional": "present"]
 
@@ -195,8 +194,8 @@ struct JSONQueryParameterParserTests {
 		#expect(result.missing == nil)
 	}
 
-	@Test("JSONQueryParameterParser parse throws error on missing required parameter")
-	func jsonQueryParameterParser_parse_throwsErrorOnMissingRequiredParameter() {
+	@Test
+	func `JSONQueryParameterParser parse throws error on missing required parameter`() {
 		let parser = JSONQueryParameterParser()
 		let parameters = ["name": "John"]
 
@@ -210,8 +209,8 @@ struct JSONQueryParameterParserTests {
 		}
 	}
 
-	@Test("JSONQueryParameterParser parse throws error on invalid JSON structure")
-	func jsonQueryParameterParser_parse_throwsErrorOnInvalidJSONStructure() {
+	@Test
+	func `JSONQueryParameterParser parse throws error on invalid JSON structure`() {
 		let parser = JSONQueryParameterParser()
 		let parameters = ["invalid": "value"]
 
@@ -228,8 +227,8 @@ struct JSONQueryParameterParserTests {
 		}
 	}
 
-	@Test("JSONQueryParameterParser parse throws error on empty parameters dictionary")
-	func jsonQueryParameterParser_parse_throwsErrorOnEmptyParametersDictionary() {
+	@Test
+	func `JSONQueryParameterParser parse throws error on empty parameters dictionary`() {
 		let parser = JSONQueryParameterParser()
 		let parameters: [String: String] = [:]
 
@@ -242,8 +241,8 @@ struct JSONQueryParameterParserTests {
 		}
 	}
 
-	@Test("JSONQueryParameterParser parse handles parameters with JSON-like values")
-	func jsonQueryParameterParser_parse_handlesParametersWithJSONLikeValues() throws {
+	@Test
+	func `JSONQueryParameterParser parse handles parameters with JSON-like values`() throws {
 		let parser = JSONQueryParameterParser()
 		let parameters = ["jsonString": "{\"key\":\"value\"}", "arrayString": "[1,2,3]", "booleanString": "true"]
 
@@ -260,8 +259,8 @@ struct JSONQueryParameterParserTests {
 		#expect(result.booleanString == "true")
 	}
 
-	@Test("JSONQueryParameterParser parse handles parameters with numeric strings")
-	func jsonQueryParameterParser_parse_handlesParametersWithNumericStrings() throws {
+	@Test
+	func `JSONQueryParameterParser parse handles parameters with numeric strings`() throws {
 		let parser = JSONQueryParameterParser()
 		let parameters = ["integer": "42", "float": "3.14", "negative": "-10", "zero": "0"]
 
@@ -280,8 +279,8 @@ struct JSONQueryParameterParserTests {
 		#expect(result.zero == "0")
 	}
 
-	@Test("JSONQueryParameterParser parse handles parameters with whitespace")
-	func jsonQueryParameterParser_parse_handlesParametersWithWhitespace() throws {
+	@Test
+	func `JSONQueryParameterParser parse handles parameters with whitespace`() throws {
 		let parser = JSONQueryParameterParser()
 		let parameters = ["leading": "  value", "trailing": "value  ", "both": "  value  ", "tabs": "\tvalue\t"]
 
@@ -302,8 +301,8 @@ struct JSONQueryParameterParserTests {
 
 	// MARK: - Array Parameters Tests
 
-	@Test("JSONQueryParameterParser parse with fromAll handles array parameters")
-	func jsonQueryParameterParser_parseFromAll_handlesArrayParameters() throws {
+	@Test
+	func `JSONQueryParameterParser parse with fromAll handles array parameters`() throws {
 		let parser = JSONQueryParameterParser()
 		let parameters = ["tags": ["electronics", "new", "sale"]]
 
@@ -316,8 +315,8 @@ struct JSONQueryParameterParserTests {
 		#expect(result.tags == ["electronics", "new", "sale"])
 	}
 
-	@Test("JSONQueryParameterParser parse with fromAll handles single value as string")
-	func jsonQueryParameterParser_parseFromAll_handlesSingleValueAsString() throws {
+	@Test
+	func `JSONQueryParameterParser parse with fromAll handles single value as string`() throws {
 		let parser = JSONQueryParameterParser()
 		let parameters = ["category": ["phones"]]
 
@@ -330,8 +329,8 @@ struct JSONQueryParameterParserTests {
 		#expect(result.category == "phones")
 	}
 
-	@Test("JSONQueryParameterParser parse with fromAll handles mixed array and single values")
-	func jsonQueryParameterParser_parseFromAll_handlesMixedArrayAndSingleValues() throws {
+	@Test
+	func `JSONQueryParameterParser parse with fromAll handles mixed array and single values`() throws {
 		let parser = JSONQueryParameterParser()
 		let parameters = [
 			"category": ["phones"],
@@ -352,8 +351,8 @@ struct JSONQueryParameterParserTests {
 		#expect(result.brand == "Apple")
 	}
 
-	@Test("JSONQueryParameterParser parse with fromAll handles optional array parameters")
-	func jsonQueryParameterParser_parseFromAll_handlesOptionalArrayParameters() throws {
+	@Test
+	func `JSONQueryParameterParser parse with fromAll handles optional array parameters`() throws {
 		let parser = JSONQueryParameterParser()
 		let parameters = [
 			"category": ["phones"],
@@ -370,8 +369,8 @@ struct JSONQueryParameterParserTests {
 		#expect(result.tags == nil)
 	}
 
-	@Test("JSONQueryParameterParser parse with fromAll handles empty array")
-	func jsonQueryParameterParser_parseFromAll_handlesEmptyArray() throws {
+	@Test
+	func `JSONQueryParameterParser parse with fromAll handles empty array`() throws {
 		let parser = JSONQueryParameterParser()
 		let parameters = [
 			"category": ["phones"],
@@ -389,8 +388,8 @@ struct JSONQueryParameterParserTests {
 		#expect(result.tags == [])
 	}
 
-	@Test("JSONQueryParameterParser parse with fromAll handles URL encoded array values")
-	func jsonQueryParameterParser_parseFromAll_handlesURLEncodedArrayValues() throws {
+	@Test
+	func `JSONQueryParameterParser parse with fromAll handles URL encoded array values`() throws {
 		let parser = JSONQueryParameterParser()
 		let parameters = ["tags": ["new arrivals", "best sellers", "on sale"]]
 
@@ -403,8 +402,8 @@ struct JSONQueryParameterParserTests {
 		#expect(result.tags == ["new arrivals", "best sellers", "on sale"])
 	}
 
-	@Test("JSONQueryParameterParser parse with fromAll handles numeric array values")
-	func jsonQueryParameterParser_parseFromAll_handlesNumericArrayValues() throws {
+	@Test
+	func `JSONQueryParameterParser parse with fromAll handles numeric array values`() throws {
 		let parser = JSONQueryParameterParser()
 		let parameters = ["ids": ["1", "2", "3", "42"]]
 

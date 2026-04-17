@@ -5,17 +5,16 @@
 import DeepLinksTesting
 import Testing
 
-@Suite("FixedAuthenticationProvider")
 struct FixedAuthenticationProviderTests {
-	@Test("returns true when configured as authenticated")
-	func isAuthenticated_returnsTrueWhenAuthenticated() {
+	@Test
+	func `returns true when configured as authenticated`() {
 		let sut = FixedAuthenticationProvider(isAuthenticated: true)
 
 		#expect(sut.isAuthenticated())
 	}
 
-	@Test("returns false when configured as unauthenticated")
-	func isAuthenticated_returnsFalseWhenUnauthenticated() {
+	@Test
+	func `returns false when configured as unauthenticated`() {
 		let sut = FixedAuthenticationProvider(isAuthenticated: false)
 
 		#expect(!sut.isAuthenticated())

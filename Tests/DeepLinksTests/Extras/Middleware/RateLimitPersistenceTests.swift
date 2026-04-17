@@ -6,12 +6,11 @@
 import Foundation
 import Testing
 
-@Suite("UserDefaultsRateLimitPersistence Tests")
 struct RateLimitPersistenceTests {
 	private static let fixedDate = Date(timeIntervalSince1970: 1_234_568_000.0)
 
-	@Test("loadRequests delivers previously saved timestamps")
-	func loadRequests_deliversPreviouslySavedTimestamps() async {
+	@Test
+	func `loadRequests delivers previously saved timestamps`() async {
 		let sut = makeSUT()
 		let testTimestamps: [TimeInterval] = [1_234_567_890.0, 1_234_567_891.0, 1_234_567_892.0]
 
@@ -22,8 +21,8 @@ struct RateLimitPersistenceTests {
 		#expect(loadedTimestamps == testTimestamps)
 	}
 
-	@Test("loadRequests delivers empty on no stored data")
-	func loadRequests_deliversEmptyOnNoStoredData() async {
+	@Test
+	func `loadRequests delivers empty on no stored data`() async {
 		let sut = makeSUT()
 
 		let loadedTimestamps = await sut.loadRequests()
@@ -31,8 +30,8 @@ struct RateLimitPersistenceTests {
 		#expect(loadedTimestamps.isEmpty)
 	}
 
-	@Test("loadRequests delivers empty on invalid stored data")
-	func loadRequests_deliversEmptyOnInvalidStoredData() async throws {
+	@Test
+	func `loadRequests delivers empty on invalid stored data`() async throws {
 		let key = "test.requests.\(UUID().uuidString)"
 		let userDefaults = try #require(UserDefaults(suiteName: "test.persistence.\(UUID().uuidString)"))
 		let invalidData = "invalid json data".data(using: .utf8)!
@@ -44,8 +43,8 @@ struct RateLimitPersistenceTests {
 		#expect(loadedTimestamps.isEmpty)
 	}
 
-	@Test("clearRequests removes all stored timestamps")
-	func clearRequests_removesAllStoredTimestamps() async {
+	@Test
+	func `clearRequests removes all stored timestamps`() async {
 		let sut = makeSUT()
 		await sut.saveRequests([1_234_567_890.0, 1_234_567_891.0])
 
@@ -57,8 +56,8 @@ struct RateLimitPersistenceTests {
 
 	// MARK: - Pruning Tests
 
-	@Test("loadRequests prunes expired timestamps")
-	func loadRequests_prunesExpiredTimestamps() async {
+	@Test
+	func `loadRequests prunes expired timestamps`() async {
 		let now = Self.fixedDate
 		let sut = makeSUT(maxAge: 60, dateProvider: { now })
 
@@ -72,8 +71,8 @@ struct RateLimitPersistenceTests {
 		#expect(loadedTimestamps == [validTimestamp])
 	}
 
-	@Test("loadRequests delivers empty when all timestamps expired")
-	func loadRequests_deliversEmptyWhenAllTimestampsExpired() async {
+	@Test
+	func `loadRequests delivers empty when all timestamps expired`() async {
 		let now = Self.fixedDate
 		let sut = makeSUT(maxAge: 60, dateProvider: { now })
 
@@ -90,8 +89,8 @@ struct RateLimitPersistenceTests {
 		#expect(loadedTimestamps.isEmpty)
 	}
 
-	@Test("loadRequests keeps all timestamps when none expired")
-	func loadRequests_keepsAllTimestampsWhenNoneExpired() async {
+	@Test
+	func `loadRequests keeps all timestamps when none expired`() async {
 		let now = Self.fixedDate
 		let sut = makeSUT(maxAge: 3600, dateProvider: { now })
 
@@ -108,8 +107,8 @@ struct RateLimitPersistenceTests {
 		#expect(loadedTimestamps == recentTimestamps)
 	}
 
-	@Test("loadRequests prunes timestamp exactly at maxAge boundary")
-	func loadRequests_prunesTimestampExactlyAtMaxAgeBoundary() async {
+	@Test
+	func `loadRequests prunes timestamp exactly at maxAge boundary`() async {
 		let now = Self.fixedDate
 		let sut = makeSUT(maxAge: 60, dateProvider: { now })
 

@@ -6,15 +6,14 @@
 import Foundation
 import Testing
 
-@Suite("ReadinessMiddleware Tests")
 struct ReadinessMiddlewareTests {
 	private let testURL = URL(string: "myapp://test")!
 	private let anotherURL = URL(string: "myapp://other")!
 
 	// MARK: - Queue Tests
 
-	@Test("When ready, URL passes through immediately")
-	func whenReady_urlPassesThrough() async throws {
+	@Test
+	func `When ready, URL passes through immediately`() async throws {
 		let queue = DeepLinkReadinessQueue()
 		_ = queue.markReady()
 		let sut = ReadinessMiddleware(queue: queue)
@@ -24,8 +23,8 @@ struct ReadinessMiddlewareTests {
 		#expect(result == testURL)
 	}
 
-	@Test("When not ready, URL is queued and nil is returned")
-	func whenNotReady_urlIsQueuedAndReturnsNil() async throws {
+	@Test
+	func `When not ready, URL is queued and nil is returned`() async throws {
 		let queue = DeepLinkReadinessQueue()
 		let sut = ReadinessMiddleware(queue: queue)
 
@@ -35,8 +34,8 @@ struct ReadinessMiddlewareTests {
 		#expect(queue.pendingCount == 1)
 	}
 
-	@Test("Multiple URLs are queued when not ready")
-	func multipleURLsQueuedWhenNotReady() async throws {
+	@Test
+	func `Multiple URLs are queued when not ready`() async throws {
 		let queue = DeepLinkReadinessQueue()
 		let sut = ReadinessMiddleware(queue: queue)
 
@@ -46,8 +45,8 @@ struct ReadinessMiddlewareTests {
 		#expect(queue.pendingCount == 2)
 	}
 
-	@Test("markReady returns all pending URLs")
-	func markReady_returnsAllPendingURLs() async throws {
+	@Test
+	func `markReady returns all pending URLs`() async throws {
 		let queue = DeepLinkReadinessQueue()
 		let sut = ReadinessMiddleware(queue: queue)
 
@@ -60,8 +59,8 @@ struct ReadinessMiddlewareTests {
 		#expect(queue.pendingCount == 0)
 	}
 
-	@Test("markReady is idempotent — second call returns empty array")
-	func markReady_isIdempotent() async throws {
+	@Test
+	func `markReady is idempotent — second call returns empty array`() async throws {
 		let queue = DeepLinkReadinessQueue()
 		let sut = ReadinessMiddleware(queue: queue)
 
@@ -74,8 +73,8 @@ struct ReadinessMiddlewareTests {
 		#expect(second.isEmpty)
 	}
 
-	@Test("After markReady, new URLs pass through immediately")
-	func afterMarkReady_newURLsPassThrough() async throws {
+	@Test
+	func `After markReady, new URLs pass through immediately`() async throws {
 		let queue = DeepLinkReadinessQueue()
 		let sut = ReadinessMiddleware(queue: queue)
 
@@ -87,15 +86,15 @@ struct ReadinessMiddlewareTests {
 		#expect(queue.pendingCount == 0)
 	}
 
-	@Test("Queue starts not ready")
-	func queue_startsNotReady() {
+	@Test
+	func `Queue starts not ready`() {
 		let queue = DeepLinkReadinessQueue()
 
 		#expect(!queue.isReady)
 	}
 
-	@Test("Queue is ready after markReady")
-	func queue_isReadyAfterMarkReady() {
+	@Test
+	func `Queue is ready after markReady`() {
 		let queue = DeepLinkReadinessQueue()
 
 		_ = queue.markReady()
@@ -103,8 +102,8 @@ struct ReadinessMiddlewareTests {
 		#expect(queue.isReady)
 	}
 
-	@Test("Empty queue markReady returns empty array")
-	func emptyQueue_markReadyReturnsEmpty() {
+	@Test
+	func `Empty queue markReady returns empty array`() {
 		let queue = DeepLinkReadinessQueue()
 
 		let pending = queue.markReady()
@@ -114,8 +113,8 @@ struct ReadinessMiddlewareTests {
 
 	// MARK: - maxQueueSize Tests
 
-	@Test("maxQueueSize drops oldest URL when queue is full")
-	func maxQueueSize_dropsOldestWhenFull() throws {
+	@Test
+	func `maxQueueSize drops oldest URL when queue is full`() throws {
 		let queue = DeepLinkReadinessQueue(maxQueueSize: 2)
 		let thirdURL = try #require(URL(string: "myapp://third"))
 
@@ -129,8 +128,8 @@ struct ReadinessMiddlewareTests {
 		#expect(pending == [anotherURL, thirdURL])
 	}
 
-	@Test("maxQueueSize of 1 keeps only the latest URL")
-	func maxQueueSize_oneKeepsLatest() {
+	@Test
+	func `maxQueueSize of 1 keeps only the latest URL`() {
 		let queue = DeepLinkReadinessQueue(maxQueueSize: 1)
 
 		_ = queue.enqueue(testURL)
@@ -140,8 +139,8 @@ struct ReadinessMiddlewareTests {
 		#expect(pending == [anotherURL])
 	}
 
-	@Test("maxQueueSize zero or negative is clamped to 1")
-	func maxQueueSize_zeroOrNegativeClampedToOne() {
+	@Test
+	func `maxQueueSize zero or negative is clamped to 1`() {
 		let zeroQueue = DeepLinkReadinessQueue(maxQueueSize: 0)
 		let negativeQueue = DeepLinkReadinessQueue(maxQueueSize: -5)
 
@@ -154,8 +153,8 @@ struct ReadinessMiddlewareTests {
 		#expect(negativeQueue.pendingCount == 1)
 	}
 
-	@Test("nil maxQueueSize allows unlimited URLs")
-	func maxQueueSize_nilAllowsUnlimited() throws {
+	@Test
+	func `nil maxQueueSize allows unlimited URLs`() throws {
 		let queue = DeepLinkReadinessQueue(maxQueueSize: nil)
 
 		for i in 0 ..< 100 {
@@ -167,8 +166,8 @@ struct ReadinessMiddlewareTests {
 
 	// MARK: - Reset Tests
 
-	@Test("reset returns queue to not-ready state")
-	func reset_returnsToNotReadyState() {
+	@Test
+	func `reset returns queue to not-ready state`() {
 		let queue = DeepLinkReadinessQueue()
 		_ = queue.markReady()
 		#expect(queue.isReady)
@@ -179,8 +178,8 @@ struct ReadinessMiddlewareTests {
 		#expect(queue.pendingCount == 0)
 	}
 
-	@Test("reset discards pending URLs")
-	func reset_discardsPendingURLs() {
+	@Test
+	func `reset discards pending URLs`() {
 		let queue = DeepLinkReadinessQueue()
 
 		_ = queue.enqueue(testURL)
@@ -193,8 +192,8 @@ struct ReadinessMiddlewareTests {
 		#expect(queue.markReady().isEmpty)
 	}
 
-	@Test("After reset, new URLs are queued again")
-	func reset_newURLsAreQueuedAgain() {
+	@Test
+	func `After reset, new URLs are queued again`() {
 		let queue = DeepLinkReadinessQueue()
 		_ = queue.markReady()
 

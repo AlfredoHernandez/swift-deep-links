@@ -6,11 +6,10 @@
 import Foundation
 import Testing
 
-@Suite("DeepLinkCoordinator Tests")
 @MainActor
 struct DeepLinkCoordinatorTests {
-	@Test("DeepLinkCoordinator handle processes single route successfully")
-	func deepLinkCoordinator_handle_processesSingleRouteSuccessfully() async throws {
+	@Test
+	func `DeepLinkCoordinator handle processes single route successfully`() async throws {
 		let routingStub = DeepLinkRoutingStub<TestRoute>()
 		let handlerSpy = DeepLinkHandlerSpy<TestRoute>()
 		let coordinator = DeepLinkCoordinator(routing: routingStub, handler: handlerSpy)
@@ -30,8 +29,8 @@ struct DeepLinkCoordinatorTests {
 		#expect(handlerSpy.handledRoutes == [.route1])
 	}
 
-	@Test("DeepLinkCoordinator handle processes multiple routes successfully")
-	func deepLinkCoordinator_handle_processesMultipleRoutesSuccessfully() async throws {
+	@Test
+	func `DeepLinkCoordinator handle processes multiple routes successfully`() async throws {
 		let routingStub = DeepLinkRoutingStub<TestRoute>()
 		let handlerSpy = DeepLinkHandlerSpy<TestRoute>()
 		let coordinator = DeepLinkCoordinator(routing: routingStub, handler: handlerSpy)
@@ -49,8 +48,8 @@ struct DeepLinkCoordinatorTests {
 		#expect(handlerSpy.handledRoutes == [.route1, .route2, .route3])
 	}
 
-	@Test("DeepLinkCoordinator handle processes empty routes array")
-	func deepLinkCoordinator_handle_processesEmptyRoutesArray() async throws {
+	@Test
+	func `DeepLinkCoordinator handle processes empty routes array`() async throws {
 		let routingStub = DeepLinkRoutingStub<TestRoute>()
 		let handlerSpy = DeepLinkHandlerSpy<TestRoute>()
 		let coordinator = DeepLinkCoordinator(routing: routingStub, handler: handlerSpy)
@@ -68,8 +67,8 @@ struct DeepLinkCoordinatorTests {
 		#expect(handlerSpy.handledRoutes.isEmpty)
 	}
 
-	@Test("DeepLinkCoordinator handle continues processing after handler error")
-	func deepLinkCoordinator_handle_continuesProcessingAfterHandlerError() async throws {
+	@Test
+	func `DeepLinkCoordinator handle continues processing after handler error`() async throws {
 		let routingStub = DeepLinkRoutingStub<TestRoute>()
 		let handlerSpy = DeepLinkHandlerSpy<TestRoute>()
 		let coordinator = DeepLinkCoordinator(routing: routingStub, handler: handlerSpy)
@@ -89,8 +88,8 @@ struct DeepLinkCoordinatorTests {
 		#expect(handlerSpy.handledRoutes == [.route1, .route3]) // route2 failed, so it's not in handledRoutes
 	}
 
-	@Test("DeepLinkCoordinator handle handles routing error gracefully")
-	func deepLinkCoordinator_handle_handlesRoutingErrorGracefully() async throws {
+	@Test
+	func `DeepLinkCoordinator handle handles routing error gracefully`() async throws {
 		let routingStub = DeepLinkRoutingStub<TestRoute>()
 		let handlerSpy = DeepLinkHandlerSpy<TestRoute>()
 		let coordinator = DeepLinkCoordinator(routing: routingStub, handler: handlerSpy)
@@ -107,8 +106,8 @@ struct DeepLinkCoordinatorTests {
 		#expect(handlerSpy.handledRoutes.isEmpty)
 	}
 
-	@Test("DeepLinkCoordinator handle processes routes with delay between executions")
-	func deepLinkCoordinator_handle_processesRoutesWithDelayBetweenExecutions() async throws {
+	@Test
+	func `DeepLinkCoordinator handle processes routes with delay between executions`() async throws {
 		let routingStub = DeepLinkRoutingStub<TestRoute>()
 		let handlerSpy = DeepLinkHandlerSpy<TestRoute>()
 		let coordinator = DeepLinkCoordinator(routing: routingStub, handler: handlerSpy)
@@ -124,8 +123,8 @@ struct DeepLinkCoordinatorTests {
 		#expect(handlerSpy.handledRoutes == [.route1, .route2])
 	}
 
-	@Test("DeepLinkCoordinator handle returns result when middleware stops processing")
-	func deepLinkCoordinator_handle_returnsResultWhenMiddlewareStopsProcessing() async throws {
+	@Test
+	func `DeepLinkCoordinator handle returns result when middleware stops processing`() async throws {
 		let routingStub = DeepLinkRoutingStub<TestRoute>()
 		let handlerSpy = DeepLinkHandlerSpy<TestRoute>()
 		let middlewareCoordinator = DeepLinkMiddlewareCoordinator()
@@ -151,8 +150,8 @@ struct DeepLinkCoordinatorTests {
 		#expect(handlerSpy.handledRoutes.isEmpty)
 	}
 
-	@Test("DeepLinkCoordinator notifies delegate when processing starts")
-	func deepLinkCoordinator_notifiesDelegateWhenProcessingStarts() async throws {
+	@Test
+	func `DeepLinkCoordinator notifies delegate when processing starts`() async throws {
 		let routingStub = DeepLinkRoutingStub<TestRoute>()
 		let handlerSpy = DeepLinkHandlerSpy<TestRoute>()
 		let delegate = CoordinatorDelegateSpy()
@@ -167,8 +166,8 @@ struct DeepLinkCoordinatorTests {
 		#expect(delegate.willProcessCalls.first == url)
 	}
 
-	@Test("DeepLinkCoordinator notifies delegate when processing completes successfully")
-	func deepLinkCoordinator_notifiesDelegateWhenProcessingCompletesSuccessfully() async throws {
+	@Test
+	func `DeepLinkCoordinator notifies delegate when processing completes successfully`() async throws {
 		let routingStub = DeepLinkRoutingStub<TestRoute>()
 		let handlerSpy = DeepLinkHandlerSpy<TestRoute>()
 		let delegate = CoordinatorDelegateSpy()
@@ -184,8 +183,8 @@ struct DeepLinkCoordinatorTests {
 		#expect(delegate.didProcessCalls.first?.result.wasSuccessful == true)
 	}
 
-	@Test("DeepLinkCoordinator notifies delegate when processing fails")
-	func deepLinkCoordinator_notifiesDelegateWhenProcessingFails() async throws {
+	@Test
+	func `DeepLinkCoordinator notifies delegate when processing fails`() async throws {
 		let routingStub = DeepLinkRoutingStub<TestRoute>()
 		let handlerSpy = DeepLinkHandlerSpy<TestRoute>()
 		let delegate = CoordinatorDelegateSpy()
@@ -200,8 +199,8 @@ struct DeepLinkCoordinatorTests {
 		#expect(delegate.didFailCalls.first?.error is DeepLinkError)
 	}
 
-	@Test("DeepLinkCoordinator works without delegate")
-	func deepLinkCoordinator_worksWithoutDelegate() async throws {
+	@Test
+	func `DeepLinkCoordinator works without delegate`() async throws {
 		let routingStub = DeepLinkRoutingStub<TestRoute>()
 		let handlerSpy = DeepLinkHandlerSpy<TestRoute>()
 		let coordinator = DeepLinkCoordinator(routing: routingStub, handler: handlerSpy)
@@ -216,8 +215,8 @@ struct DeepLinkCoordinatorTests {
 		#expect(handlerSpy.handledRoutes == [.route1])
 	}
 
-	@Test("CoordinatorOf type alias works correctly")
-	func coordinatorOf_typeAlias_worksCorrectly() async throws {
+	@Test
+	func `CoordinatorOf type alias works correctly`() async throws {
 		let routingStub = DeepLinkRoutingStub<TestRoute>()
 		let handlerSpy = DeepLinkHandlerSpy<TestRoute>()
 

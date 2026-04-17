@@ -10,11 +10,11 @@ import Testing
 
 /// Integration tests demonstrating how to use `DeepLinksTesting` utilities
 /// to test the full deep link coordinator pipeline.
-@Suite("DeepLink Coordinator Integration", .serialized)
+@Suite(.serialized)
 @MainActor
 struct DeepLinkCoordinatorIntegrationTests {
-	@Test("Handle delivers stack route on product deep link")
-	func handle_deliversStackRoute_onProductDeepLink() async throws {
+	@Test
+	func `Handle delivers stack route on product deep link`() async throws {
 		let (coordinator, handler) = makeSUT(
 			routing: DefaultDeepLinkRouting(parsers: [ProductParser(), ProfileParser()]),
 		)
@@ -27,8 +27,8 @@ struct DeepLinkCoordinatorIntegrationTests {
 		#expect(handler.handledRoutes.first?.id == AppRoute.stack(.product(productID: "PROD-42", category: "Books")).id)
 	}
 
-	@Test("Handle delivers sheet route on profile deep link")
-	func handle_deliversSheetRoute_onProfileDeepLink() async throws {
+	@Test
+	func `Handle delivers sheet route on profile deep link`() async throws {
 		let (coordinator, handler) = makeSUT(
 			routing: DefaultDeepLinkRouting(parsers: [ProductParser(), ProfileParser()]),
 		)
@@ -41,8 +41,8 @@ struct DeepLinkCoordinatorIntegrationTests {
 		#expect(handler.handledRoutes.first?.id == AppRoute.sheet(.profile(userID: "99", name: "Alice")).id)
 	}
 
-	@Test("Handle delivers configured routes on immediate routing")
-	func handle_deliversConfiguredRoutes_onImmediateRouting() async throws {
+	@Test
+	func `Handle delivers configured routes on immediate routing`() async throws {
 		let expectedRoute = AppRoute.stack(.settings(section: "privacy"))
 		let (coordinator, handler) = makeSUT(
 			routing: ImmediateRouting(routes: [expectedRoute]),
@@ -55,8 +55,8 @@ struct DeepLinkCoordinatorIntegrationTests {
 		#expect(handler.handledRoutes.first?.id == expectedRoute.id)
 	}
 
-	@Test("Handle records intercepted URLs on collecting middleware")
-	func handle_recordsInterceptedURLs_onCollectingMiddleware() async throws {
+	@Test
+	func `Handle records intercepted URLs on collecting middleware`() async throws {
 		let middleware = CollectingMiddleware()
 		let middlewareCoordinator = DeepLinkMiddlewareCoordinator()
 		await middlewareCoordinator.add(middleware)
@@ -73,8 +73,8 @@ struct DeepLinkCoordinatorIntegrationTests {
 		#expect(handler.handledRoutes.count == 1)
 	}
 
-	@Test("Handle blocks request on unauthorized scheme with security middleware")
-	func handle_blocksRequest_onUnauthorizedSchemeWithSecurityMiddleware() async throws {
+	@Test
+	func `Handle blocks request on unauthorized scheme with security middleware`() async throws {
 		let middlewareCoordinator = DeepLinkMiddlewareCoordinator()
 		await middlewareCoordinator.add(SecurityMiddleware(allowedSchemes: ["deeplink"]))
 
@@ -90,8 +90,8 @@ struct DeepLinkCoordinatorIntegrationTests {
 		#expect(handler.handledRoutes.isEmpty)
 	}
 
-	@Test("Handle allows protected routes on authenticated provider")
-	func handle_allowsProtectedRoutes_onAuthenticatedProvider() async throws {
+	@Test
+	func `Handle allows protected routes on authenticated provider`() async throws {
 		let middlewareCoordinator = DeepLinkMiddlewareCoordinator()
 		await middlewareCoordinator.add(AuthenticationMiddleware(
 			authProvider: FixedAuthenticationProvider(isAuthenticated: true),
@@ -110,8 +110,8 @@ struct DeepLinkCoordinatorIntegrationTests {
 		#expect(handler.handledRoutes.count == 1)
 	}
 
-	@Test("Handle blocks protected routes on unauthenticated provider")
-	func handle_blocksProtectedRoutes_onUnauthenticatedProvider() async throws {
+	@Test
+	func `Handle blocks protected routes on unauthenticated provider`() async throws {
 		let middlewareCoordinator = DeepLinkMiddlewareCoordinator()
 		await middlewareCoordinator.add(AuthenticationMiddleware(
 			authProvider: FixedAuthenticationProvider(isAuthenticated: false),
@@ -130,8 +130,8 @@ struct DeepLinkCoordinatorIntegrationTests {
 		#expect(handler.handledRoutes.isEmpty)
 	}
 
-	@Test("Handle records lifecycle events on collecting delegate")
-	func handle_recordsLifecycleEvents_onCollectingDelegate() async throws {
+	@Test
+	func `Handle records lifecycle events on collecting delegate`() async throws {
 		let delegate = CollectingDelegate()
 		let (coordinator, handler) = makeSUT(
 			routing: ImmediateRouting(routes: [.stack(.settings(section: "account"))]),
@@ -148,8 +148,8 @@ struct DeepLinkCoordinatorIntegrationTests {
 		#expect(handler.handledRoutes.count == 1)
 	}
 
-	@Test("Handle blocks excess requests on rate limit with in-memory persistence")
-	func handle_blocksExcessRequests_onRateLimitWithInMemoryPersistence() async throws {
+	@Test
+	func `Handle blocks excess requests on rate limit with in-memory persistence`() async throws {
 		let middlewareCoordinator = DeepLinkMiddlewareCoordinator()
 		await middlewareCoordinator.add(RateLimitMiddleware(
 			maxRequests: 2,

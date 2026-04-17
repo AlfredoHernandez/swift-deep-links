@@ -6,10 +6,9 @@
 import Foundation
 import Testing
 
-@Suite("AnalyticsMiddleware Tests")
 struct AnalyticsMiddlewareTests {
-	@Test("AnalyticsMiddleware tracks deep link events with correct parameters")
-	func analyticsMiddleware_tracksDeepLinkEventsWithCorrectParameters() async throws {
+	@Test
+	func `AnalyticsMiddleware tracks deep link events with correct parameters`() async throws {
 		let testURL = try #require(URL(string: "testapp://product?productId=456&category=electronics"))
 		let analyticsSpy = AnalyticsProviderSpy()
 		let middleware = AnalyticsMiddleware(analyticsProvider: analyticsSpy)
@@ -27,8 +26,8 @@ struct AnalyticsMiddlewareTests {
 		#expect(event.parameters["timestamp"] as? Double != nil)
 	}
 
-	@Test("AnalyticsMiddleware handles URLs with unknown scheme and host")
-	func analyticsMiddleware_handlesURLsWithUnknownSchemeAndHost() async throws {
+	@Test
+	func `AnalyticsMiddleware handles URLs with unknown scheme and host`() async throws {
 		let testURL = try #require(URL(string: "unknown://unknown"))
 		let analyticsSpy = AnalyticsProviderSpy()
 		let middleware = AnalyticsMiddleware(analyticsProvider: analyticsSpy)
@@ -45,8 +44,8 @@ struct AnalyticsMiddlewareTests {
 
 	// MARK: - Strategy Tests
 
-	@Test("AnalyticsMiddleware with detailed strategy tracks comprehensive URL information")
-	func analyticsMiddleware_withDetailedStrategy_tracksComprehensiveURLInformation() async throws {
+	@Test
+	func `AnalyticsMiddleware with detailed strategy tracks comprehensive URL information`() async throws {
 		let testURL = try #require(URL(string: "testapp://product/123?category=electronics&price=299.99"))
 		let analyticsSpy = AnalyticsProviderSpy()
 		let middleware = AnalyticsMiddleware(
@@ -76,8 +75,8 @@ struct AnalyticsMiddlewareTests {
 		}
 	}
 
-	@Test("AnalyticsMiddleware with minimal strategy tracks only essential information")
-	func analyticsMiddleware_withMinimalStrategy_tracksOnlyEssentialInformation() async throws {
+	@Test
+	func `AnalyticsMiddleware with minimal strategy tracks only essential information`() async throws {
 		let testURL = try #require(URL(string: "testapp://product/123?category=electronics&price=299.99"))
 		let analyticsSpy = AnalyticsProviderSpy()
 		let middleware = AnalyticsMiddleware(
@@ -102,8 +101,8 @@ struct AnalyticsMiddlewareTests {
 		#expect(event.parameters["query_parameters"] == nil)
 	}
 
-	@Test("AnalyticsMiddleware with performance strategy tracks timing information")
-	func analyticsMiddleware_withPerformanceStrategy_tracksTimingInformation() async throws {
+	@Test
+	func `AnalyticsMiddleware with performance strategy tracks timing information`() async throws {
 		let testURL = try #require(URL(string: "testapp://product/123"))
 		let analyticsSpy = AnalyticsProviderSpy()
 		let middleware = AnalyticsMiddleware(
@@ -133,8 +132,8 @@ struct AnalyticsMiddlewareTests {
 		}
 	}
 
-	@Test("AnalyticsMiddleware with standard strategy tracks basic URL information")
-	func analyticsMiddleware_withStandardStrategy_tracksBasicURLInformation() async throws {
+	@Test
+	func `AnalyticsMiddleware with standard strategy tracks basic URL information`() async throws {
 		let testURL = try #require(URL(string: "testapp://product/123?category=electronics"))
 		let analyticsSpy = AnalyticsProviderSpy()
 		let middleware = AnalyticsMiddleware(
@@ -162,8 +161,8 @@ struct AnalyticsMiddlewareTests {
 
 	// MARK: - Edge Cases
 
-	@Test("AnalyticsMiddleware with detailed strategy handles URLs without path")
-	func analyticsMiddleware_withDetailedStrategy_handlesURLsWithoutPath() async throws {
+	@Test
+	func `AnalyticsMiddleware with detailed strategy handles URLs without path`() async throws {
 		let testURL = try #require(URL(string: "testapp://product?category=electronics"))
 		let analyticsSpy = AnalyticsProviderSpy()
 		let middleware = AnalyticsMiddleware(
@@ -190,8 +189,8 @@ struct AnalyticsMiddlewareTests {
 		}
 	}
 
-	@Test("AnalyticsMiddleware with detailed strategy handles URLs without query parameters")
-	func analyticsMiddleware_withDetailedStrategy_handlesURLsWithoutQueryParameters() async throws {
+	@Test
+	func `AnalyticsMiddleware with detailed strategy handles URLs without query parameters`() async throws {
 		let testURL = try #require(URL(string: "testapp://product/123"))
 		let analyticsSpy = AnalyticsProviderSpy()
 		let middleware = AnalyticsMiddleware(
@@ -212,8 +211,8 @@ struct AnalyticsMiddlewareTests {
 		#expect(event.parameters["query_parameters"] == nil) // No query params should be nil
 	}
 
-	@Test("AnalyticsMiddleware with detailed strategy handles URLs with empty path")
-	func analyticsMiddleware_withDetailedStrategy_handlesURLsWithEmptyPath() async throws {
+	@Test
+	func `AnalyticsMiddleware with detailed strategy handles URLs with empty path`() async throws {
 		let testURL = try #require(URL(string: "testapp://product"))
 		let analyticsSpy = AnalyticsProviderSpy()
 		let middleware = AnalyticsMiddleware(
@@ -235,8 +234,8 @@ struct AnalyticsMiddlewareTests {
 
 	// MARK: - DefaultAnalyticsProvider Tests
 
-	@Test("DefaultAnalyticsProvider tracks events correctly")
-	func defaultAnalyticsProvider_tracksEventsCorrectly() async throws {
+	@Test
+	func `DefaultAnalyticsProvider tracks events correctly`() async throws {
 		let provider = DefaultAnalyticsProvider()
 		let testURL = try #require(URL(string: "testapp://product/123"))
 		let middleware = AnalyticsMiddleware(analyticsProvider: provider)
@@ -248,8 +247,8 @@ struct AnalyticsMiddlewareTests {
 		// But we can verify it doesn't throw any errors
 	}
 
-	@Test("DefaultAnalyticsProvider works with all strategies")
-	func defaultAnalyticsProvider_worksWithAllStrategies() async throws {
+	@Test
+	func `DefaultAnalyticsProvider works with all strategies`() async throws {
 		let provider = DefaultAnalyticsProvider()
 		let testURL = try #require(URL(string: "testapp://product/123?category=electronics"))
 
@@ -286,8 +285,8 @@ struct AnalyticsMiddlewareTests {
 		#expect(performanceResult == testURL)
 	}
 
-	@Test("DefaultAnalyticsProvider is thread-safe")
-	func defaultAnalyticsProvider_isThreadSafe() async throws {
+	@Test
+	func `DefaultAnalyticsProvider is thread-safe`() async throws {
 		let provider = DefaultAnalyticsProvider()
 		let testURL = try #require(URL(string: "testapp://product/123"))
 
@@ -311,8 +310,8 @@ struct AnalyticsMiddlewareTests {
 		}
 	}
 
-	@Test("DefaultAnalyticsProvider can be used as AnalyticsProvider protocol")
-	func defaultAnalyticsProvider_canBeUsedAsAnalyticsProviderProtocol() {
+	@Test
+	func `DefaultAnalyticsProvider can be used as AnalyticsProvider protocol`() {
 		let provider: AnalyticsProvider = DefaultAnalyticsProvider()
 
 		// Test that it can be used as protocol

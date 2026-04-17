@@ -5,17 +5,16 @@
 import DeepLinksTesting
 import Testing
 
-@Suite("CollectingHandler")
 struct CollectingHandlerTests {
-	@Test("starts with no handled routes")
-	func handledRoutes_deliversEmptyOnInit() {
+	@Test
+	func `starts with no handled routes`() {
 		let sut = CollectingHandler<TestRoute>()
 
 		#expect(sut.handledRoutes.isEmpty)
 	}
 
-	@Test("collects handled routes in order")
-	func handle_collectsRoutesInOrder() async throws {
+	@Test
+	func `collects handled routes in order`() async throws {
 		let sut = CollectingHandler<TestRoute>()
 
 		try await sut.handle(.routeA)
@@ -25,8 +24,8 @@ struct CollectingHandlerTests {
 		#expect(sut.handledRoutes == [.routeA, .routeB, .routeA])
 	}
 
-	@Test("is thread-safe under concurrent access")
-	func handle_collectsAllRoutesUnderConcurrentAccess() async {
+	@Test
+	func `is thread-safe under concurrent access`() async {
 		let sut = CollectingHandler<TestRoute>()
 
 		await withTaskGroup(of: Void.self) { group in

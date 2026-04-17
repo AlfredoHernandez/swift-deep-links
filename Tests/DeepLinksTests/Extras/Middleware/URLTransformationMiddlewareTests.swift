@@ -6,10 +6,9 @@
 import Foundation
 import Testing
 
-@Suite("URLTransformationMiddleware Tests")
 struct URLTransformationMiddlewareTests {
-	@Test("URLTransformationMiddleware transforms URLs using provided transformer")
-	func urlTransformationMiddleware_transformsURLsUsingProvidedTransformer() async throws {
+	@Test
+	func `URLTransformationMiddleware transforms URLs using provided transformer`() async throws {
 		let testURL = try #require(URL(string: "testapp://test"))
 		let transformedURL = try #require(URL(string: "testapp://transformed"))
 		let transformerStub = URLTransformerStub(transformedURL: transformedURL)
@@ -20,8 +19,8 @@ struct URLTransformationMiddlewareTests {
 		#expect(result == transformedURL)
 	}
 
-	@Test("URLTransformationMiddleware propagates transformer errors")
-	func urlTransformationMiddleware_propagatesTransformerErrors() async throws {
+	@Test
+	func `URLTransformationMiddleware propagates transformer errors`() async throws {
 		let testURL = try #require(URL(string: "testapp://test"))
 		let errorTransformer = ErrorThrowingTransformer()
 		let middleware = URLTransformationMiddleware(transformer: errorTransformer)

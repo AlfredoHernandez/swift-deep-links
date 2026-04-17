@@ -5,17 +5,16 @@
 import DeepLinksTesting
 import Testing
 
-@Suite("CollectingMiddleware")
 struct CollectingMiddlewareTests {
-	@Test("starts with no intercepted URLs")
-	func interceptedURLs_deliversEmptyOnInit() {
+	@Test
+	func `starts with no intercepted URLs`() {
 		let sut = CollectingMiddleware()
 
 		#expect(sut.interceptedURLs.isEmpty)
 	}
 
-	@Test("passes URL through and collects it")
-	func intercept_returnsURLAndCollectsIt() async throws {
+	@Test
+	func `passes URL through and collects it`() async throws {
 		let sut = CollectingMiddleware()
 
 		let result = try await sut.intercept(testURL)
@@ -24,8 +23,8 @@ struct CollectingMiddlewareTests {
 		#expect(sut.interceptedURLs == [testURL])
 	}
 
-	@Test("collects multiple URLs in order")
-	func intercept_collectsURLsInOrder() async throws {
+	@Test
+	func `collects multiple URLs in order`() async throws {
 		let sut = CollectingMiddleware()
 
 		_ = try await sut.intercept(testURL)
@@ -34,8 +33,8 @@ struct CollectingMiddlewareTests {
 		#expect(sut.interceptedURLs == [testURL, anotherURL])
 	}
 
-	@Test("is thread-safe under concurrent access")
-	func intercept_collectsAllURLsUnderConcurrentAccess() async {
+	@Test
+	func `is thread-safe under concurrent access`() async {
 		let sut = CollectingMiddleware()
 
 		await withTaskGroup(of: Void.self) { group in
@@ -48,10 +47,9 @@ struct CollectingMiddlewareTests {
 	}
 }
 
-@Suite("PassthroughMiddleware")
 struct PassthroughMiddlewareTests {
-	@Test("always returns the same URL unchanged")
-	func intercept_returnsSameURL() async throws {
+	@Test
+	func `always returns the same URL unchanged`() async throws {
 		let sut = PassthroughMiddleware()
 
 		let result1 = try await sut.intercept(testURL)

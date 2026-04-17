@@ -6,10 +6,9 @@
 import Foundation
 import Testing
 
-@Suite("AuthenticationMiddleware Tests")
 struct AuthenticationMiddlewareTests {
-	@Test("AuthenticationMiddleware allows requests for unprotected hosts")
-	func authenticationMiddleware_allowsRequestsForUnprotectedHosts() async throws {
+	@Test
+	func `AuthenticationMiddleware allows requests for unprotected hosts`() async throws {
 		let testURL = try #require(URL(string: "testapp://public"))
 		let authStub = AuthenticationProviderStub(isAuthenticated: false)
 		let middleware = AuthenticationMiddleware(
@@ -22,8 +21,8 @@ struct AuthenticationMiddlewareTests {
 		#expect(result == testURL)
 	}
 
-	@Test("AuthenticationMiddleware allows requests for protected hosts when authenticated")
-	func authenticationMiddleware_allowsRequestsForProtectedHostsWhenAuthenticated() async throws {
+	@Test
+	func `AuthenticationMiddleware allows requests for protected hosts when authenticated`() async throws {
 		let testURL = try #require(URL(string: "testapp://protected"))
 		let authStub = AuthenticationProviderStub(isAuthenticated: true)
 		let middleware = AuthenticationMiddleware(
@@ -36,8 +35,8 @@ struct AuthenticationMiddlewareTests {
 		#expect(result == testURL)
 	}
 
-	@Test("AuthenticationMiddleware blocks requests for protected hosts when not authenticated")
-	func authenticationMiddleware_blocksRequestsForProtectedHostsWhenNotAuthenticated() async throws {
+	@Test
+	func `AuthenticationMiddleware blocks requests for protected hosts when not authenticated`() async throws {
 		let testURL = try #require(URL(string: "testapp://protected"))
 		let authStub = AuthenticationProviderStub(isAuthenticated: false)
 		let middleware = AuthenticationMiddleware(
@@ -53,8 +52,8 @@ struct AuthenticationMiddlewareTests {
 		}
 	}
 
-	@Test("AuthenticationMiddleware handles URLs without host")
-	func authenticationMiddleware_handlesURLsWithoutHost() async throws {
+	@Test
+	func `AuthenticationMiddleware handles URLs without host`() async throws {
 		let testURL = try #require(URL(string: "testapp://"))
 		let authStub = AuthenticationProviderStub(isAuthenticated: false)
 		let middleware = AuthenticationMiddleware(
@@ -69,8 +68,8 @@ struct AuthenticationMiddlewareTests {
 
 	// MARK: - Strategy Tests
 
-	@Test("AuthenticationMiddleware with strict strategy blocks requests for protected hosts when not authenticated")
-	func authenticationMiddleware_withStrictStrategy_blocksRequestsForProtectedHostsWhenNotAuthenticated() async throws {
+	@Test
+	func `AuthenticationMiddleware with strict strategy blocks requests for protected hosts when not authenticated`() async throws {
 		let testURL = try #require(URL(string: "testapp://protected"))
 		let authStub = AuthenticationProviderStub(isAuthenticated: false)
 		let middleware = AuthenticationMiddleware(
@@ -87,8 +86,8 @@ struct AuthenticationMiddlewareTests {
 		}
 	}
 
-	@Test("AuthenticationMiddleware with strict strategy allows requests for protected hosts when authenticated")
-	func authenticationMiddleware_withStrictStrategy_allowsRequestsForProtectedHostsWhenAuthenticated() async throws {
+	@Test
+	func `AuthenticationMiddleware with strict strategy allows requests for protected hosts when authenticated`() async throws {
 		let testURL = try #require(URL(string: "testapp://protected"))
 		let authStub = AuthenticationProviderStub(isAuthenticated: true)
 		let middleware = AuthenticationMiddleware(
@@ -102,8 +101,8 @@ struct AuthenticationMiddlewareTests {
 		#expect(result == testURL)
 	}
 
-	@Test("AuthenticationMiddleware with permissive strategy allows all requests")
-	func authenticationMiddleware_withPermissiveStrategy_allowsAllRequests() async throws {
+	@Test
+	func `AuthenticationMiddleware with permissive strategy allows all requests`() async throws {
 		let testURL = try #require(URL(string: "testapp://protected"))
 		let authStub = AuthenticationProviderStub(isAuthenticated: false)
 		let middleware = AuthenticationMiddleware(
@@ -117,8 +116,8 @@ struct AuthenticationMiddlewareTests {
 		#expect(result == testURL)
 	}
 
-	@Test("AuthenticationMiddleware with permissive strategy allows requests even when not authenticated")
-	func authenticationMiddleware_withPermissiveStrategy_allowsRequestsEvenWhenNotAuthenticated() async throws {
+	@Test
+	func `AuthenticationMiddleware with permissive strategy allows requests even when not authenticated`() async throws {
 		let testURL = try #require(URL(string: "testapp://private"))
 		let authStub = AuthenticationProviderStub(isAuthenticated: false)
 		let middleware = AuthenticationMiddleware(
@@ -132,8 +131,8 @@ struct AuthenticationMiddlewareTests {
 		#expect(result == testURL)
 	}
 
-	@Test("AuthenticationMiddleware with standard strategy allows requests for unprotected hosts")
-	func authenticationMiddleware_withHostBasedStrategy_allowsRequestsForUnprotectedHosts() async throws {
+	@Test
+	func `AuthenticationMiddleware with standard strategy allows requests for unprotected hosts`() async throws {
 		let testURL = try #require(URL(string: "testapp://public"))
 		let authStub = AuthenticationProviderStub(isAuthenticated: false)
 		let middleware = AuthenticationMiddleware(
@@ -147,8 +146,8 @@ struct AuthenticationMiddlewareTests {
 		#expect(result == testURL)
 	}
 
-	@Test("AuthenticationMiddleware with standard strategy blocks requests for protected hosts when not authenticated")
-	func authenticationMiddleware_withHostBasedStrategy_blocksRequestsForProtectedHostsWhenNotAuthenticated() async throws {
+	@Test
+	func `AuthenticationMiddleware with standard strategy blocks requests for protected hosts when not authenticated`() async throws {
 		let testURL = try #require(URL(string: "testapp://protected"))
 		let authStub = AuthenticationProviderStub(isAuthenticated: false)
 		let middleware = AuthenticationMiddleware(
@@ -165,8 +164,8 @@ struct AuthenticationMiddlewareTests {
 		}
 	}
 
-	@Test("AuthenticationMiddleware with standard strategy allows requests for protected hosts when authenticated")
-	func authenticationMiddleware_withHostBasedStrategy_allowsRequestsForProtectedHostsWhenAuthenticated() async throws {
+	@Test
+	func `AuthenticationMiddleware with standard strategy allows requests for protected hosts when authenticated`() async throws {
 		let testURL = try #require(URL(string: "testapp://protected"))
 		let authStub = AuthenticationProviderStub(isAuthenticated: true)
 		let middleware = AuthenticationMiddleware(
@@ -180,8 +179,8 @@ struct AuthenticationMiddlewareTests {
 		#expect(result == testURL)
 	}
 
-	@Test("AuthenticationMiddleware with standard strategy handles URLs without host")
-	func authenticationMiddleware_withHostBasedStrategy_handlesURLsWithoutHost() async throws {
+	@Test
+	func `AuthenticationMiddleware with standard strategy handles URLs without host`() async throws {
 		let testURL = try #require(URL(string: "testapp://"))
 		let authStub = AuthenticationProviderStub(isAuthenticated: false)
 		let middleware = AuthenticationMiddleware(
@@ -195,8 +194,8 @@ struct AuthenticationMiddlewareTests {
 		#expect(result == testURL)
 	}
 
-	@Test("AuthenticationMiddleware with schemeBased strategy blocks requests for protected schemes when not authenticated")
-	func authenticationMiddleware_withSchemeBasedStrategy_blocksRequestsForProtectedSchemesWhenNotAuthenticated() async throws {
+	@Test
+	func `AuthenticationMiddleware with schemeBased strategy blocks requests for protected schemes when not authenticated`() async throws {
 		let testURL = try #require(URL(string: "https://example.com"))
 		let authStub = AuthenticationProviderStub(isAuthenticated: false)
 		let middleware = AuthenticationMiddleware(
@@ -213,8 +212,8 @@ struct AuthenticationMiddlewareTests {
 		}
 	}
 
-	@Test("AuthenticationMiddleware with schemeBased strategy allows requests for protected schemes when authenticated")
-	func authenticationMiddleware_withSchemeBasedStrategy_allowsRequestsForProtectedSchemesWhenAuthenticated() async throws {
+	@Test
+	func `AuthenticationMiddleware with schemeBased strategy allows requests for protected schemes when authenticated`() async throws {
 		let testURL = try #require(URL(string: "https://example.com"))
 		let authStub = AuthenticationProviderStub(isAuthenticated: true)
 		let middleware = AuthenticationMiddleware(
@@ -228,8 +227,8 @@ struct AuthenticationMiddlewareTests {
 		#expect(result == testURL)
 	}
 
-	@Test("AuthenticationMiddleware with schemeBased strategy allows requests for unprotected schemes")
-	func authenticationMiddleware_withSchemeBasedStrategy_allowsRequestsForUnprotectedSchemes() async throws {
+	@Test
+	func `AuthenticationMiddleware with schemeBased strategy allows requests for unprotected schemes`() async throws {
 		let testURL = try #require(URL(string: "http://example.com"))
 		let authStub = AuthenticationProviderStub(isAuthenticated: false)
 		let middleware = AuthenticationMiddleware(
@@ -243,8 +242,8 @@ struct AuthenticationMiddlewareTests {
 		#expect(result == testURL)
 	}
 
-	@Test("AuthenticationMiddleware with schemeBased strategy handles URLs without scheme")
-	func authenticationMiddleware_withSchemeBasedStrategy_handlesURLsWithoutScheme() async throws {
+	@Test
+	func `AuthenticationMiddleware with schemeBased strategy handles URLs without scheme`() async throws {
 		let testURL = try #require(URL(string: "://example.com"))
 		let authStub = AuthenticationProviderStub(isAuthenticated: false)
 		let middleware = AuthenticationMiddleware(
@@ -260,8 +259,8 @@ struct AuthenticationMiddlewareTests {
 
 	// MARK: - Edge Cases
 
-	@Test("AuthenticationMiddleware with standard strategy handles empty protected hosts")
-	func authenticationMiddleware_withStandardStrategy_handlesEmptyProtectedHosts() async throws {
+	@Test
+	func `AuthenticationMiddleware with standard strategy handles empty protected hosts`() async throws {
 		let testURL = try #require(URL(string: "testapp://anyhost"))
 		let authStub = AuthenticationProviderStub(isAuthenticated: false)
 		let middleware = AuthenticationMiddleware(
@@ -275,8 +274,8 @@ struct AuthenticationMiddlewareTests {
 		#expect(result == testURL)
 	}
 
-	@Test("AuthenticationMiddleware with strict strategy requires authentication for all URLs")
-	func authenticationMiddleware_withStrictStrategy_requiresAuthenticationForAllURLs() async throws {
+	@Test
+	func `AuthenticationMiddleware with strict strategy requires authentication for all URLs`() async throws {
 		let testURL = try #require(URL(string: "testapp://anyhost"))
 		let authStub = AuthenticationProviderStub(isAuthenticated: false)
 		let middleware = AuthenticationMiddleware(
@@ -293,8 +292,8 @@ struct AuthenticationMiddlewareTests {
 		}
 	}
 
-	@Test("AuthenticationMiddleware with strict strategy allows all URLs when authenticated")
-	func authenticationMiddleware_withStrictStrategy_allowsAllURLsWhenAuthenticated() async throws {
+	@Test
+	func `AuthenticationMiddleware with strict strategy allows all URLs when authenticated`() async throws {
 		let testURL = try #require(URL(string: "testapp://anyhost"))
 		let authStub = AuthenticationProviderStub(isAuthenticated: true)
 		let middleware = AuthenticationMiddleware(
@@ -310,8 +309,8 @@ struct AuthenticationMiddlewareTests {
 
 	// MARK: - PermissiveAuthenticationProvider Tests
 
-	@Test("PermissiveAuthenticationProvider always returns true for authentication")
-	func permissiveAuthenticationProvider_alwaysReturnsTrueForAuthentication() {
+	@Test
+	func `PermissiveAuthenticationProvider always returns true for authentication`() {
 		let provider = PermissiveAuthenticationProvider()
 
 		let isAuthenticated = provider.isAuthenticated()
@@ -319,8 +318,8 @@ struct AuthenticationMiddlewareTests {
 		#expect(isAuthenticated == true)
 	}
 
-	@Test("PermissiveAuthenticationProvider returns consistent authentication status")
-	func permissiveAuthenticationProvider_returnsConsistentAuthenticationStatus() {
+	@Test
+	func `PermissiveAuthenticationProvider returns consistent authentication status`() {
 		let provider = PermissiveAuthenticationProvider()
 
 		// Test multiple calls to ensure consistency
@@ -335,8 +334,8 @@ struct AuthenticationMiddlewareTests {
 		#expect(secondCall == thirdCall)
 	}
 
-	@Test("PermissiveAuthenticationProvider works with AuthenticationMiddleware")
-	func defaultAuthenticationProvider_worksWithAuthenticationMiddleware() async throws {
+	@Test
+	func `PermissiveAuthenticationProvider works with AuthenticationMiddleware`() async throws {
 		let testURL = try #require(URL(string: "testapp://protected"))
 		let provider = PermissiveAuthenticationProvider()
 		let middleware = AuthenticationMiddleware(
@@ -350,8 +349,8 @@ struct AuthenticationMiddlewareTests {
 		#expect(result == testURL)
 	}
 
-	@Test("PermissiveAuthenticationProvider works with strict strategy")
-	func defaultAuthenticationProvider_worksWithStrictStrategy() async throws {
+	@Test
+	func `PermissiveAuthenticationProvider works with strict strategy`() async throws {
 		let testURL = try #require(URL(string: "testapp://anyhost"))
 		let provider = PermissiveAuthenticationProvider()
 		let middleware = AuthenticationMiddleware(
@@ -365,8 +364,8 @@ struct AuthenticationMiddlewareTests {
 		#expect(result == testURL)
 	}
 
-	@Test("PermissiveAuthenticationProvider works with standard strategy")
-	func defaultAuthenticationProvider_worksWithHostBasedStrategy() async throws {
+	@Test
+	func `PermissiveAuthenticationProvider works with standard strategy`() async throws {
 		let testURL = try #require(URL(string: "testapp://protected"))
 		let provider = PermissiveAuthenticationProvider()
 		let middleware = AuthenticationMiddleware(
@@ -380,8 +379,8 @@ struct AuthenticationMiddlewareTests {
 		#expect(result == testURL)
 	}
 
-	@Test("PermissiveAuthenticationProvider works with schemeBased strategy")
-	func defaultAuthenticationProvider_worksWithSchemeBasedStrategy() async throws {
+	@Test
+	func `PermissiveAuthenticationProvider works with schemeBased strategy`() async throws {
 		let testURL = try #require(URL(string: "https://example.com"))
 		let provider = PermissiveAuthenticationProvider()
 		let middleware = AuthenticationMiddleware(
@@ -395,8 +394,8 @@ struct AuthenticationMiddlewareTests {
 		#expect(result == testURL)
 	}
 
-	@Test("PermissiveAuthenticationProvider is thread-safe")
-	func defaultAuthenticationProvider_isThreadSafe() async {
+	@Test
+	func `PermissiveAuthenticationProvider is thread-safe`() async {
 		let provider = PermissiveAuthenticationProvider()
 
 		// Test concurrent access
@@ -418,8 +417,8 @@ struct AuthenticationMiddlewareTests {
 		}
 	}
 
-	@Test("PermissiveAuthenticationProvider can be used as AuthenticationProvider protocol")
-	func defaultAuthenticationProvider_canBeUsedAsAuthenticationProviderProtocol() {
+	@Test
+	func `PermissiveAuthenticationProvider can be used as AuthenticationProvider protocol`() {
 		let provider: AuthenticationProvider = PermissiveAuthenticationProvider()
 
 		let isAuthenticated = provider.isAuthenticated()

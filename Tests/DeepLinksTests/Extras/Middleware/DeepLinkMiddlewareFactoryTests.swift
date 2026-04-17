@@ -6,33 +6,32 @@
 import Foundation
 import Testing
 
-@Suite("DeepLinkMiddleware Factory Methods Tests")
 struct DeepLinkMiddlewareFactoryTests {
-	@Test("Analytics factory method creates middleware with correct type")
-	func analytics_factoryMethod_createsMiddlewareWithCorrectType() {
+	@Test
+	func `Analytics factory method creates middleware with correct type`() {
 		let provider = DefaultAnalyticsProvider()
 		let middleware: any DeepLinkMiddleware = .analytics(provider: provider)
 
 		#expect(middleware is AnalyticsMiddleware)
 	}
 
-	@Test("Analytics factory method with strategy creates middleware")
-	func analytics_factoryMethodWithStrategy_createsMiddleware() {
+	@Test
+	func `Analytics factory method with strategy creates middleware`() {
 		let provider = DefaultAnalyticsProvider()
 		let middleware: any DeepLinkMiddleware = .analytics(provider: provider, strategy: .detailed)
 
 		#expect(middleware is AnalyticsMiddleware)
 	}
 
-	@Test("Logging factory method creates middleware with correct type")
-	func logging_factoryMethod_createsMiddlewareWithCorrectType() {
+	@Test
+	func `Logging factory method creates middleware with correct type`() {
 		let middleware: any DeepLinkMiddleware = .logging()
 
 		#expect(middleware is LoggingMiddleware)
 	}
 
-	@Test("Logging factory method with parameters creates middleware")
-	func logging_factoryMethodWithParameters_createsMiddleware() {
+	@Test
+	func `Logging factory method with parameters creates middleware`() {
 		let middleware: any DeepLinkMiddleware = .logging(
 			provider: .defaultSystemLogger(),
 			logLevel: .debug,
@@ -42,15 +41,15 @@ struct DeepLinkMiddlewareFactoryTests {
 		#expect(middleware is LoggingMiddleware)
 	}
 
-	@Test("RateLimit factory method creates middleware with correct type")
-	func rateLimit_factoryMethod_createsMiddlewareWithCorrectType() {
+	@Test
+	func `RateLimit factory method creates middleware with correct type`() {
 		let middleware: any DeepLinkMiddleware = .rateLimit()
 
 		#expect(middleware is RateLimitMiddleware)
 	}
 
-	@Test("RateLimit factory method with parameters creates middleware")
-	func rateLimit_factoryMethodWithParameters_createsMiddleware() {
+	@Test
+	func `RateLimit factory method with parameters creates middleware`() {
 		let middleware: any DeepLinkMiddleware = .rateLimit(
 			maxRequests: 5,
 			timeWindow: 30.0,
@@ -60,8 +59,8 @@ struct DeepLinkMiddlewareFactoryTests {
 		#expect(middleware is RateLimitMiddleware)
 	}
 
-	@Test("Security factory method creates middleware with correct type")
-	func security_factoryMethod_createsMiddlewareWithCorrectType() {
+	@Test
+	func `Security factory method creates middleware with correct type`() {
 		let middleware: any DeepLinkMiddleware = .security(
 			allowedSchemes: ["https", "myapp"],
 		)
@@ -69,8 +68,8 @@ struct DeepLinkMiddlewareFactoryTests {
 		#expect(middleware is SecurityMiddleware)
 	}
 
-	@Test("Security factory method with all parameters creates middleware")
-	func security_factoryMethodWithAllParameters_createsMiddleware() {
+	@Test
+	func `Security factory method with all parameters creates middleware`() {
 		let middleware: any DeepLinkMiddleware = .security(
 			allowedSchemes: ["https"],
 			allowedHosts: ["secure.myapp.com"],
@@ -81,8 +80,8 @@ struct DeepLinkMiddlewareFactoryTests {
 		#expect(middleware is SecurityMiddleware)
 	}
 
-	@Test("Authentication factory method creates middleware with correct type")
-	func authentication_factoryMethod_createsMiddlewareWithCorrectType() {
+	@Test
+	func `Authentication factory method creates middleware with correct type`() {
 		let provider = PermissiveAuthenticationProvider()
 		let middleware: any DeepLinkMiddleware = .authentication(
 			provider: provider,
@@ -92,8 +91,8 @@ struct DeepLinkMiddlewareFactoryTests {
 		#expect(middleware is AuthenticationMiddleware)
 	}
 
-	@Test("Authentication factory method with strategy creates middleware")
-	func authentication_factoryMethodWithStrategy_createsMiddleware() {
+	@Test
+	func `Authentication factory method with strategy creates middleware`() {
 		let provider = PermissiveAuthenticationProvider()
 		let middleware: any DeepLinkMiddleware = .authentication(
 			provider: provider,
@@ -104,16 +103,16 @@ struct DeepLinkMiddlewareFactoryTests {
 		#expect(middleware is AuthenticationMiddleware)
 	}
 
-	@Test("URLTransformation factory method creates middleware with correct type")
-	func urlTransformation_factoryMethod_createsMiddlewareWithCorrectType() {
+	@Test
+	func `URLTransformation factory method creates middleware with correct type`() {
 		let transformer = URLNormalizationTransformer()
 		let middleware: any DeepLinkMiddleware = .urlTransformation(transformer: transformer)
 
 		#expect(middleware is URLTransformationMiddleware)
 	}
 
-	@Test("URLTransformation factory method with strategy creates middleware")
-	func urlTransformation_factoryMethodWithStrategy_createsMiddleware() {
+	@Test
+	func `URLTransformation factory method with strategy creates middleware`() {
 		let transformer = URLNormalizationTransformer()
 		let middleware: any DeepLinkMiddleware = .urlTransformation(
 			transformer: transformer,
@@ -123,8 +122,8 @@ struct DeepLinkMiddlewareFactoryTests {
 		#expect(middleware is URLTransformationMiddleware)
 	}
 
-	@Test("Factory methods can be used in arrays")
-	func factoryMethods_canBeUsedInArrays() {
+	@Test
+	func `Factory methods can be used in arrays`() {
 		let provider = DefaultAnalyticsProvider()
 		let authProvider = PermissiveAuthenticationProvider()
 		let transformer = URLNormalizationTransformer()

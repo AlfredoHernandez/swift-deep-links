@@ -6,21 +6,20 @@
 import Foundation
 import Testing
 
-@Suite("DeepLinkCoordinatorBuilder Tests")
 @MainActor
 struct DeepLinkCoordinatorBuilderTests {
 	// MARK: - Basic Configuration Tests
 
-	@Test("build creates coordinator with required components")
-	func build_createsCoordinatorWithRequiredComponents() async throws {
+	@Test
+	func `build creates coordinator with required components`() async throws {
 		_ = try await DeepLinkCoordinatorBuilder<TestRoute>()
 			.routing(DeepLinkRoutingStub<TestRoute>())
 			.handler(DeepLinkHandlerSpy<TestRoute>())
 			.build()
 	}
 
-	@Test("build throws error when routing is missing")
-	func build_throwsErrorWhenRoutingIsMissing() async {
+	@Test
+	func `build throws error when routing is missing`() async {
 		await #expect(throws: DeepLinkError.missingRequiredConfiguration("routing")) {
 			try await DeepLinkCoordinatorBuilder<TestRoute>()
 				.handler(DeepLinkHandlerSpy<TestRoute>())
@@ -28,8 +27,8 @@ struct DeepLinkCoordinatorBuilderTests {
 		}
 	}
 
-	@Test("build throws error when handler is missing")
-	func build_throwsErrorWhenHandlerIsMissing() async {
+	@Test
+	func `build throws error when handler is missing`() async {
 		await #expect(throws: DeepLinkError.missingRequiredConfiguration("handler")) {
 			try await DeepLinkCoordinatorBuilder<TestRoute>()
 				.routing(DeepLinkRoutingStub<TestRoute>())
@@ -39,8 +38,8 @@ struct DeepLinkCoordinatorBuilderTests {
 
 	// MARK: - Middleware Configuration Tests
 
-	@Test("middleware adds single middleware to coordinator")
-	func middleware_addsSingleMiddleware() async throws {
+	@Test
+	func `middleware adds single middleware to coordinator`() async throws {
 		let routingStub = DeepLinkRoutingStub<TestRoute>()
 		let middlewareSpy = MiddlewareSpy()
 
@@ -58,8 +57,8 @@ struct DeepLinkCoordinatorBuilderTests {
 		#expect(middlewareSpy.requests.contains(url))
 	}
 
-	@Test("advancedMiddleware adds advanced middleware to coordinator")
-	func advancedMiddleware_addsAdvancedMiddleware() async throws {
+	@Test
+	func `advancedMiddleware adds advanced middleware to coordinator`() async throws {
 		let routingStub = DeepLinkRoutingStub<TestRoute>()
 		let advancedSpy = AdvancedMiddlewareSpy()
 
@@ -77,8 +76,8 @@ struct DeepLinkCoordinatorBuilderTests {
 		#expect(advancedSpy.requests.contains(url))
 	}
 
-	@Test("middleware with variadic adds multiple middleware")
-	func middleware_withVariadic_addsMultiple() async throws {
+	@Test
+	func `middleware with variadic adds multiple middleware`() async throws {
 		let routingStub = DeepLinkRoutingStub<TestRoute>()
 		let spy1 = MiddlewareSpy()
 		let spy2 = MiddlewareSpy()
@@ -98,8 +97,8 @@ struct DeepLinkCoordinatorBuilderTests {
 		#expect(spy2.requests.contains(url))
 	}
 
-	@Test("middleware with array adds multiple middleware")
-	func middleware_withArray_addsMultiple() async throws {
+	@Test
+	func `middleware with array adds multiple middleware`() async throws {
 		let routingStub = DeepLinkRoutingStub<TestRoute>()
 		let spy1 = MiddlewareSpy()
 		let spy2 = MiddlewareSpy()
@@ -121,8 +120,8 @@ struct DeepLinkCoordinatorBuilderTests {
 
 	// MARK: - Delegate Configuration Tests
 
-	@Test("delegate adds single delegate to coordinator")
-	func delegate_addsSingleDelegate() async throws {
+	@Test
+	func `delegate adds single delegate to coordinator`() async throws {
 		let routingStub = DeepLinkRoutingStub<TestRoute>()
 		let delegateSpy = CoordinatorDelegateSpy()
 
@@ -141,8 +140,8 @@ struct DeepLinkCoordinatorBuilderTests {
 		#expect(delegateSpy.didProcessCalls.count == 1)
 	}
 
-	@Test("delegate with multiple creates composite delegate")
-	func delegate_withMultiple_createsComposite() async throws {
+	@Test
+	func `delegate with multiple creates composite delegate`() async throws {
 		let routingStub = DeepLinkRoutingStub<TestRoute>()
 		let spy1 = CoordinatorDelegateSpy()
 		let spy2 = CoordinatorDelegateSpy()
@@ -167,8 +166,8 @@ struct DeepLinkCoordinatorBuilderTests {
 		#expect(spy2.didProcessCalls.count == 1)
 	}
 
-	@Test("delegates with array adds multiple delegates")
-	func delegates_withArray_addsMultiple() async throws {
+	@Test
+	func `delegates with array adds multiple delegates`() async throws {
 		let spy1 = CoordinatorDelegateSpy()
 		let spy2 = CoordinatorDelegateSpy()
 
@@ -181,8 +180,8 @@ struct DeepLinkCoordinatorBuilderTests {
 
 	// MARK: - Custom Middleware Coordinator Tests
 
-	@Test("middlewareCoordinator uses provided coordinator")
-	func middlewareCoordinator_usesProvidedCoordinator() async throws {
+	@Test
+	func `middlewareCoordinator uses provided coordinator`() async throws {
 		let routingStub = DeepLinkRoutingStub<TestRoute>()
 		let customCoordinator = DeepLinkMiddlewareCoordinator()
 		let middlewareSpy = MiddlewareSpy()
@@ -205,8 +204,8 @@ struct DeepLinkCoordinatorBuilderTests {
 
 	// MARK: - Method Chaining Tests
 
-	@Test("builder supports full method chaining")
-	func builder_supportsFullMethodChaining() async throws {
+	@Test
+	func `builder supports full method chaining`() async throws {
 		let routingStub = DeepLinkRoutingStub<TestRoute>()
 		let spy1 = MiddlewareSpy()
 		let spy2 = MiddlewareSpy()
@@ -231,8 +230,8 @@ struct DeepLinkCoordinatorBuilderTests {
 
 	// MARK: - Error Handling Tests
 
-	@Test("build handles middleware errors gracefully")
-	func build_handlesMiddlewareErrorsGracefully() async throws {
+	@Test
+	func `build handles middleware errors gracefully`() async throws {
 		let coordinator = try await DeepLinkCoordinatorBuilder<TestRoute>()
 			.routing(DeepLinkRoutingStub<TestRoute>())
 			.handler(DeepLinkHandlerSpy<TestRoute>())

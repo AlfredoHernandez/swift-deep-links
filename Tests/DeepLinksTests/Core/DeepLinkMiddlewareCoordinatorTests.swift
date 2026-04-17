@@ -6,12 +6,11 @@
 import Foundation
 import Testing
 
-@Suite("DeepLinkMiddleware Tests")
 struct DeepLinkMiddlewareCoordinatorTests {
 	// MARK: - Middleware Coordinator Tests
 
-	@Test("DeepLinkMiddlewareCoordinator processes URL through middleware")
-	func middlewareCoordinator_processesURLThroughMiddleware() async throws {
+	@Test
+	func `DeepLinkMiddlewareCoordinator processes URL through middleware`() async throws {
 		let coordinator = DeepLinkMiddlewareCoordinator()
 		let testURL = try #require(URL(string: "testapp://test"))
 
@@ -23,8 +22,8 @@ struct DeepLinkMiddlewareCoordinatorTests {
 		#expect(result == testURL)
 	}
 
-	@Test("DeepLinkMiddlewareCoordinator stops processing when middleware returns nil")
-	func middlewareCoordinator_stopsProcessingWhenMiddlewareReturnsNil() async throws {
+	@Test
+	func `DeepLinkMiddlewareCoordinator stops processing when middleware returns nil`() async throws {
 		let coordinator = DeepLinkMiddlewareCoordinator()
 		let testURL = try #require(URL(string: "testapp://test"))
 
@@ -36,8 +35,8 @@ struct DeepLinkMiddlewareCoordinatorTests {
 		#expect(result == nil)
 	}
 
-	@Test("DeepLinkMiddlewareCoordinator processes middleware in order")
-	func middlewareCoordinator_processesMiddlewareInOrder() async throws {
+	@Test
+	func `DeepLinkMiddlewareCoordinator processes middleware in order`() async throws {
 		let coordinator = DeepLinkMiddlewareCoordinator()
 		let testURL = try #require(URL(string: "testapp://test"))
 
@@ -57,8 +56,8 @@ struct DeepLinkMiddlewareCoordinatorTests {
 		#expect(try #require(firstMiddleware.callTimes.first) < secondMiddleware.callTimes.first!)
 	}
 
-	@Test("DeepLinkMiddlewareCoordinator transforms URL through middleware")
-	func middlewareCoordinator_transformsURLThroughMiddleware() async throws {
+	@Test
+	func `DeepLinkMiddlewareCoordinator transforms URL through middleware`() async throws {
 		let coordinator = DeepLinkMiddlewareCoordinator()
 		let testURL = try #require(URL(string: "testapp://test"))
 		let transformedURL = try #require(URL(string: "testapp://transformed"))
@@ -71,8 +70,8 @@ struct DeepLinkMiddlewareCoordinatorTests {
 		#expect(result == transformedURL)
 	}
 
-	@Test("DeepLinkMiddlewareCoordinator throws error when middleware throws")
-	func middlewareCoordinator_throwsErrorWhenMiddlewareThrows() async throws {
+	@Test
+	func `DeepLinkMiddlewareCoordinator throws error when middleware throws`() async throws {
 		let coordinator = DeepLinkMiddlewareCoordinator()
 		let testURL = try #require(URL(string: "testapp://test"))
 
@@ -87,8 +86,8 @@ struct DeepLinkMiddlewareCoordinatorTests {
 		}
 	}
 
-	@Test("DeepLinkMiddlewareCoordinator removes middleware")
-	func middlewareCoordinator_removesMiddleware() async throws {
+	@Test
+	func `DeepLinkMiddlewareCoordinator removes middleware`() async throws {
 		let coordinator = DeepLinkMiddlewareCoordinator()
 		let testURL = try #require(URL(string: "testapp://test"))
 
@@ -106,8 +105,8 @@ struct DeepLinkMiddlewareCoordinatorTests {
 		#expect(middleware.requests.isEmpty)
 	}
 
-	@Test("DeepLinkMiddlewareCoordinator removes all middleware")
-	func middlewareCoordinator_removesAllMiddleware() async throws {
+	@Test
+	func `DeepLinkMiddlewareCoordinator removes all middleware`() async throws {
 		let coordinator = DeepLinkMiddlewareCoordinator()
 		let testURL = try #require(URL(string: "testapp://test"))
 
@@ -130,8 +129,8 @@ struct DeepLinkMiddlewareCoordinatorTests {
 
 	// MARK: - Logging Middleware Tests
 
-	@Test("LoggingMiddleware logs URL information")
-	func loggingMiddleware_logsURLInformation() async throws {
+	@Test
+	func `LoggingMiddleware logs URL information`() async throws {
 		let testURL = try #require(URL(string: "testapp://profile?userId=123"))
 		let middleware = LoggingMiddleware()
 
@@ -142,8 +141,8 @@ struct DeepLinkMiddlewareCoordinatorTests {
 
 	// MARK: - Analytics Middleware Tests
 
-	@Test("AnalyticsMiddleware tracks deep link events")
-	func analyticsMiddleware_tracksDeepLinkEvents() async throws {
+	@Test
+	func `AnalyticsMiddleware tracks deep link events`() async throws {
 		let testURL = try #require(URL(string: "testapp://product?productId=456"))
 		let analyticsProvider = AnalyticsProviderSpy()
 		let middleware = AnalyticsMiddleware(analyticsProvider: analyticsProvider)
@@ -158,8 +157,8 @@ struct DeepLinkMiddlewareCoordinatorTests {
 
 	// MARK: - Rate Limit Middleware Tests
 
-	@Test("RateLimitMiddleware allows requests within limit")
-	func rateLimitMiddleware_allowsRequestsWithinLimit() async throws {
+	@Test
+	func `RateLimitMiddleware allows requests within limit`() async throws {
 		let testURL = try #require(URL(string: "testapp://test"))
 		let persistence = InMemoryRateLimitPersistence()
 		let middleware = RateLimitMiddleware(
@@ -175,8 +174,8 @@ struct DeepLinkMiddlewareCoordinatorTests {
 		}
 	}
 
-	@Test("RateLimitMiddleware blocks requests exceeding limit")
-	func rateLimitMiddleware_blocksRequestsExceedingLimit() async throws {
+	@Test
+	func `RateLimitMiddleware blocks requests exceeding limit`() async throws {
 		let testURL = try #require(URL(string: "testapp://test"))
 		let persistence = InMemoryRateLimitPersistence()
 		let middleware = RateLimitMiddleware(
@@ -202,8 +201,8 @@ struct DeepLinkMiddlewareCoordinatorTests {
 
 	// MARK: - Authentication Middleware Tests
 
-	@Test("AuthenticationMiddleware allows requests for unprotected hosts")
-	func authenticationMiddleware_allowsRequestsForUnprotectedHosts() async throws {
+	@Test
+	func `AuthenticationMiddleware allows requests for unprotected hosts`() async throws {
 		let testURL = try #require(URL(string: "testapp://public"))
 		let authProvider = AuthenticationProviderStub(isAuthenticated: false)
 		let middleware = AuthenticationMiddleware(
@@ -216,8 +215,8 @@ struct DeepLinkMiddlewareCoordinatorTests {
 		#expect(result == testURL)
 	}
 
-	@Test("AuthenticationMiddleware allows requests for protected hosts when authenticated")
-	func authenticationMiddleware_allowsRequestsForProtectedHostsWhenAuthenticated() async throws {
+	@Test
+	func `AuthenticationMiddleware allows requests for protected hosts when authenticated`() async throws {
 		let testURL = try #require(URL(string: "testapp://protected"))
 		let authProvider = AuthenticationProviderStub(isAuthenticated: true)
 		let middleware = AuthenticationMiddleware(
@@ -230,8 +229,8 @@ struct DeepLinkMiddlewareCoordinatorTests {
 		#expect(result == testURL)
 	}
 
-	@Test("AuthenticationMiddleware blocks requests for protected hosts when not authenticated")
-	func authenticationMiddleware_blocksRequestsForProtectedHostsWhenNotAuthenticated() async throws {
+	@Test
+	func `AuthenticationMiddleware blocks requests for protected hosts when not authenticated`() async throws {
 		let testURL = try #require(URL(string: "testapp://protected"))
 		let authProvider = AuthenticationProviderStub(isAuthenticated: false)
 		let middleware = AuthenticationMiddleware(
@@ -249,8 +248,8 @@ struct DeepLinkMiddlewareCoordinatorTests {
 
 	// MARK: - Security Middleware Tests
 
-	@Test("SecurityMiddleware allows requests with allowed schemes")
-	func securityMiddleware_allowsRequestsWithAllowedSchemes() async throws {
+	@Test
+	func `SecurityMiddleware allows requests with allowed schemes`() async throws {
 		let testURL = try #require(URL(string: "testapp://test"))
 		let middleware = SecurityMiddleware(
 			allowedSchemes: ["testapp"],
@@ -263,8 +262,8 @@ struct DeepLinkMiddlewareCoordinatorTests {
 		#expect(result == testURL)
 	}
 
-	@Test("SecurityMiddleware blocks requests with disallowed schemes")
-	func securityMiddleware_blocksRequestsWithDisallowedSchemes() async throws {
+	@Test
+	func `SecurityMiddleware blocks requests with disallowed schemes`() async throws {
 		let testURL = try #require(URL(string: "http://test"))
 		let middleware = SecurityMiddleware(
 			allowedSchemes: ["testapp"],
@@ -280,8 +279,8 @@ struct DeepLinkMiddlewareCoordinatorTests {
 		}
 	}
 
-	@Test("SecurityMiddleware allows requests with allowed hosts")
-	func securityMiddleware_allowsRequestsWithAllowedHosts() async throws {
+	@Test
+	func `SecurityMiddleware allows requests with allowed hosts`() async throws {
 		let testURL = try #require(URL(string: "testapp://allowed"))
 		let middleware = SecurityMiddleware(
 			allowedSchemes: ["testapp"],
@@ -294,8 +293,8 @@ struct DeepLinkMiddlewareCoordinatorTests {
 		#expect(result == testURL)
 	}
 
-	@Test("SecurityMiddleware blocks requests with disallowed hosts")
-	func securityMiddleware_blocksRequestsWithDisallowedHosts() async throws {
+	@Test
+	func `SecurityMiddleware blocks requests with disallowed hosts`() async throws {
 		let testURL = try #require(URL(string: "testapp://disallowed"))
 		let middleware = SecurityMiddleware(
 			allowedSchemes: ["testapp"],
@@ -311,8 +310,8 @@ struct DeepLinkMiddlewareCoordinatorTests {
 		}
 	}
 
-	@Test("SecurityMiddleware blocks requests matching blocked patterns")
-	func securityMiddleware_blocksRequestsMatchingBlockedPatterns() async throws {
+	@Test
+	func `SecurityMiddleware blocks requests matching blocked patterns`() async throws {
 		let testURL = try #require(URL(string: "testapp://malicious"))
 		let blockedPattern = try NSRegularExpression(pattern: "malicious")
 		let middleware = SecurityMiddleware(
@@ -331,8 +330,8 @@ struct DeepLinkMiddlewareCoordinatorTests {
 
 	// MARK: - URL Transformation Middleware Tests
 
-	@Test("URLTransformationMiddleware transforms URLs")
-	func urlTransformationMiddleware_transformsURLs() async throws {
+	@Test
+	func `URLTransformationMiddleware transforms URLs`() async throws {
 		let testURL = try #require(URL(string: "testapp://test"))
 		let transformedURL = try #require(URL(string: "testapp://transformed"))
 		let transformer = URLTransformerStub(transformedURL: transformedURL)
@@ -343,8 +342,8 @@ struct DeepLinkMiddlewareCoordinatorTests {
 		#expect(result == transformedURL)
 	}
 
-	@Test("URLNormalizationTransformer normalizes URLs")
-	func urlNormalizationTransformer_normalizesURLs() throws {
+	@Test
+	func `URLNormalizationTransformer normalizes URLs`() throws {
 		let testURL = try #require(URL(string: "testapp://test//path?param1=value1&param2="))
 		let transformer = URLNormalizationTransformer()
 
@@ -357,8 +356,8 @@ struct DeepLinkMiddlewareCoordinatorTests {
 
 	// MARK: - Advanced Middleware Tests
 
-	@Test("AdvancedDeepLinkMiddleware provides full control over processing")
-	func advancedDeepLinkMiddleware_providesFullControlOverProcessing() async throws {
+	@Test
+	func `AdvancedDeepLinkMiddleware provides full control over processing`() async throws {
 		let coordinator = DeepLinkMiddlewareCoordinator()
 		let testURL = try #require(URL(string: "testapp://test"))
 

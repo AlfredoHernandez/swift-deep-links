@@ -6,10 +6,9 @@ import DeepLinks
 import DeepLinksTesting
 import Testing
 
-@Suite("ImmediateRouting")
 struct ImmediateRoutingTests {
-	@Test("returns preconfigured routes for any URL")
-	func route_deliversPreconfiguredRoutes() async throws {
+	@Test
+	func `returns preconfigured routes for any URL`() async throws {
 		let sut = ImmediateRouting<TestRoute>(routes: [.routeA, .routeB])
 
 		let result = try await sut.route(from: testURL)
@@ -17,8 +16,8 @@ struct ImmediateRoutingTests {
 		#expect(result == [.routeA, .routeB])
 	}
 
-	@Test("returns same routes regardless of URL")
-	func route_ignoresURLAndReturnsSameRoutes() async throws {
+	@Test
+	func `returns same routes regardless of URL`() async throws {
 		let sut = ImmediateRouting<TestRoute>(routes: [.routeA])
 
 		let first = try await sut.route(from: testURL)
@@ -27,8 +26,8 @@ struct ImmediateRoutingTests {
 		#expect(first == second)
 	}
 
-	@Test("returns empty array when configured with no routes")
-	func route_deliversEmptyOnEmptyConfiguration() async throws {
+	@Test
+	func `returns empty array when configured with no routes`() async throws {
 		let sut = ImmediateRouting<TestRoute>(routes: [])
 
 		let result = try await sut.route(from: testURL)
@@ -36,8 +35,8 @@ struct ImmediateRoutingTests {
 		#expect(result.isEmpty)
 	}
 
-	@Test("throws the exact configured error")
-	func route_throwsConfiguredError() async {
+	@Test
+	func `throws the exact configured error`() async {
 		let sut = ImmediateRouting<TestRoute>(error: DeepLinkError.routeNotFound("test"))
 
 		await #expect(throws: DeepLinkError.routeNotFound("test")) {

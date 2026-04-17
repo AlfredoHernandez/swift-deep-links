@@ -7,11 +7,10 @@ import DeepLinksTesting
 import Foundation
 import Testing
 
-@Suite("CollectingDelegate")
 @MainActor
 struct CollectingDelegateTests {
-	@Test("starts with no events")
-	func allEvents_deliverEmptyOnInit() {
+	@Test
+	func `starts with no events`() {
 		let sut = CollectingDelegate()
 
 		#expect(sut.willProcessURLs.isEmpty)
@@ -19,8 +18,8 @@ struct CollectingDelegateTests {
 		#expect(sut.failedEvents.isEmpty)
 	}
 
-	@Test("collects willProcess URLs in order")
-	func willProcess_collectsURLsInOrder() {
+	@Test
+	func `collects willProcess URLs in order`() {
 		let sut = CollectingDelegate()
 
 		sut.coordinator(NSObject(), willProcess: testURL)
@@ -29,8 +28,8 @@ struct CollectingDelegateTests {
 		#expect(sut.willProcessURLs == [testURL, anotherURL])
 	}
 
-	@Test("collects didProcess events with result data")
-	func didProcess_collectsURLAndResult() {
+	@Test
+	func `collects didProcess events with result data`() {
 		let sut = CollectingDelegate()
 		let result = DeepLinkResult<TestRoute>(
 			originalURL: testURL,
@@ -49,8 +48,8 @@ struct CollectingDelegateTests {
 		#expect(sut.processedEvents.first?.result.executionTime == 0.1)
 	}
 
-	@Test("collects multiple didProcess events in order")
-	func didProcess_collectsMultipleEventsInOrder() {
+	@Test
+	func `collects multiple didProcess events in order`() {
 		let sut = CollectingDelegate()
 		let result1 = DeepLinkResult<TestRoute>(originalURL: testURL, processedURL: testURL, routes: [.routeA], executionTime: 0.1)
 		let result2 = DeepLinkResult<TestRoute>(originalURL: anotherURL, processedURL: anotherURL, routes: [.routeB], executionTime: 0.2)
@@ -63,8 +62,8 @@ struct CollectingDelegateTests {
 		#expect(sut.processedEvents[1].url == anotherURL)
 	}
 
-	@Test("collects didFailProcessing events with error")
-	func didFailProcessing_collectsURLAndError() {
+	@Test
+	func `collects didFailProcessing events with error`() {
 		let sut = CollectingDelegate()
 		let error = DeepLinkError.routeNotFound("test")
 
@@ -75,8 +74,8 @@ struct CollectingDelegateTests {
 		#expect(sut.failedEvents.first?.error as? DeepLinkError == .routeNotFound("test"))
 	}
 
-	@Test("collects multiple didFailProcessing events in order")
-	func didFailProcessing_collectsMultipleEventsInOrder() {
+	@Test
+	func `collects multiple didFailProcessing events in order`() {
 		let sut = CollectingDelegate()
 
 		sut.coordinator(NSObject(), didFailProcessing: testURL, error: DeepLinkError.routeNotFound("a"))
