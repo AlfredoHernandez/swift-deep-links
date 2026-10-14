@@ -93,7 +93,7 @@ struct MiddlewareDidFinishTests {
 	}
 
 	@Test
-	func `drained links tell only the middleware after readiness`() async {
+	func `a drained link tells the middleware after readiness, and settles the middleware before it`() async {
 		let before = FinishRecorder()
 		let after = FinishRecorder()
 		let queue = DeepLinkReadinessQueue()
@@ -102,7 +102,7 @@ struct MiddlewareDidFinishTests {
 
 		_ = await coordinator.markReadyAndDrain(queue: queue)
 
-		#expect(before.finishes.map(\.outcome) == [.deferred])
+		#expect(before.finishes.map(\.outcome) == [.deferred, .succeeded])
 		#expect(after.finishes.map(\.outcome) == [.succeeded])
 	}
 

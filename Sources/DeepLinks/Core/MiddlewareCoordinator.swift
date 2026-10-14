@@ -246,11 +246,19 @@ private extension DeepLinkMiddlewareCoordinator {
 
 		for middleware in chain {
 			run.visited.append((middleware, current))
+			let isReadinessGate = middleware is ReadinessMiddleware
+			var input = current
+			if isReadinessGate {
+				input.deferral = DeepLinkDeferral(runID: DeepLinkRun.id, visited: run.visited)
+			}
 			do {
-				guard let next = try await intercept(current, with: middleware) else {
+				guard var next = try await intercept(input, with: middleware) else {
 					run.result = .success(nil)
-					run.wasDeferred = middleware is ReadinessMiddleware
+					run.wasDeferred = isReadinessGate
 					return run
+				}
+				if isReadinessGate {
+					next.deferral = current.deferral
 				}
 				current = next
 			} catch {

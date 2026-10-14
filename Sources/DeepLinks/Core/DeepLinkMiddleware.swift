@@ -91,7 +91,9 @@ public protocol DeepLinkMiddleware: _DeepLinkURLIntercepting {
 	/// ``DeepLinkCoordinator`` calls it for every middleware that ran on the
 	/// link in this pass, including one that threw, after routing and the
 	/// handler ran; middleware after the one that stopped the chain did not run
-	/// and is not called. Calling ``DeepLinkMiddlewareCoordinator`` or
+	/// and is not called. Middleware before a readiness gate that queued the
+	/// link is called with ``DeepLinkOutcome/deferred`` and later once more
+	/// with the final outcome. Calling ``DeepLinkMiddlewareCoordinator`` or
 	/// `intercept` directly never triggers it. The default does nothing.
 	///
 	/// - Parameters:
@@ -111,6 +113,14 @@ public enum DeepLinkOutcome: Sendable {
 
 	/// A ``ReadinessMiddleware`` queued the link; it continues with the
 	/// middleware after the readiness gate when the queue drains.
+	///
+	/// This is not final: the middleware that ran before the gate is called
+	/// **again** with the final outcome, when the drained link finishes, or
+	/// with ``stopped`` when ``DeepLinkReadinessQueue`` evicts or resets it.
+	/// Keep work pending until then (``SignedLinkMiddleware`` keeps its nonce
+	/// reserved). A custom ``ReadinessQueue`` that rebuilds requests instead
+	/// of storing them loses this settlement; the work then only ends by
+	/// whatever expiry it has (a nonce reservation's time to live).
 	case deferred
 
 	/// A middleware or the router threw, so no handler ran.

@@ -60,9 +60,11 @@ import os
 /// link is rejected as reused), then settled in
 /// ``didFinish(_:outcome:)``: **committed** once a handler ran (including
 /// ``DeepLinkOutcome/handlerFailed(_:)``: a handler may have acted before it
-/// threw, or another route succeeded) or a ``ReadinessMiddleware`` queued the
-/// link; **released** when a later middleware or the router stopped or failed
-/// it before any handler ran, so the user can retry and a link saved by
+/// threw, or another route succeeded); **released** when a later middleware
+/// or the router stopped or failed it before any handler ran, or a
+/// ``DeepLinkReadinessQueue`` evicted or reset it. A link queued by readiness
+/// keeps its reservation until it drains and is settled with that pass's
+/// outcome, so the user can retry and a link saved by
 /// ``AuthenticationMiddleware`` resumes once after sign-in. Keep handlers
 /// idempotent where a repeat could double a side effect. A
 /// reservation never settled lapses after the store's time to live. Called
@@ -180,16 +182,19 @@ public final class SignedLinkMiddleware: DeepLinkMiddleware {
 		return verified.markingSignature(verified: true)
 	}
 
-	/// Spends the nonce reserved for this link when it succeeded or was queued
-	/// for readiness or a handler ran, and frees it when the link stopped or
-	/// failed before any handler ran.
+	/// Spends the nonce reserved for this link once a handler ran, frees it when
+	/// the link stopped or failed before any handler ran, and keeps it while a
+	/// readiness queue holds the link (``DeepLinkOutcome/deferred``).
 	public func didFinish(_: DeepLinkRequest, outcome: DeepLinkOutcome) async {
+		if case .deferred = outcome {
+			return
+		}
 		guard let nonceStore, let runID = DeepLinkRun.id,
 		      let reservation = settlements.withLock({ $0.settle(runID) })
 		else { return }
 
 		switch outcome {
-		case .succeeded, .deferred, .handlerFailed:
+		case .succeeded, .handlerFailed, .deferred:
 			await nonceStore.commit(reservation)
 
 		case .stopped, .failed:

@@ -101,6 +101,7 @@ public final class DeepLinkReadinessQueue: ReadinessQueue, Sendable {
 			return (nil, evicted)
 		}
 		if let evicted = outcome.evicted {
+			evicted.deferral?.settleDropped()
 			onEvict?(evicted.url)
 		}
 		return outcome.passThrough
@@ -145,9 +146,11 @@ public final class DeepLinkReadinessQueue: ReadinessQueue, Sendable {
 	/// ``markReady()`` is called. Useful for scenarios like logout/login cycles
 	/// where the app needs to re-gate deep link processing.
 	public func reset() {
-		state.withLock { state in
+		let dropped = state.withLock { state in
 			state.isReady = false
-			state.pending = []
+			defer { state.pending = [] }
+			return state.pending
 		}
+		dropped.forEach { $0.deferral?.settleDropped() }
 	}
 }

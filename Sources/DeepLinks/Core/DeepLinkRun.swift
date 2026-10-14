@@ -3,6 +3,7 @@
 //
 
 import Foundation
+import os
 
 /// Identifies one pass of a link through ``DeepLinkCoordinator``, so
 /// middleware can match ``DeepLinkMiddleware/didFinish(_:outcome:)`` with the
@@ -46,5 +47,42 @@ struct MiddlewareRun: Sendable {
 		for visit in visited.reversed() {
 			await visit.middleware.didFinish(visit.request, outcome: outcome)
 		}
+	}
+}
+
+/// The middleware that ran before a ``ReadinessMiddleware`` queued a link,
+/// waiting to hear how the link finally ended.
+///
+/// It travels with the queued ``DeepLinkRequest`` and is settled exactly once:
+/// with the drained pass's outcome, or with ``DeepLinkOutcome/stopped`` when
+/// the queue evicts or resets the link. Settlement runs under the original
+/// pass's identifier so middleware can find what it held for the link.
+final class DeepLinkDeferral: Sendable {
+	private let runID: UUID?
+	private let visited: [(middleware: any DeepLinkMiddleware, request: DeepLinkRequest)]
+	private let isSettled = OSAllocatedUnfairLock(initialState: false)
+
+	init(runID: UUID?, visited: [(middleware: any DeepLinkMiddleware, request: DeepLinkRequest)]) {
+		self.runID = runID
+		self.visited = visited
+	}
+
+	func settle(with outcome: DeepLinkOutcome) async {
+		let isFirst = isSettled.withLock { settled in
+			defer { settled = true }
+			return !settled
+		}
+		guard isFirst else { return }
+		await DeepLinkRun.$id.withValue(runID) {
+			for visit in visited.reversed() {
+				await visit.middleware.didFinish(visit.request, outcome: outcome)
+			}
+		}
+	}
+
+	/// Settles as ``DeepLinkOutcome/stopped`` without blocking the caller,
+	/// for queues dropping a link from synchronous code.
+	func settleDropped() {
+		Task { await settle(with: .stopped) }
 	}
 }

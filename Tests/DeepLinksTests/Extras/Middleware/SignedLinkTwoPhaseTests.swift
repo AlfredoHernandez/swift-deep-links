@@ -104,14 +104,60 @@ struct SignedLinkTwoPhaseTests {
 	}
 
 	@Test
-	func `a link queued for readiness keeps its nonce spent`() async {
+	func `a link queued for readiness holds its nonce and spends it when it drains`() async {
 		let queue = DeepLinkReadinessQueue()
 		let sut = Pipeline(after: [ReadinessMiddleware(queue: queue)])
 
 		#expect(await sut.open(sut.link).wasStoppedByMiddleware)
-
 		#expect(await sut.open(sut.link).firstDeepLinkError == .securityViolation(SignedLinkMiddleware.reusedNonceReason))
+
 		#expect(await sut.coordinator.markReadyAndDrain(queue: queue).map(\.wasSuccessful) == [true])
+		sut.clock.advance(by: InMemoryNonceStore.defaultReservationTTL + 1)
+		#expect(await sut.open(sut.link).firstDeepLinkError == .securityViolation(SignedLinkMiddleware.reusedNonceReason))
+	}
+
+	@Test
+	func `a queued link that fails after draining can be retried`() async {
+		let queue = DeepLinkReadinessQueue()
+		let gate = ToggleMiddleware(allows: false)
+		let sut = Pipeline(after: [ReadinessMiddleware(queue: queue), gate])
+		_ = await sut.open(sut.link)
+
+		#expect(await sut.coordinator.markReadyAndDrain(queue: queue).map(\.wasSuccessful) == [false])
+		gate.allows = true
+
+		#expect(await sut.open(sut.link).wasSuccessful)
+	}
+
+	@Test(.timeLimit(.minutes(1)))
+	func `an evicted queued link releases its nonce`() async throws {
+		let queue = DeepLinkReadinessQueue(maxQueueSize: 1)
+		let store = SignalingNonceStore()
+		let sut = Pipeline(after: [ReadinessMiddleware(queue: queue)], nonceStore: store.wrapping)
+		var releases = store.releases.makeAsyncIterator()
+		_ = await sut.open(sut.link)
+
+		let other = try SignedLinkBuilder(key: key).sign(#require(URL(string: "https://example.com/other")), expiresAt: sut.clock.now + 600, nonce: "n-2")
+		_ = await sut.open(other)
+		#expect(await releases.next() == "n-1")
+		_ = queue.markReady()
+
+		#expect(await sut.open(sut.link).wasSuccessful)
+	}
+
+	@Test(.timeLimit(.minutes(1)))
+	func `resetting the readiness queue releases queued nonces`() async {
+		let queue = DeepLinkReadinessQueue()
+		let store = SignalingNonceStore()
+		let sut = Pipeline(after: [ReadinessMiddleware(queue: queue)], nonceStore: store.wrapping)
+		var releases = store.releases.makeAsyncIterator()
+		_ = await sut.open(sut.link)
+
+		queue.reset()
+		#expect(await releases.next() == "n-1")
+		_ = queue.markReady()
+
+		#expect(await sut.open(sut.link).wasSuccessful)
 	}
 
 	@Test
@@ -208,10 +254,11 @@ private struct Pipeline: Sendable {
 		after: [any DeepLinkMiddleware] = [],
 		parser: any DeepLinkParser<TestRoute> = ImmediateParser(routes: [TestRoute.route1]),
 		handler: any DeepLinkHandler<TestRoute> = CollectingHandler<TestRoute>(),
+		nonceStore: ((@escaping @Sendable () -> Date) -> any NonceStore)? = nil,
 	) {
 		let signed = SignedLinkMiddleware(
 			keys: SigningKeyring(key: key),
-			nonceStore: InMemoryNonceStore(dateProvider: clock.dateProvider),
+			nonceStore: nonceStore?(clock.dateProvider) ?? InMemoryNonceStore(dateProvider: clock.dateProvider),
 			dateProvider: clock.dateProvider,
 		)
 		coordinator = DeepLinkCoordinator(
@@ -322,6 +369,46 @@ private final class NestedProcessingHandler: DeepLinkHandler {
 	func handle(_: TestRoute, context _: DeepLinkContext) async throws {
 		guard !hasNested.withLock({ defer { $0 = true }; return $0 }) else { return }
 		_ = try await chain.process(DeepLinkRequest(url: link))
+	}
+}
+
+/// An in-memory store that announces every released nonce.
+private final class SignalingNonceStore: Sendable {
+	private let releaseEvents = AsyncStream<String>.makeStream()
+	private let inner = OSAllocatedUnfairLock<InMemoryNonceStore?>(initialState: nil)
+
+	var releases: AsyncStream<String> {
+		releaseEvents.stream
+	}
+
+	var wrapping: (@escaping @Sendable () -> Date) -> any NonceStore {
+		{ [self] dateProvider in
+			let store = InMemoryNonceStore(dateProvider: dateProvider)
+			inner.withLock { $0 = store }
+			return Forwarding(store: store, onRelease: { [releaseEvents] in releaseEvents.continuation.yield($0) })
+		}
+	}
+
+	private struct Forwarding: NonceStore {
+		let store: InMemoryNonceStore
+		let onRelease: @Sendable (String) -> Void
+
+		func consume(_ nonce: String, expiresAt: Date) async -> Bool {
+			await store.consume(nonce, expiresAt: expiresAt)
+		}
+
+		func reserve(_ nonce: String, expiresAt: Date) async -> NonceReservation? {
+			await store.reserve(nonce, expiresAt: expiresAt)
+		}
+
+		func commit(_ reservation: NonceReservation) async {
+			await store.commit(reservation)
+		}
+
+		func release(_ reservation: NonceReservation) async {
+			await store.release(reservation)
+			onRelease(reservation.nonce)
+		}
 	}
 }
 

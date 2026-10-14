@@ -132,9 +132,10 @@ let link = try SignedLinkBuilder(key: currentKey, keyID: "2026-10").sign(
 - Nonces are two-phase: `SignedLinkMiddleware` reserves the nonce once the
   signature verifies, and the coordinator spends it once a handler runs (even
   one that throws: it, or an earlier route, may already have acted; keep
-  handlers idempotent) or readiness queues it. If authentication,
-  confirmation or the parsers stop the link before any handler runs, the
-  nonce is released, so the user can retry,
+  handlers idempotent). A link queued by readiness keeps the nonce reserved
+  until it drains and is settled then; if the queue evicts or resets it, the
+  nonce is released. If authentication, confirmation or the parsers stop the
+  link before any handler runs, the nonce is released, so the user can retry,
   and a link saved for sign-in resumes once. A reservation never settled (the
   app was killed mid-link) lapses after `reservationTTL`; while the link is
   still in flight, `SignedLinkMiddleware` refuses the same nonce regardless,

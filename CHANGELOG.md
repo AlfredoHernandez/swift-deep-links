@@ -276,7 +276,10 @@ middleware order and a hardening checklist.
   (default 300 s). `DeepLinkMiddleware` gains
   `didFinish(_:outcome:)` (default no-op), which the coordinator calls for
   every middleware that ran with a `DeepLinkOutcome` (`.succeeded`,
-  `.stopped`, `.deferred`, `.failed`). `AuthenticationMiddleware` now saves the
+  `.stopped`, `.deferred`, `.failed`, `.handlerFailed`). A link queued by
+  readiness keeps its nonce reserved: the middleware before the gate hears
+  `.deferred` and later the drained pass's outcome, or `.stopped` when
+  `DeepLinkReadinessQueue` evicts or resets it (releasing the nonce). `AuthenticationMiddleware` now saves the
   link as it entered the chain, so a resumed signed link still carries its
   signature. `reusedNonce: .drop` stops a reused link silently, and replay
   protection belongs before signed links so double deliveries are dropped

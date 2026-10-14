@@ -273,6 +273,9 @@ private extension DeepLinkCoordinator {
 		let run = await middlewareStage(request)
 		let (result, outcome) = await process(request, after: run, startTime: startTime)
 		await run.finish(with: outcome)
+		if !run.wasDeferred {
+			await request.deferral?.settle(with: outcome)
+		}
 
 		broadcaster.publish(result)
 		return result

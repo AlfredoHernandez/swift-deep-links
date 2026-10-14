@@ -113,6 +113,10 @@ public struct DeepLinkRequest: Sendable, Hashable {
 	/// Where the link came from.
 	public var context: DeepLinkContext
 
+	/// Middleware settlement postponed because a readiness queue held this
+	/// request; not part of the request's identity.
+	var deferral: DeepLinkDeferral?
+
 	/// Creates a request.
 	///
 	/// - Parameters:
@@ -125,7 +129,9 @@ public struct DeepLinkRequest: Sendable, Hashable {
 
 	/// This request with `url` in place of its URL and the same context.
 	public func replacingURL(_ url: URL) -> DeepLinkRequest {
-		DeepLinkRequest(url: url, context: context).bindingSignatureToURL()
+		var request = self
+		request.url = url
+		return request.bindingSignatureToURL()
 	}
 
 	/// This request with the signature flag cleared unless it was verified for this URL.
@@ -134,5 +140,18 @@ public struct DeepLinkRequest: Sendable, Hashable {
 		var request = self
 		request.context.signatureVerifiedURL = nil
 		return request
+	}
+}
+
+// MARK: - Equatable & Hashable
+
+public extension DeepLinkRequest {
+	static func == (lhs: DeepLinkRequest, rhs: DeepLinkRequest) -> Bool {
+		lhs.url == rhs.url && lhs.context == rhs.context
+	}
+
+	func hash(into hasher: inout Hasher) {
+		hasher.combine(url)
+		hasher.combine(context)
 	}
 }

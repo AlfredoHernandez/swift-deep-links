@@ -10,7 +10,8 @@ import Foundation
 /// Spent nonces are stored with their link's expiry and pruned once expired
 /// (when the store loads and when it is full). Reservations live in memory
 /// only and are **dropped on relaunch**: a link interrupted by termination
-/// never completed, so it may be opened again. The one gap is a link whose
+/// (including one waiting in a readiness queue, which does not survive
+/// relaunch either) never completed, so it may be opened again. The one gap is a link whose
 /// handler finished just before the app was killed and before the commit was
 /// written; it could run once more after relaunch, within its expiry.
 ///
