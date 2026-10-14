@@ -23,8 +23,9 @@ described in the [CHANGELOG](CHANGELOG.md) and the
 8. [`handle(activity:)` checks the activity type](#8-handleactivity-checks-the-activity-type)
 9. [`PathPatternMatch.int` is canonical](#9-pathpatternmatchint-is-canonical)
 10. [Removed APIs](#10-removed-apis)
-11. [Recommended middleware order](#recommended-middleware-order)
-12. [Hardening checklist](#hardening-checklist)
+11. [Custom nonce stores](#11-custom-nonce-stores)
+12. [Recommended middleware order](#recommended-middleware-order)
+13. [Hardening checklist](#hardening-checklist)
 
 ## 1. Coordinator and builder
 
@@ -334,6 +335,50 @@ let id = try match.value("id", as: Int.self)
 
 `DeepLinksTesting` types are now checked `Sendable` (no source change).
 
+## 11. Custom nonce stores
+
+`SignedLinkMiddleware` uses nonces in two phases: it **reserves** the nonce
+when the signature verifies and the coordinator **commits** it once a handler
+runs, or **releases** it when authentication, confirmation or the parsers stop
+the link first, so the user can retry and a link saved for sign-in resumes.
+
+A custom `NonceStore` that implements only `consume(_:expiresAt:)` still
+compiles, but the default `reserve` **consumes at once** and the default
+`release` does nothing. With such a store a signed link is spent as soon as
+its signature verifies: a link rejected by authentication cannot be resumed
+after sign-in (it fails as `"Signed link already used"`), and a declined
+confirmation or a parser error cannot be retried. Implement all three to get
+retries:
+
+```swift
+actor RedisNonceStore: NonceStore {
+    func consume(_ nonce: String, expiresAt: Date) async -> Bool {
+        await redis.set(nonce, "spent", ifAbsent: true, expiresAt: expiresAt)
+    }
+
+    // Hold the nonce briefly; let it lapse if the app dies mid-link.
+    func reserve(_ nonce: String, expiresAt: Date) async -> NonceReservation? {
+        let reservation = NonceReservation(nonce: nonce, expiresAt: expiresAt)
+        let held = await redis.set(nonce, reservation.token.uuidString, ifAbsent: true, expiresIn: 300)
+        return held ? reservation : nil
+    }
+
+    func commit(_ reservation: NonceReservation) async {
+        await redis.set(reservation.nonce, "spent", expiresAt: reservation.expiresAt)
+    }
+
+    // Free it only if this reservation still owns it.
+    func release(_ reservation: NonceReservation) async {
+        await redis.delete(reservation.nonce, ifValue: reservation.token.uuidString)
+    }
+}
+```
+
+Declare the methods `async`: in an actor, a synchronous method with the same
+name loses overload resolution to the protocol's `async` default, which
+silently reintroduces consume-at-reserve. The built-in `InMemoryNonceStore` and
+`UserDefaultsNonceStore` implement the full protocol.
+
 ## Recommended middleware order
 
 Each stage only sees links the earlier stages accepted, so cheap rejections
@@ -368,9 +413,9 @@ come first and side effects (prompts, analytics) last:
   reserved there and spent once a handler runs (even one that throws, since it
   may have acted); if authentication, confirmation or the parsers stop it
   before any handler runs, the nonce is released and the link can be retried
-  or resumed after sign-in. Keep handlers idempotent. Custom `NonceStore`s that only
-  implement `consume` keep working but spend the nonce at once; implement
-  `reserve`/`commit`/`release` to get retries.
+  or resumed after sign-in. Keep handlers idempotent. Custom `NonceStore`s that
+  only implement `consume` spend the nonce at once (see
+  [Custom nonce stores](#11-custom-nonce-stores)).
 - **Readiness** after the checks that do not need the app to be ready; queued
   links resume the chain after it, so later stages evaluate them at drain time.
 - **Confirmation** after readiness (the UI must be able to present) and after

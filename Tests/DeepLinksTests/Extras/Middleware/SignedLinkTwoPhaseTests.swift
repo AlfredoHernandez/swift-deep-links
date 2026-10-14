@@ -243,6 +243,17 @@ struct SignedLinkTwoPhaseTests {
 	}
 
 	@Test
+	func `a consume-only custom store spends the nonce at reservation, so a rejected link cannot be retried`() async {
+		let gate = ToggleMiddleware(allows: false)
+		let sut = Pipeline(after: [gate], nonceStore: { _ in ConsumeOnlyStore() })
+
+		#expect(await !sut.open(sut.link).wasSuccessful)
+		gate.allows = true
+
+		#expect(await sut.open(sut.link).firstDeepLinkError == .securityViolation(SignedLinkMiddleware.reusedNonceReason))
+	}
+
+	@Test
 	func `concurrent deliveries through the coordinator admit exactly one`() async {
 		let sut = Pipeline()
 		let link = sut.link
@@ -426,6 +437,15 @@ private final class SignalingNonceStore: Sendable {
 			await store.release(reservation)
 			onRelease(reservation.nonce)
 		}
+	}
+}
+
+/// A 1.x-style store implementing only `consume`.
+private final class ConsumeOnlyStore: NonceStore {
+	private let seen = OSAllocatedUnfairLock<Set<String>>(initialState: [])
+
+	func consume(_ nonce: String, expiresAt _: Date) async -> Bool {
+		seen.withLock { $0.insert(nonce).inserted }
 	}
 }
 
