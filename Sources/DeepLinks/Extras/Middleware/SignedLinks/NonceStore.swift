@@ -29,7 +29,9 @@ public protocol NonceStore: Sendable {
 	/// after a store-defined time to live. Must be atomic like ``consume(_:expiresAt:)``.
 	///
 	/// The default consumes the nonce at once, so stores implementing only
-	/// ``consume(_:expiresAt:)`` keep working but cannot release.
+	/// ``consume(_:expiresAt:)`` keep working but cannot release. Declare your
+	/// implementations `async`: a synchronous actor method of the same name
+	/// loses overload resolution to this default in async callers.
 	///
 	/// - Returns: The reservation, or `nil` when the nonce is in use, spent or cannot be recorded.
 	func reserve(_ nonce: String, expiresAt: Date) async -> NonceReservation?
@@ -82,8 +84,8 @@ public struct NonceReservation: Sendable, Hashable, Codable {
 /// attacker without the key cannot fill the store. Reservations count towards
 /// `maxEntries` and lapse after `reservationTTL` if never committed or released.
 ///
-/// The record does not survive a relaunch; persist nonces in your own
-/// ``NonceStore`` when links must stay single-use across launches.
+/// The record does not survive a relaunch; use ``UserDefaultsNonceStore``
+/// when links must stay single-use across launches.
 public final class InMemoryNonceStore: NonceStore {
 	/// The default time a reservation holds a nonce without being committed or released.
 	public static let defaultReservationTTL: TimeInterval = 300

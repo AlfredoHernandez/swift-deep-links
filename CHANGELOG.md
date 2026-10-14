@@ -308,6 +308,11 @@ middleware order and a hardening checklist.
   `handle(url:context:)`; no other payload value reaches the pipeline, and a
   payload without a URL returns `nil` without running it. All are main-actor
   isolated so the non-`Sendable` system objects can be passed directly.
+- **`UserDefaultsNonceStore`.** A bounded, persistent `NonceStore` (injectable
+  `UserDefaults`, key and clock): spent nonces survive relaunch as versioned
+  JSON and are pruned by expiry; open reservations stay in memory and are
+  dropped on relaunch so an interrupted link can be retried; unreadable data
+  starts an empty store.
 - **Route-level rules.** `RouteMatcher<Route>` (`.routes(where:)`, `.all`,
   `.custom`) selects **parsed** routes, and two handler decorators enforce
   rules on them regardless of URL spelling: `SignedRouteGuard` /

@@ -136,8 +136,10 @@ let link = try SignedLinkBuilder(key: currentKey, keyID: "2026-10").sign(
   app was killed mid-link) lapses after `reservationTTL`. Calling the
   middleware directly, outside a coordinator, consumes at once. Pass
   `reusedNonce: .drop` to stop reused links silently instead of with an error.
-  `InMemoryNonceStore` is bounded and forgets on relaunch; persist nonces in
-  your own `NonceStore` when a link must stay single-use across launches.
+  `InMemoryNonceStore` is bounded and forgets on relaunch; use
+  `UserDefaultsNonceStore` when a link must stay single-use across launches
+  (it persists spent nonces and drops open reservations on relaunch, so an
+  interrupted link can be retried).
 - Userinfo (`user:pass@`) is not signed; `.hardened` security in front
   rejects it.
 - Notification payloads, Spotlight identifiers and quick actions that open a
