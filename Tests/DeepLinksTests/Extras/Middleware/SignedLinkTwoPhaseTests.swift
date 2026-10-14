@@ -67,14 +67,26 @@ struct SignedLinkTwoPhaseTests {
 	}
 
 	@Test
-	func `a link whose handler fails can be retried`() async {
+	func `a link whose handler ran and failed spends its nonce, since the handler may have acted`() async {
 		let handler = ToggleHandler(succeeds: false)
 		let sut = Pipeline(handler: handler)
 
 		#expect(await !sut.open(sut.link).wasSuccessful)
 		handler.succeeds = true
 
-		#expect(await sut.open(sut.link).wasSuccessful)
+		#expect(await sut.open(sut.link).firstDeepLinkError == .securityViolation(SignedLinkMiddleware.reusedNonceReason))
+	}
+
+	@Test
+	func `a link with one failing route among several spends its nonce`() async {
+		let handler = FailingOnRoute2Handler()
+		let sut = Pipeline(parser: ImmediateParser(routes: [TestRoute.route1, .route2]), handler: handler)
+
+		let first = await sut.open(sut.link)
+
+		#expect(first.successfulRoutes == 1)
+		#expect(first.failedRoutes == 1)
+		#expect(await sut.open(sut.link).firstDeepLinkError == .securityViolation(SignedLinkMiddleware.reusedNonceReason))
 	}
 
 	@Test
@@ -220,6 +232,14 @@ private final class ToggleAuthentication: AuthenticationProvider {
 
 	func isAuthenticated() -> Bool {
 		isSignedIn
+	}
+}
+
+private struct FailingOnRoute2Handler: DeepLinkHandler {
+	func handle(_ route: TestRoute, context _: DeepLinkContext) async throws {
+		if route == .route2 {
+			throw DeepLinkError.handlerError(message: "route 2", underlyingError: nil)
+		}
 	}
 }
 

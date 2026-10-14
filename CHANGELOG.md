@@ -258,10 +258,12 @@ middleware order and a hardening checklist.
   never include the key, signature or link, the nonce is consumed only after
   verification, and verified links continue with the signature parameters
   stripped. Nonces are two-phase inside `DeepLinkCoordinator`: reserved when
-  the signature verifies, spent only when the whole link succeeds (or is
-  queued by readiness) and released when a later middleware, the router or a
-  handler stops or fails it, so the user can retry (including after sign-in
+  the signature verifies, spent once a handler ran (even if one threw, since
+  it may have acted; outcome `.handlerFailed`) or readiness queued the link,
+  and released when a later middleware or the router stopped or failed it
+  before any handler ran, so the user can retry (including after sign-in
   through `resumePendingLinks(from:)`); concurrent deliveries still admit one.
+  Make handlers idempotent where a repeat could double a side effect.
   `NonceStore` gains `reserve(_:expiresAt:)`, `commit(_:)` and `release(_:)`
   with defaults that consume at once, so 1.x-style stores keep compiling;
   `InMemoryNonceStore(reservationTTL:)` lets abandoned reservations lapse

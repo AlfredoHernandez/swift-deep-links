@@ -365,9 +365,10 @@ come first and side effects (prompts, analytics) last:
   resumed link is dropped as a replay.
 - **Signed links** before authentication, so parsers and later stages see
   verified links with the signature parameters stripped. A nonce is only
-  reserved there and spent when the whole link succeeds; if authentication,
-  confirmation, a parser or a handler stops it, the nonce is released and the
-  link can be retried or resumed after sign-in. Custom `NonceStore`s that only
+  reserved there and spent once a handler runs (even one that throws, since it
+  may have acted); if authentication, confirmation or the parsers stop it
+  before any handler runs, the nonce is released and the link can be retried
+  or resumed after sign-in. Keep handlers idempotent. Custom `NonceStore`s that only
   implement `consume` keep working but spend the nonce at once; implement
   `reserve`/`commit`/`release` to get retries.
 - **Readiness** after the checks that do not need the app to be ready; queued

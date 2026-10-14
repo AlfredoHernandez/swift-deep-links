@@ -68,7 +68,7 @@ struct MiddlewareDidFinishTests {
 	}
 
 	@Test
-	func `handler failure is reported as failed`() async {
+	func `handler failure is reported as a handler failure, not as nothing ran`() async {
 		let recorder = FinishRecorder()
 		let coordinator = DeepLinkCoordinator(
 			routing: DefaultDeepLinkRouting(parsers: [ImmediateParser(routes: [TestRoute.route1])]),
@@ -78,7 +78,7 @@ struct MiddlewareDidFinishTests {
 
 		_ = await coordinator.handle(url: url("myapp://a"))
 
-		#expect(recorder.finishes.map(\.outcome) == [.failed])
+		#expect(recorder.finishes.map(\.outcome) == [.handlerFailed])
 	}
 
 	@Test
@@ -140,7 +140,7 @@ private struct Finish: Equatable {
 
 /// `DeepLinkOutcome` without the error payload, for equality.
 private enum DeepLinkOutcomeKind: Equatable {
-	case succeeded, stopped, deferred, failed
+	case succeeded, stopped, deferred, failed, handlerFailed
 
 	init(_ outcome: DeepLinkOutcome) {
 		switch outcome {
@@ -148,6 +148,7 @@ private enum DeepLinkOutcomeKind: Equatable {
 		case .stopped: self = .stopped
 		case .deferred: self = .deferred
 		case .failed: self = .failed
+		case .handlerFailed: self = .handlerFailed
 		}
 	}
 }

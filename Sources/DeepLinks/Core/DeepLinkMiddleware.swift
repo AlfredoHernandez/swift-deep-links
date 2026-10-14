@@ -113,8 +113,16 @@ public enum DeepLinkOutcome: Sendable {
 	/// middleware after the readiness gate when the queue drains.
 	case deferred
 
-	/// A middleware, the router or a handler threw.
+	/// A middleware or the router threw, so no handler ran.
 	case failed(any Error)
+
+	/// Routing succeeded and the handlers ran, but at least one threw.
+	///
+	/// Earlier routes, or the failing handler itself before it threw, may
+	/// already have acted, so treat the link as used (``SignedLinkMiddleware``
+	/// spends its nonce). Make handlers idempotent where a retry could repeat
+	/// a side effect.
+	case handlerFailed(any Error)
 }
 
 public extension DeepLinkMiddleware {

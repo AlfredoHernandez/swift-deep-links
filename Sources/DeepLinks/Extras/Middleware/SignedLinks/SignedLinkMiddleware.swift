@@ -58,10 +58,13 @@ import os
 /// Inside ``DeepLinkCoordinator`` nonces are two-phase: the nonce is
 /// **reserved** when the signature verifies (a concurrent delivery of the same
 /// link is rejected as reused), then settled in
-/// ``didFinish(_:outcome:)``: **committed** when the link succeeded or a
-/// ``ReadinessMiddleware`` queued it, **released** when a later middleware,
-/// the router or a handler stopped or failed it, so the user can retry and a
-/// link saved by ``AuthenticationMiddleware`` resumes once after sign-in. A
+/// ``didFinish(_:outcome:)``: **committed** once a handler ran (including
+/// ``DeepLinkOutcome/handlerFailed(_:)``: a handler may have acted before it
+/// threw, or another route succeeded) or a ``ReadinessMiddleware`` queued the
+/// link; **released** when a later middleware or the router stopped or failed
+/// it before any handler ran, so the user can retry and a link saved by
+/// ``AuthenticationMiddleware`` resumes once after sign-in. Keep handlers
+/// idempotent where a repeat could double a side effect. A
 /// reservation never settled lapses after the store's time to live. Called
 /// directly (outside a coordinator) the middleware consumes at once. Nonces
 /// are global, not scoped to a key id, so use unguessable values.
@@ -178,14 +181,15 @@ public final class SignedLinkMiddleware: DeepLinkMiddleware {
 	}
 
 	/// Spends the nonce reserved for this link when it succeeded or was queued
-	/// for readiness, and frees it when a later stage stopped or failed it.
+	/// for readiness or a handler ran, and frees it when the link stopped or
+	/// failed before any handler ran.
 	public func didFinish(_: DeepLinkRequest, outcome: DeepLinkOutcome) async {
 		guard let nonceStore, let runID = DeepLinkRun.id,
 		      let reservation = reservations.withLock({ $0.removeValue(forKey: runID) })
 		else { return }
 
 		switch outcome {
-		case .succeeded, .deferred:
+		case .succeeded, .deferred, .handlerFailed:
 			await nonceStore.commit(reservation)
 
 		case .stopped, .failed:

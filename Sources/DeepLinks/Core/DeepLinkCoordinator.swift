@@ -307,7 +307,7 @@ private extension DeepLinkCoordinator {
 				executionResult: executionResult,
 				startTime: startTime,
 			)
-			return (result, executionResult.errors.first.map(DeepLinkOutcome.failed) ?? .succeeded)
+			return (result, executionResult.errors.first.map(DeepLinkOutcome.handlerFailed) ?? .succeeded)
 		} catch {
 			return await (handleProcessingError(url: request.url, error: error, startTime: startTime), .failed(error))
 		}

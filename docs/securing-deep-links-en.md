@@ -130,9 +130,11 @@ let link = try SignedLinkBuilder(key: currentKey, keyID: "2026-10").sign(
   have expired.
 - Expiry: keep lifetimes short (minutes for resets, days for invitations).
 - Nonces are two-phase: `SignedLinkMiddleware` reserves the nonce once the
-  signature verifies, and the coordinator spends it only when the whole link
-  succeeds (or readiness queues it). If authentication, confirmation, a parser
-  or a handler stops the link, the nonce is released, so the user can retry,
+  signature verifies, and the coordinator spends it once a handler runs (even
+  one that throws: it, or an earlier route, may already have acted; keep
+  handlers idempotent) or readiness queues it. If authentication,
+  confirmation or the parsers stop the link before any handler runs, the
+  nonce is released, so the user can retry,
   and a link saved for sign-in resumes once. A reservation never settled (the
   app was killed mid-link) lapses after `reservationTTL`. Calling the
   middleware directly, outside a coordinator, consumes at once. Pass
