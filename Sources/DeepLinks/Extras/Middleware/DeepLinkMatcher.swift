@@ -125,12 +125,23 @@ private extension DeepLinkMatcher {
 	/// encoded past the decoding limit, so the caller fails closed.
 	static func matchablePaths(of url: URL) -> [String]? {
 		let pathForms = [url.path(percentEncoded: true), url.standardized.path(percentEncoded: true)]
+			+ opaquePathForms(of: url)
 		var paths: [String] = []
 		for encodedPath in pathForms + customSchemeHostForms(of: url, paths: pathForms) {
 			guard let decodedForms = decodedForms(of: encodedPath) else { return nil }
 			paths += decodedForms.map(normalizedPath)
 		}
 		return paths
+	}
+
+	/// `myapp:reset/abc` has no hierarchical path on some Foundation versions,
+	/// so read it from the raw string: everything after `scheme:` up to `?`/`#`.
+	static func opaquePathForms(of url: URL) -> [String] {
+		let raw = url.absoluteString
+		guard let colon = raw.firstIndex(of: ":") else { return [] }
+		let afterScheme = raw[raw.index(after: colon)...]
+		guard !afterScheme.hasPrefix("//") else { return [] }
+		return [String(afterScheme.prefix { $0 != "?" && $0 != "#" })]
 	}
 
 	/// `myapp://reset/abc` reaches parsers as host `reset`, path `/abc`; also
