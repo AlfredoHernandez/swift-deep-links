@@ -10,8 +10,10 @@ import Foundation
 /// the **parsed route**, so every URL spelling that reaches a protected screen
 /// is confirmed, and the prompt can describe the action ("Send 10 € to Ana?")
 /// rather than a URL. Denial, or no answer within `timeout`, throws
-/// ``DeepLinkError/confirmationDenied(_:)`` with the link as it arrived (or
-/// `about:blank` when called outside ``DeepLinkCoordinator``). The timeout
+/// ``DeepLinkError/confirmationDenied(_:)`` with the URL the router received,
+/// after middleware (so without signature parameters), or `about:blank` when
+/// called outside ``DeepLinkCoordinator``. Like every error, it carries the
+/// full URL: show or log its `redactedDescription`. The timeout
 /// wins even if `confirm` ignores cancellation; dismiss your prompt when its
 /// task is cancelled.
 ///
@@ -57,7 +59,7 @@ public struct ConfirmingHandler<Route: DeepLinkRoute>: DeepLinkHandler {
 				await confirm(route, context)
 			}
 			guard approved else {
-				throw DeepLinkError.confirmationDenied(DeepLinkRun.arrival?.url ?? URL(string: "about:blank")!)
+				throw DeepLinkError.confirmationDenied(DeepLinkRun.routedURL ?? URL(string: "about:blank")!)
 			}
 		}
 		try await wrapped.handle(route, context: context)

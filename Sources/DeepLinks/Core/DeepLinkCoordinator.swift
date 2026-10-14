@@ -299,7 +299,9 @@ private extension DeepLinkCoordinator {
 
 		do {
 			let routes = try await routeURL(processed.url)
-			let executionResult = await executeRoutes(routes, context: processed.context)
+			let executionResult = await DeepLinkRun.$routedURL.withValue(processed.url) {
+				await executeRoutes(routes, context: processed.context)
+			}
 			let result = await createSuccessResult(
 				originalURL: request.url,
 				processedURL: processed.url,

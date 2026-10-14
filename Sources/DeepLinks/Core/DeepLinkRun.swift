@@ -14,6 +14,10 @@ enum DeepLinkRun {
 	/// rewrote it (for example stripped its signature).
 	@TaskLocal static var arrival: DeepLinkRequest?
 
+	/// The URL the router and handlers received in this pass, after every
+	/// middleware (signature parameters already stripped).
+	@TaskLocal static var routedURL: URL?
+
 	/// Runs `body` as a standalone call, not part of the enclosing
 	/// coordinator pass, so middleware called from a handler (for example
 	/// ``DeepLinkMiddlewareCoordinator/process(_:)-(DeepLinkRequest)``) cannot
@@ -24,7 +28,9 @@ enum DeepLinkRun {
 	) async rethrows -> Output {
 		try await $id.withValue(nil) {
 			try await $arrival.withValue(nil) {
-				try await body()
+				try await $routedURL.withValue(nil) {
+					try await body()
+				}
 			}
 		}
 	}

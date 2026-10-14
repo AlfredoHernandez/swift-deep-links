@@ -192,6 +192,22 @@ struct RouteGuardTests {
 		#expect(handler.handledRoutes.isEmpty)
 	}
 
+	@Test
+	func `a declined signed link reports the routed URL without its signature parameters`() async throws {
+		let coordinator = DeepLinkCoordinator(
+			routing: DefaultDeepLinkRouting(parsers: [ImmediateParser(routes: [TestRoute.route1])]),
+			handler: CollectingHandler<TestRoute>().confirming(.all) { _, _ in false },
+			middlewareCoordinator: DeepLinkMiddlewareCoordinator(middleware: [
+				SignedLinkMiddleware(keys: SigningKeyring(keys: ["k1": key]), requiresExpiry: false),
+			]),
+		)
+		let link = try SignedLinkBuilder(key: key, keyID: "k1").sign(#require(URL(string: "myapp://pay?amount=5")), nonce: "n-1")
+
+		let result = await coordinator.handle(url: link)
+
+		#expect(try result.firstDeepLinkError == .confirmationDenied(#require(URL(string: "myapp://pay?amount=5"))))
+	}
+
 	@Test(.timeLimit(.minutes(1)))
 	func `unanswered route confirmation times out as a denial`() async {
 		let inner = CollectingHandler<TestRoute>()

@@ -519,7 +519,7 @@ public extension DeepLinkHandler {
 }
 ```
 
-Route rules decide on the route the parsers produced, so they hold however the URL was spelled; they are the strongest protection. `SignedRouteGuard` throws `securityViolation(unsignedRouteReason)` for a protected route unless `context.isSignatureVerified`, which only `SignedLinkMiddleware` sets (it verifies every link carrying a signature, whatever its URL rule); keep that middleware in the chain. `ConfirmingHandler` asks `confirm` with the route, so the prompt can describe the action; denial or timeout throws `confirmationDenied` with the arriving URL (`about:blank` outside a coordinator), and the timeout wins even if `confirm` ignores cancellation. Use URL rules (`DeepLinkMatcher`) in addition when you want to reject before parsing and other middleware run.
+Route rules decide on the route the parsers produced, so they hold however the URL was spelled; they are the strongest protection. `SignedRouteGuard` throws `securityViolation(unsignedRouteReason)` for a protected route unless `context.isSignatureVerified`, which only `SignedLinkMiddleware` sets (it verifies every link carrying a signature, whatever its URL rule); keep that middleware in the chain. `ConfirmingHandler` asks `confirm` with the route, so the prompt can describe the action; denial or timeout throws `confirmationDenied` with the URL the router received, signature parameters already stripped (`about:blank` outside a coordinator), and the timeout wins even if `confirm` ignores cancellation. Use URL rules (`DeepLinkMatcher`) in addition when you want to reject before parsing and other middleware run.
 
 ### DeepLinkMatcher
 
