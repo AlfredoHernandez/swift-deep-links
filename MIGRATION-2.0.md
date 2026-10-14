@@ -372,7 +372,10 @@ come first and side effects (prompts, analytics) last:
 - [ ] Password resets, invitations and payment links are signed
       (`.signedLinks`) with an expiry and a nonce; keys live in the Keychain or
       server config, rotate through `kid`, and are at least 256 bits.
-- [ ] Destructive or financial routes ask the user first (`.confirmation`).
+- [ ] Sensitive routes are protected at the route level
+      (`handler.requiringSignature(for:)`, `handler.confirming(_:)`), which holds
+      for every URL spelling; URL rules (`.signedLinks`, `.confirmation`) only filter early.
+- [ ] Destructive or financial routes ask the user first (`.confirmation` or `.confirming`).
 - [ ] A rate limiter runs before signature checks and prompts. The default
       `UserDefaultsRateLimitPersistence` is user-editable; implement your own
       `RateLimitPersistence` (in memory or in the Keychain) if a reset limit matters.

@@ -13,7 +13,12 @@ import os
 /// resets, invitations and payment confirmations.
 ///
 /// A link the ``DeepLinkMatcher`` selects must carry a signature made with a
-/// key the ``SigningKeyProvider`` knows; other links pass through untouched.
+/// key the ``SigningKeyProvider`` knows. Any other link that carries the
+/// signature parameter is verified too (and rejected if the signature is
+/// invalid), so route-level rules (``SignedRouteGuard``) can rely on it; links
+/// without one pass through. Every link leaves with
+/// ``DeepLinkContext/isSignatureVerified`` set to whether its signature was
+/// verified here.
 /// Sign links with ``SignedLinkBuilder`` or an equivalent server
 /// implementation.
 ///
@@ -159,14 +164,17 @@ public final class SignedLinkMiddleware: DeepLinkMiddleware {
 	}
 
 	public func intercept(_ request: DeepLinkRequest) async throws -> DeepLinkRequest? {
-		guard matcher.matches(request) else { return request }
+		guard matcher.matches(request) || carriesSignature(request.url) else {
+			return request.markingSignature(verified: false)
+		}
 
 		let fields = try SignedLinkFields(url: request.url, parameters: parameters)
 		try await verifySignature(of: fields, in: request.url)
 		let validUntil = try validatedExpiry(fields.expiry)
 		guard try await consumeNonce(fields.nonce, validUntil: validUntil) else { return nil }
 
-		return stripsSignatureParameters ? request.replacingURL(strippingSignatureParameters(from: request.url)) : request
+		let verified = stripsSignatureParameters ? request.replacingURL(strippingSignatureParameters(from: request.url)) : request
+		return verified.markingSignature(verified: true)
 	}
 
 	/// Spends the nonce reserved for this link when it succeeded or was queued
@@ -241,6 +249,11 @@ private extension SignedLinkMiddleware {
 		return true
 	}
 
+	func carriesSignature(_ url: URL) -> Bool {
+		(URLComponents(url: url, resolvingAgainstBaseURL: false)?.percentEncodedQueryItems ?? [])
+			.contains { SignedLinkCanonicalForm.decodedName(of: $0) == parameters.signature }
+	}
+
 	func strippingSignatureParameters(from url: URL) -> URL {
 		guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return url }
 		let kept = (components.percentEncodedQueryItems ?? []).filter {
@@ -281,6 +294,14 @@ private struct SignedLinkFields {
 		keyID = try values(of: parameters.keyID).first
 		expiry = try values(of: parameters.expiry).first
 		nonce = try values(of: parameters.nonce).first
+	}
+}
+
+private extension DeepLinkRequest {
+	func markingSignature(verified: Bool) -> DeepLinkRequest {
+		var request = self
+		request.context.isSignatureVerified = verified
+		return request
 	}
 }
 

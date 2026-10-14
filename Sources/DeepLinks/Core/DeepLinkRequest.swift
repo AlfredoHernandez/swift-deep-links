@@ -50,6 +50,14 @@ public struct DeepLinkContext: Sendable, Hashable {
 	/// back to the originating window.
 	public var sceneID: String?
 
+	/// Whether ``SignedLinkMiddleware`` verified this link's signature.
+	///
+	/// Only ``SignedLinkMiddleware`` sets it (to `true` after a valid
+	/// signature, `false` otherwise); entry points and app code cannot, so a
+	/// ``SignedRouteGuard`` can trust it. It is not persisted by
+	/// ``UserDefaultsPendingLinkStore``; resumed links are verified again.
+	public internal(set) var isSignatureVerified = false
+
 	/// Creates a context.
 	///
 	/// - Parameters:

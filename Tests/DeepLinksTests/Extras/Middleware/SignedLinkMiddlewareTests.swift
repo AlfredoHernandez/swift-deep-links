@@ -33,13 +33,15 @@ struct SignedLinkMiddlewareTests {
 	}
 
 	@Test
-	func `request context is preserved`() async throws {
+	func `request context is preserved and marked verified`() async throws {
 		let (sut, _) = makeSUT()
 		let context = DeepLinkContext(source: .universalLink, sceneID: "scene")
+		var verified = context
+		verified.isSignatureVerified = true
 
 		let result = try await sut.intercept(DeepLinkRequest(url: sign("https://example.com/reset"), context: context))
 
-		#expect(result?.context == context)
+		#expect(result?.context == verified)
 	}
 
 	@Test

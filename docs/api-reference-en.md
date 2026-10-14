@@ -81,6 +81,7 @@ public struct DeepLinkContext: Sendable, Hashable {
     public var source: Source
     public var sourceApplication: String?
     public var sceneID: String?
+    public internal(set) var isSignatureVerified: Bool  // set only by SignedLinkMiddleware
     public init(source: Source = .unknown, sourceApplication: String? = nil, sceneID: String? = nil)
     public static func openedURL(_ url: URL, sourceApplication: String? = nil, sceneID: String? = nil) -> DeepLinkContext
 }
@@ -479,6 +480,37 @@ public struct DeepLinkConfirmationRequest: Sendable, Hashable {
 ```
 
 Asks the user before a sensitive link continues. Approval passes the request on unchanged; denial or no answer within `timeout` throws `DeepLinkError.confirmationDenied(url)`. On timeout, or when the link's task is cancelled, the link is denied immediately, even if the provider ignores cancellation, and the task running `confirm` is cancelled: dismiss the prompt and resume with `false` in a cancellation handler. Prompts are serialized; a link cancelled while waiting for its turn throws `CancellationError` without being shown. Place it after `.readiness(...)` and every rejecting middleware, so the user is never asked about a link that would be rejected anyway.
+
+### Route-Level Rules
+
+```swift
+public struct RouteMatcher<Route: DeepLinkRoute>: Sendable {
+    public init(_ predicate: @escaping @Sendable (Route, DeepLinkContext) -> Bool)
+    public func matches(_ route: Route, context: DeepLinkContext) -> Bool
+    public static var all: RouteMatcher { get }
+    public static func routes(where predicate: @escaping @Sendable (Route) -> Bool) -> RouteMatcher
+    public static func custom(_ predicate: @escaping @Sendable (Route, DeepLinkContext) -> Bool) -> RouteMatcher
+}
+
+public struct SignedRouteGuard<Route: DeepLinkRoute>: DeepLinkHandler {
+    public static var unsignedRouteReason: String { get }  // "Route requires a signed link"
+    public init(_ handler: any DeepLinkHandler<Route>, requiredFor matcher: RouteMatcher<Route>)
+}
+
+public struct ConfirmingHandler<Route: DeepLinkRoute>: DeepLinkHandler {
+    public init(_ handler: any DeepLinkHandler<Route>, requiredFor matcher: RouteMatcher<Route>,
+                timeout: Duration? = nil, sleep: … = { try await Task.sleep(for: $0) },
+                confirm: @Sendable @escaping (Route, DeepLinkContext) async -> Bool)
+}
+
+public extension DeepLinkHandler {
+    func requiringSignature(for matcher: RouteMatcher<Route>) -> SignedRouteGuard<Route>
+    func confirming(_ matcher: RouteMatcher<Route>, timeout: Duration? = nil,
+                    confirm: @Sendable @escaping (Route, DeepLinkContext) async -> Bool) -> ConfirmingHandler<Route>
+}
+```
+
+Route rules decide on the route the parsers produced, so they hold however the URL was spelled; they are the strongest protection. `SignedRouteGuard` throws `securityViolation(unsignedRouteReason)` for a protected route unless `context.isSignatureVerified`, which only `SignedLinkMiddleware` sets (it verifies every link carrying a signature, whatever its URL rule); keep that middleware in the chain. `ConfirmingHandler` asks `confirm` with the route, so the prompt can describe the action; denial or timeout throws `confirmationDenied` with the arriving URL (`about:blank` outside a coordinator), and the timeout wins even if `confirm` ignores cancellation. Use URL rules (`DeepLinkMatcher`) in addition when you want to reject before parsing and other middleware run.
 
 ### DeepLinkMatcher
 

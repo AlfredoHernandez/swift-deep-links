@@ -3,7 +3,6 @@
 //
 
 import Foundation
-import os
 
 /// Middleware that asks the user to confirm sensitive deep links, such as
 /// payments, deletions or account changes, before they continue.
@@ -66,7 +65,7 @@ public final class ConfirmationMiddleware: DeepLinkMiddleware {
 		guard matcher.matches(request) else { return request }
 
 		let prompt = DeepLinkConfirmationRequest(url: redactor.redact(request.url), context: request.context)
-		guard try await gate.run({ try await self.answer(to: prompt) }) else {
+		guard try await gate.run({ await self.answer(to: prompt) }) else {
 			throw DeepLinkError.confirmationDenied(request.url)
 		}
 		return request
@@ -76,62 +75,9 @@ public final class ConfirmationMiddleware: DeepLinkMiddleware {
 // MARK: - Prompting
 
 private extension ConfirmationMiddleware {
-	/// Races the prompt against the timeout in unstructured tasks, so the first
-	/// outcome returns (and frees the serial gate) even when the provider
-	/// ignores cancellation. Cancelling the link denies it the same way.
-	func answer(to prompt: DeepLinkConfirmationRequest) async throws -> Bool {
-		guard let timeout else { return await provider.confirm(prompt) }
-
-		let decision = FirstDecision()
-		let promptTask = Task { [provider] in await decision.resolve(provider.confirm(prompt)) }
-		let timerTask = Task { [sleep] in
-			try? await sleep(timeout)
-			decision.resolve(false)
+	func answer(to prompt: DeepLinkConfirmationRequest) async -> Bool {
+		await ConfirmationRace.decide(timeout: timeout, sleep: sleep) { [provider] in
+			await provider.confirm(prompt)
 		}
-		defer {
-			promptTask.cancel()
-			timerTask.cancel()
-		}
-		return await withTaskCancellationHandler {
-			await decision.value
-		} onCancel: {
-			decision.resolve(false)
-		}
-	}
-}
-
-/// A decision that the first of several racers settles; later answers are ignored.
-private final class FirstDecision: Sendable {
-	private struct State {
-		var decision: Bool?
-		var waiter: CheckedContinuation<Bool, Never>?
-	}
-
-	private let state = OSAllocatedUnfairLock(initialState: State())
-
-	var value: Bool {
-		get async {
-			await withCheckedContinuation { continuation in
-				let settled = state.withLock { state -> Bool? in
-					if state.decision == nil {
-						state.waiter = continuation
-					}
-					return state.decision
-				}
-				if let settled {
-					continuation.resume(returning: settled)
-				}
-			}
-		}
-	}
-
-	func resolve(_ decision: Bool) {
-		let waiter = state.withLock { state -> CheckedContinuation<Bool, Never>? in
-			guard state.decision == nil else { return nil }
-			state.decision = decision
-			defer { state.waiter = nil }
-			return state.waiter
-		}
-		waiter?.resume(returning: decision)
 	}
 }

@@ -80,7 +80,6 @@ F1, F3, F5, F7, F10, F11, A5. Also: `.hardened` rejects invisible Unicode format
 - **Replay protection and attacker floods.** `maxEntries` eviction can be forced by many distinct links inside one window; documented, mitigated by placing the rate limiter first.
 
 ### Backlog (deferred from Phase 3)
-- **Route-level confirmation/signature rules.** `DeepLinkMatcher` works on the URL and context before routing; matching on parsed routes would need a handler decorator (for example a `ConfirmingHandler`). Use `.paths`/`.hosts` or `.custom` meanwhile.
 - **Persistent nonce store.** Only `InMemoryNonceStore` ships; single-use links across relaunches need an app-provided `NonceStore`.
 - **SwiftUI scene identifier.** SwiftUI exposes none, so `onDeepLink(_:sceneID:)` takes an app-supplied identifier (documented `@SceneStorage` pattern) rather than deriving one.
 - **Replay vs. pending-link resume ordering.** The recommended order puts replay protection before authentication; apps resuming protected links must move it after authentication (documented).

@@ -308,6 +308,17 @@ middleware order and a hardening checklist.
   `handle(url:context:)`; no other payload value reaches the pipeline, and a
   payload without a URL returns `nil` without running it. All are main-actor
   isolated so the non-`Sendable` system objects can be passed directly.
+- **Route-level rules.** `RouteMatcher<Route>` (`.routes(where:)`, `.all`,
+  `.custom`) selects **parsed** routes, and two handler decorators enforce
+  rules on them regardless of URL spelling: `SignedRouteGuard` /
+  `handler.requiringSignature(for:)` rejects protected routes whose link was
+  not verified (`securityViolation(SignedRouteGuard.unsignedRouteReason)`),
+  and `ConfirmingHandler` / `handler.confirming(_:timeout:confirm:)` asks a
+  route-aware closure first (`confirmationDenied` on denial or timeout).
+  `DeepLinkContext.isSignatureVerified` records the result and only
+  `SignedLinkMiddleware` can set it; the middleware now also verifies any link
+  that carries a signature, not only those its URL rule selects (an invalid
+  signature is rejected either way).
 - **Multi-scene routing (F9).** `SceneRoutingHandler<Route>` is a handler that
   forwards each route to the handler registered for its
   `DeepLinkContext.sceneID` (`register(_:forScene:)`, `unregister(scene:)`),

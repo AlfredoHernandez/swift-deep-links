@@ -187,7 +187,32 @@ final class AlertConfirmation: DeepLinkConfirmationProvider {
 }
 ```
 
-## 5. Parse strictly
+## 5. Prefer route-level rules
+
+URL rules (`DeepLinkMatcher`) run before parsing and see a URL that may be
+spelled in many ways. Route rules run on the route your parsers produced, so
+they hold however the link was written. Use them for everything sensitive,
+and keep URL rules as an early filter:
+
+```swift
+let isSensitive: @Sendable (AppRoute) -> Bool = {
+    switch $0 { case .resetPassword, .payment: true; default: false }
+}
+
+.handler(
+    AppHandler()
+        .requiringSignature(for: .routes(where: isSensitive))      // only verified signed links
+        .confirming(.routes { if case .payment = $0 { true } else { false } }) { route, _ in
+            await alerts.confirm(route.summary)                      // describe the action, not the URL
+        }
+)
+```
+
+`SignedRouteGuard` relies on `DeepLinkContext.isSignatureVerified`, which only
+`SignedLinkMiddleware` sets, so keep `.signedLinks(...)` in the chain (it
+verifies every link carrying a signature, even ones no URL rule selects).
+
+## 6. Parse strictly
 
 - Prefer `PathPatternParser` (`PathPatternParser("/products/:id") { … }`): captures are
   decoded once, restricted to unreserved characters, and `.`/`..` segments are
@@ -200,20 +225,20 @@ final class AlertConfirmation: DeepLinkConfirmationProvider {
   `blockedURL` stop routing so a laxer parser cannot accept what a stricter
   one rejected.
 
-## 6. Keep secrets out of logs
+## 7. Keep secrets out of logs
 
 Since 2.0, framework logs, analytics, error descriptions and notifications
 redact tokens, codes, emails, JWTs and userinfo. Use
 `error.redactedDescription` in your own logs, keep `.unredacted` / `.full` to
 debug builds, and keep secrets out of path segments, which are never redacted.
 
-## 7. Multi-window apps
+## 8. Multi-window apps
 
 Pass each scene's identifier with the link (`sceneID:` on every entry point,
 `onDeepLink(_:sceneID:)` in SwiftUI) and route through a `SceneRoutingHandler`,
 so a link opened in one window cannot drive navigation in another.
 
-## 8. Verify
+## 9. Verify
 
 - Run `DeepLinkDiagnostics` in debug builds with your `applinks:` entitlement
   values to catch hosts that do not match your associated domains.
