@@ -127,7 +127,7 @@ public final class SignedLinkMiddleware: DeepLinkMiddleware {
 	private let reusedNonce: ReusedNonceResponse
 	private let stripsSignatureParameters: Bool
 	private let dateProvider: @Sendable () -> Date
-	private let reservations = OSAllocatedUnfairLock<[UUID: NonceReservation]>(initialState: [:])
+	private let reservations = OSAllocatedUnfairLock<[UUID: [NonceReservation]]>(initialState: [:])
 
 	/// Creates a signed-link middleware.
 	///
@@ -185,8 +185,13 @@ public final class SignedLinkMiddleware: DeepLinkMiddleware {
 	/// failed before any handler ran.
 	public func didFinish(_: DeepLinkRequest, outcome: DeepLinkOutcome) async {
 		guard let nonceStore, let runID = DeepLinkRun.id,
-		      let reservation = reservations.withLock({ $0.removeValue(forKey: runID) })
+		      let reservation = reservations.withLock({ $0[runID]?.popLast() })
 		else { return }
+		reservations.withLock {
+			if $0[runID]?.isEmpty == true {
+				$0[runID] = nil
+			}
+		}
 
 		switch outcome {
 		case .succeeded, .deferred, .handlerFailed:
@@ -249,7 +254,7 @@ private extension SignedLinkMiddleware {
 			return await nonceStore.consume(nonce, expiresAt: validUntil)
 		}
 		guard let reservation = await nonceStore.reserve(nonce, expiresAt: validUntil) else { return false }
-		reservations.withLock { $0[runID] = reservation }
+		reservations.withLock { $0[runID, default: []].append(reservation) }
 		return true
 	}
 

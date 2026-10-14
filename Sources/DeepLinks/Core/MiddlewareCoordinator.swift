@@ -152,11 +152,18 @@ public actor DeepLinkMiddlewareCoordinator {
 
 	/// Processes a request through all middleware in sequence.
 	///
+	/// This is a standalone call even from inside a handler: it is not part of
+	/// the coordinator pass that invoked the handler, so
+	/// ``DeepLinkMiddleware/didFinish(_:outcome:)`` is not called and
+	/// ``SignedLinkMiddleware`` consumes nonces at once instead of reserving them.
+	///
 	/// - Parameter request: The URL and the context it arrived with
 	/// - Returns: The processed request, or `nil` if processing was stopped
 	/// - Throws: An error if any middleware throws an error
 	public func process(_ request: DeepLinkRequest) async throws -> DeepLinkRequest? {
-		try await run(request, through: middleware[...])
+		try await DeepLinkRun.outside {
+			try await run(request, through: middleware[...])
+		}
 	}
 
 	/// Processes a URL through the middleware registered after `anchor`,
@@ -191,7 +198,9 @@ public actor DeepLinkMiddlewareCoordinator {
 	/// Processes a request through the middleware registered after `anchor`.
 	/// See ``process(_:startingAfter:)-(URL,_)``.
 	public func process(_ request: DeepLinkRequest, startingAfter anchor: some DeepLinkMiddleware & AnyObject) async throws -> DeepLinkRequest? {
-		try await run(request, through: middleware(after: { ($0 as AnyObject) === anchor }))
+		try await DeepLinkRun.outside {
+			try await run(request, through: middleware(after: { ($0 as AnyObject) === anchor }))
+		}
 	}
 
 	func trackedProcess(_ request: DeepLinkRequest) async -> MiddlewareRun {

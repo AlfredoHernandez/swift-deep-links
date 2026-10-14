@@ -115,6 +115,32 @@ struct SignedLinkTwoPhaseTests {
 	}
 
 	@Test
+	func `a signed link processed inside a handler does not disturb the outer link's nonce`() async throws {
+		let clock = ManualDateProvider()
+		let signed = SignedLinkMiddleware(
+			keys: SigningKeyring(key: key),
+			nonceStore: InMemoryNonceStore(dateProvider: clock.dateProvider),
+			dateProvider: clock.dateProvider,
+		)
+		let chain = DeepLinkMiddlewareCoordinator(middleware: [signed])
+		let inner = try SignedLinkBuilder(key: key).sign(#require(URL(string: "https://example.com/inner")), expiresAt: clock.now + 600, nonce: "inner")
+		let outer = try SignedLinkBuilder(key: key).sign(#require(URL(string: "https://example.com/outer")), expiresAt: clock.now + 600, nonce: "outer")
+		let coordinator = DeepLinkCoordinator(
+			routing: DefaultDeepLinkRouting(parsers: [ImmediateParser(routes: [TestRoute.route1])]),
+			handler: NestedProcessingHandler(chain: chain, link: inner),
+			middlewareCoordinator: chain,
+		)
+
+		#expect(await coordinator.handle(url: outer).wasSuccessful)
+		clock.advance(by: InMemoryNonceStore.defaultReservationTTL + 1)
+
+		#expect(await coordinator.handle(url: outer).firstDeepLinkError == .securityViolation(SignedLinkMiddleware.reusedNonceReason))
+		await #expect(throws: DeepLinkError.securityViolation(SignedLinkMiddleware.reusedNonceReason)) {
+			try await chain.process(DeepLinkRequest(url: inner))
+		}
+	}
+
+	@Test
 	func `concurrent deliveries through the coordinator admit exactly one`() async {
 		let sut = Pipeline()
 		let link = sut.link
@@ -240,6 +266,23 @@ private struct FailingOnRoute2Handler: DeepLinkHandler {
 		if route == .route2 {
 			throw DeepLinkError.handlerError(message: "route 2", underlyingError: nil)
 		}
+	}
+}
+
+/// Processes `link` through `chain` the first time it handles a route.
+private final class NestedProcessingHandler: DeepLinkHandler {
+	private let chain: DeepLinkMiddlewareCoordinator
+	private let link: URL
+	private let hasNested = OSAllocatedUnfairLock(initialState: false)
+
+	init(chain: DeepLinkMiddlewareCoordinator, link: URL) {
+		self.chain = chain
+		self.link = link
+	}
+
+	func handle(_: TestRoute, context _: DeepLinkContext) async throws {
+		guard !hasNested.withLock({ defer { $0 = true }; return $0 }) else { return }
+		_ = try await chain.process(DeepLinkRequest(url: link))
 	}
 }
 
