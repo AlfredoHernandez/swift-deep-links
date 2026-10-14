@@ -349,8 +349,11 @@ middleware order and a hardening checklist.
 - **`UserDefaultsNonceStore`.** A bounded, persistent `NonceStore` (injectable
   `UserDefaults`, key and clock): spent nonces survive relaunch as versioned
   JSON and are pruned by expiry; open reservations stay in memory and are
-  dropped on relaunch so an interrupted link can be retried; unreadable data
-  starts an empty store.
+  dropped on relaunch so an interrupted link can be retried. It writes only
+  when the spent set changes; unreadable data is logged and starts an empty
+  store, data from a newer format version is kept and the store refuses every
+  nonce, and a nonce whose spending cannot be written is refused. Not atomic
+  across processes sharing an app group.
 - **Route-level rules.** `RouteMatcher<Route>` (`.routes(where:)`, `.all`,
   `.custom`) selects **parsed** routes, and two handler decorators enforce
   rules on them regardless of URL spelling: `SignedRouteGuard` /

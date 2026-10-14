@@ -5,6 +5,7 @@
 @testable import DeepLinks
 import DeepLinksTesting
 import Foundation
+import os
 import Testing
 
 struct UserDefaultsNonceStoreTests {
@@ -94,6 +95,46 @@ struct UserDefaultsNonceStoreTests {
 	}
 
 	@Test
+	func `storage is written only when the spent nonces change`() async throws {
+		let writes = OSAllocatedUnfairLock(initialState: 0)
+		let store = try UserDefaultsNonceStore(userDefaults: #require(CountingDefaults(suiteName: makeSuite(), writes: writes)), dateProvider: clock.dateProvider)
+
+		let reservation = try #require(await store.reserve("a", expiresAt: clock.now + 600))
+		await store.release(reservation)
+		#expect(writes.withLock { $0 } == 0)
+
+		_ = await store.consume("b", expiresAt: clock.now + 600)
+		_ = await store.consume("b", expiresAt: clock.now + 600)
+		#expect(writes.withLock { $0 } == 1)
+	}
+
+	@Test
+	func `data from an unknown newer version fails closed and is kept`() async throws {
+		let suite = try makeSuite()
+		let future = Data(#"{"version":2,"spent":{},"extra":true}"#.utf8)
+		UserDefaults(suiteName: suite)?.set(future, forKey: UserDefaultsNonceStore.defaultKey)
+		let store = makeSUT(suite)
+
+		#expect(await !store.consume("n", expiresAt: clock.now + 600))
+		#expect(await store.reserve("n", expiresAt: clock.now + 600) == nil)
+		#expect(UserDefaults(suiteName: suite)?.data(forKey: UserDefaultsNonceStore.defaultKey) == future)
+	}
+
+	@Test
+	func `a nonce that cannot be persisted is refused`() async throws {
+		let store = try UserDefaultsNonceStore(
+			userDefaults: #require(UserDefaults(suiteName: makeSuite())),
+			key: UserDefaultsNonceStore.defaultKey,
+			maxEntries: 100,
+			reservationTTL: 60,
+			dateProvider: clock.dateProvider,
+			encode: { _ in throw CocoaError(.coderInvalidValue) },
+		)
+
+		#expect(await !store.consume("n", expiresAt: clock.now + 600))
+	}
+
+	@Test
 	func `concurrent consumption of one nonce admits exactly one`() async throws {
 		let store = try makeSUT(makeSuite())
 		let expiry = clock.now + 600
@@ -131,5 +172,20 @@ struct UserDefaultsNonceStoreTests {
 		let object = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
 		let nonces = try #require(object["spent"] as? [String: Any])
 		return nonces.keys.sorted()
+	}
+}
+
+/// Counts the writes a store makes into a counter the test keeps.
+private final class CountingDefaults: UserDefaults {
+	private let writes: OSAllocatedUnfairLock<Int>
+
+	init?(suiteName: String, writes: OSAllocatedUnfairLock<Int>) {
+		self.writes = writes
+		super.init(suiteName: suiteName)
+	}
+
+	override func set(_ value: Any?, forKey defaultName: String) {
+		writes.withLock { $0 += 1 }
+		super.set(value, forKey: defaultName)
 	}
 }

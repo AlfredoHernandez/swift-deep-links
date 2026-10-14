@@ -37,7 +37,7 @@ struct SignedLinkMiddlewareTests {
 		let (sut, _) = makeSUT()
 		let context = DeepLinkContext(source: .universalLink, sceneID: "scene")
 		var verified = context
-		verified.signatureVerifiedURL = try #require(URL(string: "https://example.com/reset"))
+		verified.signatureVerifiedURL = url("https://example.com/reset")
 
 		let result = try await sut.intercept(DeepLinkRequest(url: sign("https://example.com/reset"), context: context))
 
