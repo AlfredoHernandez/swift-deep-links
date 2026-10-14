@@ -226,6 +226,23 @@ struct SignedLinkTwoPhaseTests {
 	}
 
 	@Test
+	func `a signed link queued, drained while signed out and resumed after sign-in still verifies`() async {
+		let queue = DeepLinkReadinessQueue()
+		let auth = ToggleAuthentication()
+		let pending = InMemoryPendingLinkStore()
+		let sut = Pipeline(after: [
+			ReadinessMiddleware(queue: queue),
+			AuthenticationMiddleware(authProvider: auth, protectedHosts: ["example.com"], pendingLinks: pending),
+		])
+		_ = await sut.open(sut.link)
+
+		#expect(await sut.coordinator.markReadyAndDrain(queue: queue).map(\.wasSuccessful) == [false])
+		auth.isSignedIn = true
+
+		#expect(await sut.coordinator.resumePendingLinks(from: pending).map(\.wasSuccessful) == [true])
+	}
+
+	@Test
 	func `concurrent deliveries through the coordinator admit exactly one`() async {
 		let sut = Pipeline()
 		let link = sut.link

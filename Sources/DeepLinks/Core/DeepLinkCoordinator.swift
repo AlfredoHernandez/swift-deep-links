@@ -257,7 +257,7 @@ private extension DeepLinkCoordinator {
 		middlewareStage: (DeepLinkRequest) async -> MiddlewareRun,
 	) async -> DeepLinkResult<Route> {
 		await DeepLinkRun.$id.withValue(UUID()) {
-			await DeepLinkRun.$arrival.withValue(request) {
+			await DeepLinkRun.$arrival.withValue(request.deferral?.arrival ?? request) {
 				await handleInRun(request, middlewareStage: middlewareStage)
 			}
 		}

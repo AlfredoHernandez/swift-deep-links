@@ -59,11 +59,16 @@ struct MiddlewareRun: Sendable {
 /// pass's identifier so middleware can find what it held for the link.
 final class DeepLinkDeferral: Sendable {
 	private let runID: UUID?
+
+	/// The link as it entered the chain in the pass that queued it, so the
+	/// drained pass saves pending links with their signature intact.
+	let arrival: DeepLinkRequest?
 	private let visited: [(middleware: any DeepLinkMiddleware, request: DeepLinkRequest)]
 	private let isSettled = OSAllocatedUnfairLock(initialState: false)
 
-	init(runID: UUID?, visited: [(middleware: any DeepLinkMiddleware, request: DeepLinkRequest)]) {
+	init(runID: UUID?, arrival: DeepLinkRequest?, visited: [(middleware: any DeepLinkMiddleware, request: DeepLinkRequest)]) {
 		self.runID = runID
+		self.arrival = arrival
 		self.visited = visited
 	}
 

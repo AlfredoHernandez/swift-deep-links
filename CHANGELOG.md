@@ -280,8 +280,8 @@ middleware order and a hardening checklist.
   readiness keeps its nonce reserved: the middleware before the gate hears
   `.deferred` and later the drained pass's outcome, or `.stopped` when
   `DeepLinkReadinessQueue` evicts or resets it (releasing the nonce). `AuthenticationMiddleware` now saves the
-  link as it entered the chain, so a resumed signed link still carries its
-  signature. `reusedNonce: .drop` stops a reused link silently, and replay
+  link as it entered the chain (also when it was drained from a readiness
+  queue), so a resumed signed link still carries its signature. `reusedNonce: .drop` stops a reused link silently, and replay
   protection belongs before signed links so double deliveries are dropped
   quietly. `SignedLinkBuilder` signs links for servers and tests. Matchers
   compare hosts and paths case-insensitively and match paths after

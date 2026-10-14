@@ -102,8 +102,9 @@ public final class AuthenticationMiddleware: DeepLinkMiddleware {
 	///     ``DeepLinkError/unauthorizedAccess(_:)`` so it can be resumed after
 	///     sign-in with ``DeepLinkCoordinator/resumePendingLinks(from:)``. The
 	///     link is still rejected. Inside ``DeepLinkCoordinator`` the URL saved
-	///     is the link as it entered the chain (signature included), because a
-	///     resume runs the whole chain again; called directly, it is the URL
+	///     is the link as it entered the chain (signature included), also for a
+	///     link drained from a readiness queue, because a resume runs the whole
+	///     chain again; called directly, it is the URL
 	///     this middleware received. Defaults to `nil`, which saves nothing.
 	public init(
 		authProvider: AuthenticationProvider,
