@@ -49,7 +49,7 @@ struct RouteGuardTests {
 		let inner = CollectingHandler<TestRoute>()
 		let sut = inner.requiringSignature(for: .routes { $0 == .route1 })
 		var verified = DeepLinkContext(source: .universalLink)
-		verified.signatureVerifiedURL = try #require(URL(string: "myapp://pay"))
+		verified.signatureVerifiedURL = payURL
 
 		try await sut.handle(.route1, context: verified)
 		try await sut.handle(.route2, context: .unknown)
@@ -147,7 +147,7 @@ struct RouteGuardTests {
 	func `signed link middleware clears a verified flag it did not set`() async throws {
 		let middleware = SignedLinkMiddleware(keys: SigningKeyring(key: key), requiredFor: .paths(["/nothing"]), requiresExpiry: false)
 		var context = DeepLinkContext()
-		context.signatureVerifiedURL = try #require(URL(string: "myapp://x"))
+		context.signatureVerifiedURL = otherURL
 
 		let result = try await middleware.intercept(DeepLinkRequest(url: #require(URL(string: "myapp://x")), context: context))
 
@@ -239,6 +239,8 @@ struct RouteGuardTests {
 // MARK: - Helpers
 
 private let key = SymmetricKey(data: Data(repeating: 9, count: 32))
+private let payURL = URL(string: "myapp://pay")!
+private let otherURL = URL(string: "myapp://x")!
 
 /// A URL rule that never matches plus a route rule protecting `.route1`, so
 /// only the route guard can catch an unsigned link.
