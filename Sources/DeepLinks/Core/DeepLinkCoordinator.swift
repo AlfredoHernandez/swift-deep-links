@@ -242,8 +242,8 @@ extension DeepLinkCoordinator {
 	/// already ran is not repeated while later middleware (authentication,
 	/// security, rate limiting) still evaluates the link at drain time.
 	@discardableResult
-	func handleResumingAfterReadiness(url: URL, of queue: any ReadinessQueue) async -> DeepLinkResult<Route> {
-		await handle(DeepLinkRequest(url: url)) { [middlewareCoordinator] in
+	func handleResumingAfterReadiness(_ request: DeepLinkRequest, of queue: any ReadinessQueue) async -> DeepLinkResult<Route> {
+		await handle(request) { [middlewareCoordinator] in
 			await middlewareCoordinator.trackedProcess($0, resumingAfterReadinessOf: queue)
 		}
 	}

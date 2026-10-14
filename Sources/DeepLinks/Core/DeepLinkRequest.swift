@@ -31,8 +31,8 @@ public struct DeepLinkContext: Sendable, Hashable {
 		case shortcut
 		/// An App Intent or Siri.
 		case intent
-		/// The entry point did not say, or the link was replayed from a
-		/// readiness queue or pending-link store, which keep only the URL.
+		/// The entry point did not say, or the link was replayed from a custom
+		/// readiness queue or pending-link store that keeps only the URL.
 		case unknown
 	}
 

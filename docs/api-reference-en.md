@@ -87,7 +87,7 @@ public struct DeepLinkContext: Sendable, Hashable {
 }
 ```
 
-The context is a claim made by your entry point, not proof: any app can open a custom scheme. Use it to restrict sensitive flows (`.security(..., allowedSources: [.universalLink])`), never to trust a link. `openedURL(_:)` maps custom schemes to `.customScheme` and `http(s)` to `.unknown`, because an open-URL callback does not prove associated-domain verification; only browsing-web activities (`handle(activity:)`, `onDeepLink`) are `.universalLink`. Links replayed by `markReadyAndDrain(queue:)` and `resumePendingLinks(from:)` carry `.unknown`, because queues and stores keep only the URL; place source checks before `.readiness(queue:)` and keep them off links you resume after sign-in.
+The context is a claim made by your entry point, not proof: any app can open a custom scheme. Use it to restrict sensitive flows (`.security(..., allowedSources: [.universalLink])`), never to trust a link. `openedURL(_:)` maps custom schemes to `.customScheme` and `http(s)` to `.unknown`, because an open-URL callback does not prove associated-domain verification; only browsing-web activities (`handle(activity:)`, `onDeepLink`) are `.universalLink`. Links replayed by `markReadyAndDrain(queue:)` and `resumePendingLinks(from:)` keep the context they arrived with (custom queues and stores that implement only the URL requirements replay with `.unknown`).
 
 ## Core Types
 
@@ -572,6 +572,9 @@ public protocol PendingLinkStore: Sendable {
     func save(_ url: URL) async       // newest last; re-saving moves the URL to the end
     func takeAll() async -> [URL]     // unexpired links, oldest first; empties the store
     func removeAll() async
+    // Keep the context (defaults wrap the URL forms and resume with .unknown):
+    func save(_ request: DeepLinkRequest) async
+    func takeAllRequests() async -> [DeepLinkRequest]
 }
 
 public actor InMemoryPendingLinkStore: PendingLinkStore {
@@ -589,6 +592,8 @@ public extension DeepLinkCoordinator {
 }
 ```
 
+`AuthenticationMiddleware` saves the link as it entered the chain, with its context, and `resumePendingLinks(from:)` replays it with that context through the whole chain. `UserDefaultsPendingLinkStore` persists the context as versioned JSON (`source`, `sourceApplication`, `sceneID`) but never the signature-verified flag, so a resumed link is verified again; links saved by 1.x or with an unknown source load as `.unknown`.
+
 Pass a store to `AuthenticationMiddleware(authProvider:protectedHosts:strategy:pendingLinks:)` (or `.authentication(..., pendingLinks:)`) and a link rejected with `unauthorizedAccess` is saved before the error propagates. After sign-in, `resumePendingLinks(from:)` runs each saved link through the **whole** chain again, so authentication, security and rate limiting are evaluated at resume time; a link that is still unauthorized is saved again. Stores keep at most `maxCount` links (oldest dropped, clamped to at least 1) and discard links older than `expiry` seconds. Only the URL and its save time are stored; the `UserDefaults` store writes them unencrypted, so prefer the in-memory store when protected links carry secrets. Call `removeAll()` on sign-out so one account's pending link never runs for another. Any app or page can trigger a protected link, so only protect routes that are safe to run after sign-in without a fresh user action, or confirm before acting.
 
 ## Readiness
@@ -602,8 +607,14 @@ public protocol ReadinessQueue: ReadinessCondition {
     var pendingCount: Int { get }
     var pendingURLs: [URL] { get }
     func reset()
+    // Keep the context (defaults wrap the URL forms and replay with .unknown):
+    func enqueue(_ request: DeepLinkRequest) -> DeepLinkRequest?
+    func markReadyReturningRequests() -> [DeepLinkRequest]
+    var pendingRequests: [DeepLinkRequest] { get }
 }
 ```
+
+`DeepLinkReadinessQueue` and `ReadinessMiddleware` keep the whole request, so `markReadyAndDrain(queue:)` replays each link with its source, source application, scene and signature-verified flag.
 
 ### DeepLinkReadinessQueue
 
@@ -732,7 +743,7 @@ public final class SceneRoutingHandler<Route: DeepLinkRoute>: DeepLinkHandler {
 }
 ```
 
-Use it as the coordinator's handler: each link goes to the handler registered for its `context.sceneID`, which receives the full context. Links without a scene or from an unregistered scene (closed window, readiness drain, pending-link resume) go to `fallback`; without one they fail with `handlerError(message: noSceneHandlerMessage, underlyingError: nil)`. The scene ID reaches the context through `handle(url:context:)`, `handle(activity:handoffActivityTypes:sceneID:)`, the notification, Spotlight and quick-action entry points (`sceneID:`; notifications default to the response's `targetScene` on iOS/visionOS) and `onDeepLink(_:sceneID:)`.
+Use it as the coordinator's handler: each link goes to the handler registered for its `context.sceneID`, which receives the full context. Links without a scene or from an unregistered scene (closed window, `handle(url:)`, a custom queue or store that keeps only URLs) go to `fallback`; without one they fail with `handlerError(message: noSceneHandlerMessage, underlyingError: nil)`. The scene ID reaches the context through `handle(url:context:)`, `handle(activity:handoffActivityTypes:sceneID:)`, the notification, Spotlight and quick-action entry points (`sceneID:`; notifications default to the response's `targetScene` on iOS/visionOS) and `onDeepLink(_:sceneID:)`.
 
 ## Parsing
 

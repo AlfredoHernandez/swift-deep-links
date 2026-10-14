@@ -35,8 +35,8 @@ public extension DeepLinkCoordinator {
 	@discardableResult
 	func resumePendingLinks(from store: any PendingLinkStore) async -> [DeepLinkResult<Route>] {
 		var results: [DeepLinkResult<Route>] = []
-		for url in await store.takeAll() {
-			await results.append(handle(url: url))
+		for request in await store.takeAllRequests() {
+			await results.append(handle(url: request.url, context: request.context))
 		}
 		return results
 	}

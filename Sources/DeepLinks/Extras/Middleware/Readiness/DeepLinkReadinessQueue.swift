@@ -55,7 +55,7 @@ public final class DeepLinkReadinessQueue: ReadinessQueue, Sendable {
 
 	private struct State {
 		var isReady = false
-		var pendingURLs: [URL] = []
+		var pending: [DeepLinkRequest] = []
 	}
 
 	/// Creates a new readiness queue.
@@ -85,39 +85,36 @@ public final class DeepLinkReadinessQueue: ReadinessQueue, Sendable {
 	/// - Parameter url: The deep link URL
 	/// - Returns: The URL if ready (pass through), or `nil` if queued
 	public func enqueue(_ url: URL) -> URL? {
-		let outcome = state.withLock { state -> (passThrough: URL?, evicted: URL?) in
+		enqueue(DeepLinkRequest(url: url))?.url
+	}
+
+	public func enqueue(_ request: DeepLinkRequest) -> DeepLinkRequest? {
+		let outcome = state.withLock { state -> (passThrough: DeepLinkRequest?, evicted: DeepLinkRequest?) in
 			if state.isReady {
-				return (url, nil)
+				return (request, nil)
 			}
-			var evicted: URL?
-			if let max = maxQueueSize, state.pendingURLs.count >= max {
-				evicted = state.pendingURLs.removeFirst()
+			var evicted: DeepLinkRequest?
+			if let max = maxQueueSize, state.pending.count >= max {
+				evicted = state.pending.removeFirst()
 			}
-			state.pendingURLs.append(url)
+			state.pending.append(request)
 			return (nil, evicted)
 		}
 		if let evicted = outcome.evicted {
-			onEvict?(evicted)
+			onEvict?(evicted.url)
 		}
 		return outcome.passThrough
 	}
 
-	/// Signals readiness and returns all pending URLs for reprocessing.
-	///
-	/// This method is idempotent — subsequent calls return an empty array.
-	///
-	/// - Warning: The returned array is the **only** reference to the queued URLs;
-	///   the queue is drained as a side effect of this call. If the caller drops
-	///   or fails to process the returned URLs, they are lost. To inspect the
-	///   queue without draining it, read ``pendingURLs`` instead.
-	///
-	/// - Returns: The URLs that were queued before readiness was signaled
 	public func markReady() -> [URL] {
+		markReadyReturningRequests().map(\.url)
+	}
+
+	public func markReadyReturningRequests() -> [DeepLinkRequest] {
 		state.withLock { state in
 			state.isReady = true
-			let pending = state.pendingURLs
-			state.pendingURLs = []
-			return pending
+			defer { state.pending = [] }
+			return state.pending
 		}
 	}
 
@@ -125,7 +122,7 @@ public final class DeepLinkReadinessQueue: ReadinessQueue, Sendable {
 	///
 	/// - Returns: The count of URLs waiting to be processed
 	public var pendingCount: Int {
-		state.withLock { $0.pendingURLs.count }
+		state.withLock { $0.pending.count }
 	}
 
 	/// A snapshot of the URLs currently in the queue.
@@ -135,7 +132,11 @@ public final class DeepLinkReadinessQueue: ReadinessQueue, Sendable {
 	///
 	/// - Returns: The URLs currently waiting to be processed
 	public var pendingURLs: [URL] {
-		state.withLock { $0.pendingURLs }
+		pendingRequests.map(\.url)
+	}
+
+	public var pendingRequests: [DeepLinkRequest] {
+		state.withLock { $0.pending }
 	}
 
 	/// Resets the queue to its initial not-ready state, discarding any pending URLs.
@@ -146,7 +147,7 @@ public final class DeepLinkReadinessQueue: ReadinessQueue, Sendable {
 	public func reset() {
 		state.withLock { state in
 			state.isReady = false
-			state.pendingURLs = []
+			state.pending = []
 		}
 	}
 }

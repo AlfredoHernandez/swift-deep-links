@@ -267,7 +267,7 @@ struct WindowRoot: View {
 }
 ```
 
-In UIKit, register in `scene(_:willConnectTo:options:)` under `session.persistentIdentifier` and unregister in `sceneDidDisconnect(_:)`. Links without a scene (readiness drains, pending-link resumes, `handle(url:)`) go to the fallback.
+In UIKit, register in `scene(_:willConnectTo:options:)` under `session.persistentIdentifier` and unregister in `sceneDidDisconnect(_:)`. Links without a scene (`handle(url:)`, or a window closed before its queued link drained) go to the fallback; drained and resumed links keep their scene.
 
 ### Notifications, Spotlight and Quick Actions
 

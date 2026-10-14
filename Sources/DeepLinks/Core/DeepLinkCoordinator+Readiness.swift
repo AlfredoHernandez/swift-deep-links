@@ -41,11 +41,11 @@ public extension DeepLinkCoordinator {
 	/// - Returns: One ``DeepLinkResult`` per drained URL, in queue order.
 	@discardableResult
 	func markReadyAndDrain(queue: any ReadinessQueue) async -> [DeepLinkResult<Route>] {
-		let pending = queue.markReady()
+		let pending = queue.markReadyReturningRequests()
 		var results: [DeepLinkResult<Route>] = []
 		results.reserveCapacity(pending.count)
-		for url in pending {
-			await results.append(handleResumingAfterReadiness(url: url, of: queue))
+		for request in pending {
+			await results.append(handleResumingAfterReadiness(request, of: queue))
 		}
 		return results
 	}

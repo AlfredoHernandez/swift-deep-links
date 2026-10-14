@@ -40,4 +40,36 @@ public protocol ReadinessQueue: ReadinessCondition {
 
 	/// Resets the queue to its initial not-ready state, discarding any pending URLs.
 	func reset()
+
+	/// Enqueues the request if not ready, or returns it for immediate processing.
+	///
+	/// Keeping the whole request lets a drained link reach the handler with
+	/// the ``DeepLinkContext`` it arrived with. The default enqueues the URL,
+	/// so a queue implementing only ``enqueue(_:)-(URL)`` drains with
+	/// ``DeepLinkContext/unknown``.
+	///
+	/// - Parameter request: The deep link and its context
+	/// - Returns: The request if ready (pass through), or `nil` if queued
+	func enqueue(_ request: DeepLinkRequest) -> DeepLinkRequest?
+
+	/// Signals readiness and returns all pending requests, with their
+	/// contexts, for reprocessing. The default wraps ``markReady()``.
+	func markReadyReturningRequests() -> [DeepLinkRequest]
+
+	/// A snapshot of the requests currently in the queue. The default wraps ``pendingURLs``.
+	var pendingRequests: [DeepLinkRequest] { get }
+}
+
+public extension ReadinessQueue {
+	func enqueue(_ request: DeepLinkRequest) -> DeepLinkRequest? {
+		enqueue(request.url).map(request.replacingURL)
+	}
+
+	func markReadyReturningRequests() -> [DeepLinkRequest] {
+		markReady().map { DeepLinkRequest(url: $0) }
+	}
+
+	var pendingRequests: [DeepLinkRequest] {
+		pendingURLs.map { DeepLinkRequest(url: $0) }
+	}
 }

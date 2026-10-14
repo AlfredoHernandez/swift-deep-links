@@ -61,12 +61,12 @@ public final class ReadinessMiddleware: DeepLinkMiddleware {
 		self.log = log
 	}
 
-	public func intercept(_ url: URL) async throws -> URL? {
-		guard let passedURL = queue.enqueue(url) else {
-			log.log(level: .info, "Deep link queued (app not ready): \(privacy.describe(url))")
+	public func intercept(_ request: DeepLinkRequest) async throws -> DeepLinkRequest? {
+		guard let passed = queue.enqueue(request) else {
+			log.log(level: .info, "Deep link queued (app not ready): \(privacy.describe(request.url))")
 			return nil
 		}
-		return passedURL
+		return passed
 	}
 
 	func isGating(_ candidate: any ReadinessQueue) -> Bool {

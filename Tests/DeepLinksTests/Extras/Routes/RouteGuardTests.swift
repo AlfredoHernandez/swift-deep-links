@@ -89,6 +89,26 @@ struct RouteGuardTests {
 	}
 
 	@Test
+	func `a signed link queued for readiness still passes the route guard when drained`() async throws {
+		let handler = CollectingHandler<TestRoute>()
+		let queue = DeepLinkReadinessQueue()
+		let coordinator = DeepLinkCoordinator(
+			routing: DefaultDeepLinkRouting(parsers: [ImmediateParser(routes: [TestRoute.route1])]),
+			handler: handler.requiringSignature(for: .all),
+			middlewareCoordinator: DeepLinkMiddlewareCoordinator(middleware: [
+				SignedLinkMiddleware(keys: SigningKeyring(key: key), requiresExpiry: false),
+				ReadinessMiddleware(queue: queue),
+			]),
+		)
+		_ = try await coordinator.handle(url: SignedLinkBuilder(key: key).sign(#require(URL(string: "myapp://pay"))))
+
+		let drained = await coordinator.markReadyAndDrain(queue: queue)
+
+		#expect(drained.map(\.wasSuccessful) == [true])
+		#expect(handler.handledRoutes == [.route1])
+	}
+
+	@Test
 	func `signed link middleware clears a verified flag it did not set`() async throws {
 		let middleware = SignedLinkMiddleware(keys: SigningKeyring(key: key), requiredFor: .paths(["/nothing"]), requiresExpiry: false)
 		var context = DeepLinkContext()

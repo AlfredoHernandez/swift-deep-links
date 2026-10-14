@@ -134,7 +134,11 @@ struct StripTracking: DeepLinkMiddleware {
 
 `DeepLinkMiddlewareCoordinator.process(_:)` takes a `DeepLinkRequest`;
 `CollectingMiddleware` adds `interceptedRequests`. Links replayed from a
-readiness queue or a pending-link store carry the `.unknown` source.
+readiness queue or a pending-link store keep the context they arrived with.
+Custom `ReadinessQueue` / `PendingLinkStore` types that implement only the URL
+requirements still compile and replay with `.unknown`; implement
+`enqueue(_: DeepLinkRequest)`, `markReadyReturningRequests()`,
+`pendingRequests`, `save(_: DeepLinkRequest)` and `takeAllRequests()` to keep it.
 
 `AdvancedDeepLinkMiddleware` / `MiddlewareResult` were removed (see
 [Removed APIs](#10-removed-apis)).

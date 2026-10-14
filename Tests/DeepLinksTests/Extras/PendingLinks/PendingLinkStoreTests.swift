@@ -128,14 +128,19 @@ struct PendingLinkStoreTests {
 	}
 
 	@Test
-	func `user defaults persists only the URL and the time it was saved`() async throws {
+	func `user defaults persists only the URL, the save time and the context`() async throws {
 		let suiteName = makeSuiteName()
-		try await UserDefaultsPendingLinkStore(userDefaults: defaults(suiteName), key: "pending").save(link("a"))
+		var context = DeepLinkContext(source: .notification, sourceApplication: "com.example", sceneID: "scene")
+		context.isSignatureVerified = true
+		try await UserDefaultsPendingLinkStore(userDefaults: defaults(suiteName), key: "pending")
+			.save(DeepLinkRequest(url: link("a"), context: context))
 
 		let data = try #require(defaults(suiteName).data(forKey: "pending"))
 		let entries = try #require(JSONSerialization.jsonObject(with: data) as? [[String: Any]])
+		let storedContext = try #require(entries.first?["context"] as? [String: Any])
 
-		#expect(entries.map { Set($0.keys) } == [["url", "savedAt"]])
+		#expect(entries.map { Set($0.keys) } == [["url", "savedAt", "context"]])
+		#expect(Set(storedContext.keys) == ["version", "source", "sourceApplication", "sceneID"])
 	}
 
 	@Test

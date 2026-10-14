@@ -34,8 +34,8 @@ middleware order and a hardening checklist.
   `.unknown` for unverified `http(s)`), and browsing-web activities as
   `.universalLink`. A type implementing neither `intercept` form (or neither
   `handle` form) throws `missingRequiredConfiguration` instead of recursing.
-  Readiness drains and pending-link resumes replay URLs
-  only, so those links carry `.unknown`. `DeepLinksTesting.CollectingMiddleware`
+  Readiness drains and pending-link resumes replay each link with the context
+  it arrived with (see below). `DeepLinksTesting.CollectingMiddleware`
   records `interceptedRequests`.
 - **`DefaultDeepLinkRouting` stops at security errors.** A parser throwing
   `DeepLinkError.securityViolation` or `.blockedURL` (directly or nested in a
@@ -308,6 +308,18 @@ middleware order and a hardening checklist.
   `handle(url:context:)`; no other payload value reaches the pipeline, and a
   payload without a URL returns `nil` without running it. All are main-actor
   isolated so the non-`Sendable` system objects can be passed directly.
+- **Queued and pending links keep their context.** `ReadinessQueue` gains
+  `enqueue(_: DeepLinkRequest)`, `markReadyReturningRequests()` and
+  `pendingRequests`, and `PendingLinkStore` gains `save(_: DeepLinkRequest)`
+  and `takeAllRequests()`, each with a default over the URL requirements so
+  1.x conformers still compile (and replay with `.unknown`).
+  `DeepLinkReadinessQueue`, both pending stores, `ReadinessMiddleware` and
+  `AuthenticationMiddleware` keep the whole request, so `markReadyAndDrain` and
+  `resumePendingLinks` hand the handler the original source, source
+  application and scene (a drained signed link stays verified for
+  `SignedRouteGuard`). `UserDefaultsPendingLinkStore` persists the context as
+  versioned JSON without the signature-verified flag; links stored by 1.x, or
+  with a source this version does not know, load as `.unknown`.
 - **`UserDefaultsNonceStore`.** A bounded, persistent `NonceStore` (injectable
   `UserDefaults`, key and clock): spent nonces survive relaunch as versioned
   JSON and are pruned by expiry; open reservations stay in memory and are

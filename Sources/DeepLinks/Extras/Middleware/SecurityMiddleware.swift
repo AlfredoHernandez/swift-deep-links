@@ -108,8 +108,8 @@ public final class SecurityMiddleware: DeepLinkMiddleware {
 	///   - blockedPatterns: Array of regex patterns for blocked URLs
 	///   - allowedSources: The ``DeepLinkContext/Source``s accepted, checked
 	///     before anything else; `nil` (the default) accepts every source. A link
-	///     intercepted as a bare URL, or replayed from a readiness queue or
-	///     pending-link store, has the ``DeepLinkContext/Source/unknown`` source.
+	///     intercepted as a bare URL has the ``DeepLinkContext/Source/unknown``
+	///     source; links replayed from the built-in queues and stores keep theirs.
 	///   - strategy: The security validation strategy to use (defaults to ``SecurityStrategy/hardened``;
 	///     pass `.standard` for the 1.x behavior)
 	///   - limits: Size limits checked before the strategy runs (defaults to ``DeepLinkInputLimits/unlimited``)

@@ -117,11 +117,12 @@ public final class AuthenticationMiddleware: DeepLinkMiddleware {
 		self.pendingLinks = pendingLinks
 	}
 
-	public func intercept(_ url: URL) async throws -> URL? {
+	public func intercept(_ request: DeepLinkRequest) async throws -> DeepLinkRequest? {
 		do {
-			return try strategy.validate(url: url, protectedHosts: protectedHosts, provider: authProvider)
+			return try strategy.validate(url: request.url, protectedHosts: protectedHosts, provider: authProvider)
+				.map(request.replacingURL)
 		} catch let DeepLinkError.unauthorizedAccess(rejectedURL) {
-			await pendingLinks?.save(DeepLinkRun.arrival?.url ?? rejectedURL)
+			await pendingLinks?.save(DeepLinkRun.arrival ?? request.replacingURL(rejectedURL))
 			throw DeepLinkError.unauthorizedAccess(rejectedURL)
 		}
 	}

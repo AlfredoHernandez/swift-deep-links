@@ -15,8 +15,7 @@ import os
 /// handler. The scene handler receives the full context.
 ///
 /// Links without a scene, or from a scene with no registered handler (it was
-/// closed, or the link was replayed from a readiness queue or pending-link
-/// store, which keep only the URL), go to `fallback`, typically the handler
+/// closed before a queued or pending link was replayed), go to `fallback`, typically the handler
 /// of the frontmost scene. Without a fallback they fail with
 /// ``DeepLinkError/handlerError(message:underlyingError:)``.
 ///

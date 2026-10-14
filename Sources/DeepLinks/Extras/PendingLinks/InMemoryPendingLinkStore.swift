@@ -30,13 +30,21 @@ public actor InMemoryPendingLinkStore: PendingLinkStore {
 		self.dateProvider = dateProvider
 	}
 
-	public func save(_ url: URL) {
-		links = policy.inserting(url, at: now, into: links)
+	public func save(_ url: URL) async {
+		await save(DeepLinkRequest(url: url))
 	}
 
-	public func takeAll() -> [URL] {
+	public func takeAll() async -> [URL] {
+		await takeAllRequests().map(\.url)
+	}
+
+	public func save(_ request: DeepLinkRequest) async {
+		links = policy.inserting(request, at: now, into: links)
+	}
+
+	public func takeAllRequests() async -> [DeepLinkRequest] {
 		defer { links.removeAll() }
-		return policy.unexpired(links, at: now).map(\.url)
+		return policy.unexpired(links, at: now).map(\.request)
 	}
 
 	public func removeAll() {
