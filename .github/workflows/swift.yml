@@ -60,6 +60,9 @@ jobs:
       - name: Select Xcode Version
         run: sudo xcode-select -switch /Applications/Xcode_26.0.app
 
+      - name: Hide sample workspace so xcodebuild resolves the package schemes
+        run: mv DeepLink.xcworkspace "$RUNNER_TEMP/DeepLink.xcworkspace"
+
       - name: Build DeepLinks for ${{ matrix.platform }}
         run: |
           xcodebuild build \
