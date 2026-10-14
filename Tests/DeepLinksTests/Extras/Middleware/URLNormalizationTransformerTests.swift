@@ -16,7 +16,7 @@ struct URLNormalizationTransformerTests {
 
 		#expect(result.path == "/path")
 		#expect(result.query?.contains("param1=value1") == true)
-		#expect(result.query?.contains("param2=") == false) // Empty param removed
+		#expect(result.query?.contains("param2=") == false)
 		#expect(result.query?.contains("param3=value3") == true)
 	}
 

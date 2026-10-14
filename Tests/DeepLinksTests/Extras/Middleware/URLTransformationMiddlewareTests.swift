@@ -29,7 +29,7 @@ struct URLTransformationMiddlewareTests {
 			_ = try await middleware.intercept(testURL)
 			#expect(Bool(false), "Expected transformer error")
 		} catch let error as DeepLinkError {
-			#expect(error == .handlerError("Transformer error"))
+			#expect(error == .handlerError(message: "Transformer error", underlyingError: nil))
 		}
 	}
 
@@ -49,7 +49,7 @@ struct URLTransformationMiddlewareTests {
 
 	private final class ErrorThrowingTransformer: URLTransformer {
 		func transform(_: URL) throws -> URL {
-			throw DeepLinkError.handlerError("Transformer error")
+			throw DeepLinkError.handlerError(message: "Transformer error", underlyingError: nil)
 		}
 	}
 }

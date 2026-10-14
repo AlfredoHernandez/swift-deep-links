@@ -24,4 +24,8 @@ actor InMemoryRateLimitPersistence: RateLimitPersistence {
 	func clearRequests() {
 		timestamps.removeAll()
 	}
+
+	func mutateRequests<Output: Sendable>(_ mutation: @Sendable (inout [TimeInterval]) -> Output) -> Output {
+		mutation(&timestamps)
+	}
 }

@@ -9,6 +9,11 @@ import Testing
 struct RateLimitPersistenceTests {
 	private static let fixedDate = Date(timeIntervalSince1970: 1_234_568_000.0)
 
+	/// Per-test cleanup: each test instance owns a tracker whose `deinit`
+	/// removes every `UserDefaults` suite registered during the test, so the
+	/// process-wide `.plist` registrations don't leak between tests or runs.
+	private let cleanup = UserDefaultsSuiteCleanup()
+
 	@Test
 	func `loadRequests delivers previously saved timestamps`() async {
 		let sut = makeSUT()
@@ -33,7 +38,9 @@ struct RateLimitPersistenceTests {
 	@Test
 	func `loadRequests delivers empty on invalid stored data`() async throws {
 		let key = "test.requests.\(UUID().uuidString)"
-		let userDefaults = try #require(UserDefaults(suiteName: "test.persistence.\(UUID().uuidString)"))
+		let suiteName = "test.persistence.\(UUID().uuidString)"
+		cleanup.track(suiteName)
+		let userDefaults = try #require(UserDefaults(suiteName: suiteName))
 		let invalidData = "invalid json data".data(using: .utf8)!
 		userDefaults.set(invalidData, forKey: key)
 
@@ -124,13 +131,40 @@ struct RateLimitPersistenceTests {
 
 	// MARK: - Helpers
 
+	@Test
+	func `mutateRequests applies the change and returns the closure result`() async {
+		let sut = makeSUT()
+		await sut.saveRequests([1_234_567_990.0])
+
+		let count = await sut.mutateRequests { timestamps in
+			timestamps.append(1_234_567_999.0)
+			return timestamps.count
+		}
+
+		#expect(count == 2)
+		#expect(await sut.loadRequests() == [1_234_567_990.0, 1_234_567_999.0])
+	}
+
+	@Test
+	func `mutateRequests sees pruned timestamps`() async {
+		let now = Date(timeIntervalSince1970: 1_000_000)
+		let sut = makeSUT(maxAge: 60, dateProvider: { now })
+		await sut.saveRequests([now.timeIntervalSince1970 - 120, now.timeIntervalSince1970 - 10])
+
+		let seen = await sut.mutateRequests { $0 }
+
+		#expect(seen == [now.timeIntervalSince1970 - 10])
+	}
+
 	private func makeSUT(
 		maxAge: TimeInterval = 3600,
 		dateProvider: @escaping @Sendable () -> Date = { fixedDate },
 	) -> UserDefaultsRateLimitPersistence {
 		let key = "test.requests.\(UUID().uuidString)"
+		let suiteName = "test.persistence.\(UUID().uuidString)"
+		cleanup.track(suiteName)
 		return UserDefaultsRateLimitPersistence(
-			userDefaults: UserDefaults(suiteName: "test.persistence.\(UUID().uuidString)")!,
+			userDefaults: UserDefaults(suiteName: suiteName)!,
 			key: key,
 			maxAge: maxAge,
 			dateProvider: dateProvider,

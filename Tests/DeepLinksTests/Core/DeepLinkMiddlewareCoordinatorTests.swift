@@ -14,7 +14,6 @@ struct DeepLinkMiddlewareCoordinatorTests {
 		let coordinator = DeepLinkMiddlewareCoordinator()
 		let testURL = try #require(URL(string: "testapp://test"))
 
-		// Add a simple middleware that returns the URL
 		await coordinator.add(MiddlewareSpy())
 
 		let result = try await coordinator.process(testURL)
@@ -27,7 +26,6 @@ struct DeepLinkMiddlewareCoordinatorTests {
 		let coordinator = DeepLinkMiddlewareCoordinator()
 		let testURL = try #require(URL(string: "testapp://test"))
 
-		// Add middleware that returns nil
 		await coordinator.add(MiddlewareStub(result: nil))
 
 		let result = try await coordinator.process(testURL)
@@ -40,7 +38,6 @@ struct DeepLinkMiddlewareCoordinatorTests {
 		let coordinator = DeepLinkMiddlewareCoordinator()
 		let testURL = try #require(URL(string: "testapp://test"))
 
-		// Add middleware that tracks order
 		let firstMiddleware = OrderTrackingSpy(id: "first")
 		let secondMiddleware = OrderTrackingSpy(id: "second")
 
@@ -52,7 +49,6 @@ struct DeepLinkMiddlewareCoordinatorTests {
 		#expect(firstMiddleware.wasCalled)
 		#expect(secondMiddleware.wasCalled)
 
-		// Verify order by checking that first middleware was called before second
 		#expect(try #require(firstMiddleware.callTimes.first) < secondMiddleware.callTimes.first!)
 	}
 
@@ -62,7 +58,6 @@ struct DeepLinkMiddlewareCoordinatorTests {
 		let testURL = try #require(URL(string: "testapp://test"))
 		let transformedURL = try #require(URL(string: "testapp://transformed"))
 
-		// Add middleware that transforms URL
 		await coordinator.add(URLTransformingStub(transformedURL: transformedURL))
 
 		let result = try await coordinator.process(testURL)
@@ -75,7 +70,6 @@ struct DeepLinkMiddlewareCoordinatorTests {
 		let coordinator = DeepLinkMiddlewareCoordinator()
 		let testURL = try #require(URL(string: "testapp://test"))
 
-		// Add middleware that throws error
 		await coordinator.add(ErrorThrowingStub())
 
 		do {
@@ -91,14 +85,11 @@ struct DeepLinkMiddlewareCoordinatorTests {
 		let coordinator = DeepLinkMiddlewareCoordinator()
 		let testURL = try #require(URL(string: "testapp://test"))
 
-		// Add middleware
 		let middleware = MiddlewareSpy()
 		await coordinator.add(middleware)
 
-		// Remove middleware
 		await coordinator.remove(MiddlewareSpy.self)
 
-		// Should not process through middleware
 		let result = try await coordinator.process(testURL)
 
 		#expect(result == testURL)
@@ -110,16 +101,13 @@ struct DeepLinkMiddlewareCoordinatorTests {
 		let coordinator = DeepLinkMiddlewareCoordinator()
 		let testURL = try #require(URL(string: "testapp://test"))
 
-		// Add multiple middleware
 		let middleware1 = MiddlewareSpy()
 		let middleware2 = MiddlewareSpy()
 		await coordinator.add(middleware1)
 		await coordinator.add(middleware2)
 
-		// Remove all middleware
 		await coordinator.removeAll()
 
-		// Should not process through middleware
 		let result = try await coordinator.process(testURL)
 
 		#expect(result == testURL)
@@ -167,7 +155,6 @@ struct DeepLinkMiddlewareCoordinatorTests {
 			persistence: persistence,
 		)
 
-		// Make 3 requests (within limit)
 		for _ in 0 ..< 3 {
 			let result = try await middleware.intercept(testURL)
 			#expect(result == testURL)
@@ -184,7 +171,6 @@ struct DeepLinkMiddlewareCoordinatorTests {
 			persistence: persistence,
 		)
 
-		// Make 2 requests (within limit)
 		for _ in 0 ..< 2 {
 			let result = try await middleware.intercept(testURL)
 			#expect(result == testURL)
@@ -195,7 +181,7 @@ struct DeepLinkMiddlewareCoordinatorTests {
 			_ = try await middleware.intercept(testURL)
 			#expect(Bool(false), "Expected rate limit error")
 		} catch let error as DeepLinkError {
-			#expect(error == .rateLimitExceeded(2, 60.0))
+			#expect(error == .rateLimitExceeded(maxRequests: 2, timeWindow: 60.0))
 		}
 	}
 
@@ -242,7 +228,7 @@ struct DeepLinkMiddlewareCoordinatorTests {
 			_ = try await middleware.intercept(testURL)
 			#expect(Bool(false), "Expected unauthorized access error")
 		} catch let error as DeepLinkError {
-			#expect(error == .unauthorizedAccess("protected"))
+			#expect(error == .unauthorizedAccess(testURL))
 		}
 	}
 
@@ -324,7 +310,7 @@ struct DeepLinkMiddlewareCoordinatorTests {
 			_ = try await middleware.intercept(testURL)
 			#expect(Bool(false), "Expected blocked URL error")
 		} catch let error as DeepLinkError {
-			#expect(error == .blockedURL(testURL.absoluteString))
+			#expect(error == .blockedURL(testURL))
 		}
 	}
 
@@ -354,29 +340,42 @@ struct DeepLinkMiddlewareCoordinatorTests {
 		#expect(result.query?.contains("param2=") == false)
 	}
 
-	// MARK: - Advanced Middleware Tests
+	// MARK: - Middleware Protocol Coverage
 
 	@Test
-	func `AdvancedDeepLinkMiddleware provides full control over processing`() async throws {
+	func `middleware can transform the URL for downstream middleware`() async throws {
 		let coordinator = DeepLinkMiddlewareCoordinator()
 		let testURL = try #require(URL(string: "testapp://test"))
+		let transformedURL = try #require(URL(string: "testapp://advanced"))
 
-		// Add advanced middleware that transforms URL
-		let advancedMiddleware = try AdvancedMiddlewareSpy(transformedURL: #require(URL(string: "testapp://advanced")))
-		await coordinator.add(advancedMiddleware)
+		await coordinator.add(URLTransformingStub(transformedURL: transformedURL))
 
 		let result = try await coordinator.process(testURL)
 
-		#expect(result == URL(string: "testapp://advanced"))
+		#expect(result == transformedURL)
 	}
 
-	// MARK: - Test Helpers
+	@Test
+	func `middleware can halt processing by returning nil`() async throws {
+		let coordinator = DeepLinkMiddlewareCoordinator()
+		let testURL = try #require(URL(string: "testapp://test"))
 
-	// MARK: - Dummies
+		await coordinator.add(MiddlewareStub(result: nil))
 
-	private final class DummyMiddleware: DeepLinkMiddleware {
-		func intercept(_: URL) async throws -> URL? {
-			nil
+		let result = try await coordinator.process(testURL)
+
+		#expect(result == nil)
+	}
+
+	@Test
+	func `middleware can halt processing by throwing an error`() async throws {
+		let coordinator = DeepLinkMiddlewareCoordinator()
+		let testURL = try #require(URL(string: "testapp://test"))
+
+		await coordinator.add(ErrorThrowingStub())
+
+		await #expect(throws: DeepLinkError.self) {
+			try await coordinator.process(testURL)
 		}
 	}
 
@@ -397,7 +396,7 @@ struct DeepLinkMiddlewareCoordinatorTests {
 	private final class ErrorThrowingStub: DeepLinkMiddleware {
 		private let error: Error
 
-		init(error: Error = DeepLinkError.handlerError("Test error")) {
+		init(error: Error = DeepLinkError.handlerError(message: "Test error", underlyingError: nil)) {
 			self.error = error
 		}
 
@@ -465,24 +464,6 @@ struct DeepLinkMiddlewareCoordinatorTests {
 				return false
 			}
 			return selfTime < otherTime
-		}
-	}
-
-	private final class AdvancedMiddlewareSpy: AdvancedDeepLinkMiddleware, @unchecked Sendable {
-		private let transformedURL: URL
-		private(set) var requests = [URL]()
-
-		init(transformedURL: URL) {
-			self.transformedURL = transformedURL
-		}
-
-		func intercept(_ url: URL) async -> MiddlewareResult {
-			requests.append(url)
-			return .transform(transformedURL)
-		}
-
-		var wasCalled: Bool {
-			!requests.isEmpty
 		}
 	}
 }

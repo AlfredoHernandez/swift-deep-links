@@ -35,8 +35,8 @@ import os
 /// - Note: This handler performs no actual route processing; it only records routes.
 /// - Complexity: O(1) for recording each route.
 /// - SeeAlso: `CollectingMiddleware`, `CollectingDelegate`
-public final class CollectingHandler<Route: DeepLinkRoute>: DeepLinkHandler, @unchecked Sendable {
-	private let state = OSAllocatedUnfairLock(initialState: [Route]())
+public final class CollectingHandler<Route: DeepLinkRoute>: DeepLinkHandler {
+	private let state = OSAllocatedUnfairLock(initialState: [(route: Route, context: DeepLinkContext)]())
 
 	/// Initializes a new collecting handler with no recorded routes.
 	public init() {}
@@ -46,10 +46,20 @@ public final class CollectingHandler<Route: DeepLinkRoute>: DeepLinkHandler, @un
 	/// Access this property to assert which routes were processed during your test.
 	/// The routes are stored in the order they were received.
 	public var handledRoutes: [Route] {
-		state.withLock { $0 }
+		state.withLock { $0.map(\.route) }
+	}
+
+	/// The context each route arrived with, in the same order as ``handledRoutes``.
+	/// Routes passed to ``handle(_:)`` directly record ``DeepLinkContext/unknown``.
+	public var handledContexts: [DeepLinkContext] {
+		state.withLock { $0.map(\.context) }
 	}
 
 	public func handle(_ route: Route) async throws {
-		state.withLock { $0.append(route) }
+		try await handle(route, context: .unknown)
+	}
+
+	public func handle(_ route: Route, context: DeepLinkContext) async throws {
+		state.withLock { $0.append((route, context)) }
 	}
 }

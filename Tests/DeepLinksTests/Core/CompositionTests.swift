@@ -10,34 +10,6 @@ struct CompositionTests {
 	// MARK: - Delegate Composition Tests
 
 	@Test
-	@MainActor func `compose with variadic delegates creates composite delegate`() {
-		let provider = DefaultAnalyticsProvider()
-
-		let composite = compose(
-			.logging(),
-			.analytics(provider: provider),
-			.notification(),
-		)
-
-		#expect(composite is CompositeDeepLinkDelegate)
-	}
-
-	@Test
-	@MainActor func `compose with array of delegates creates composite delegate`() {
-		let provider = DefaultAnalyticsProvider()
-
-		let delegates: [DeepLinkCoordinatorDelegate] = [
-			.logging(),
-			.analytics(provider: provider),
-			.notification(),
-		]
-
-		let composite = compose(delegates)
-
-		#expect(composite is CompositeDeepLinkDelegate)
-	}
-
-	@Test
 	@MainActor func `composed delegate executes all delegates in order`() throws {
 		let spy1 = DelegateSpy()
 		let spy2 = DelegateSpy()
@@ -46,12 +18,28 @@ struct CompositionTests {
 		let composite = compose(spy1, spy2, spy3)
 
 		let url = try #require(URL(string: "test://example"))
-		let dummyCoordinator = DummyCoordinator()
-		composite.coordinator(dummyCoordinator, willProcess: url)
+		let coordinator = try makeTestCoordinator()
+		composite.coordinator(coordinator, willProcess: url)
 
 		#expect(spy1.willProcessCalled == true)
 		#expect(spy2.willProcessCalled == true)
 		#expect(spy3.willProcessCalled == true)
+	}
+
+	@Test
+	@MainActor func `composed delegate from an array forwards events to each delegate`() throws {
+		let spy1 = DelegateSpy()
+		let spy2 = DelegateSpy()
+
+		let delegates: [any DeepLinkCoordinatorDelegate<TestRoute>] = [spy1, spy2]
+		let composite = compose(delegates)
+
+		let url = try #require(URL(string: "test://example"))
+		let coordinator = try makeTestCoordinator()
+		composite.coordinator(coordinator, willProcess: url)
+
+		#expect(spy1.willProcessCalled == true)
+		#expect(spy2.willProcessCalled == true)
 	}
 
 	@Test
@@ -60,7 +48,7 @@ struct CompositionTests {
 		let routing = TestRouting()
 		let handler = TestHandler()
 
-		let coordinator = try await DeepLinkCoordinatorBuilder<TestRoute>()
+		let coordinator = try DeepLinkCoordinatorBuilder<TestRoute>()
 			.routing(routing)
 			.handler(handler)
 			.delegate(compose(
@@ -76,54 +64,45 @@ struct CompositionTests {
 		#expect(result.routes.count == 1)
 	}
 
-	// MARK: - Middleware Composition Tests
-
 	@Test
-	func `compose with variadic middleware creates array`() {
-		let provider = DefaultAnalyticsProvider()
+	@MainActor func `compose with a single delegate still forwards events`() throws {
+		let spy = DelegateSpy()
 
-		let middleware = compose(
-			.logging(),
-			.analytics(provider: provider),
-			.rateLimit(maxRequests: 10, timeWindow: 60),
-		)
+		let composite = compose(spy)
 
-		#expect(middleware.count == 3)
-		#expect(middleware[0] is LoggingMiddleware)
-		#expect(middleware[1] is AnalyticsMiddleware)
-		#expect(middleware[2] is RateLimitMiddleware)
+		let url = try #require(URL(string: "test://example"))
+		let coordinator = try makeTestCoordinator()
+		composite.coordinator(coordinator, willProcess: url)
+
+		#expect(spy.willProcessCalled == true)
 	}
 
 	@Test
-	func `compose with array of middleware returns same array`() {
-		let provider = DefaultAnalyticsProvider()
+	@MainActor func `compose with an empty array does not crash when invoked`() throws {
+		let delegates: [any DeepLinkCoordinatorDelegate<TestRoute>] = []
+		let composite = compose(delegates)
 
-		let middlewareList: [any DeepLinkMiddleware] = [
-			.logging(),
-			.analytics(provider: provider),
-		]
-
-		let composed = compose(middlewareList)
-
-		#expect(composed.count == 2)
-		#expect(composed[0] is LoggingMiddleware)
-		#expect(composed[1] is AnalyticsMiddleware)
+		let url = try #require(URL(string: "test://example"))
+		let coordinator = try makeTestCoordinator()
+		composite.coordinator(coordinator, willProcess: url)
 	}
 
+	// MARK: - Middleware Composition
+
 	@Test
-	func `composed middleware works with coordinator builder`() async throws {
+	func `middleware arrays passed through the builder run all middleware in order`() async throws {
 		let provider = DefaultAnalyticsProvider()
 		let routing = TestRouting()
 		let handler = TestHandler()
 
-		let coordinator = try await DeepLinkCoordinatorBuilder<TestRoute>()
+		let coordinator = try DeepLinkCoordinatorBuilder<TestRoute>()
 			.routing(routing)
 			.handler(handler)
-			.middleware(compose(
+			.middleware([
 				.logging(),
 				.analytics(provider: provider),
 				.rateLimit(maxRequests: 10, timeWindow: 60),
-			))
+			])
 			.build()
 
 		let url = try #require(URL(string: "test://example"))
@@ -131,34 +110,6 @@ struct CompositionTests {
 
 		#expect(result.wasSuccessful)
 		#expect(result.routes.count == 1)
-	}
-
-	@Test
-	@MainActor func `compose with single delegate works correctly`() {
-		let composite = compose(.logging())
-
-		#expect(composite is CompositeDeepLinkDelegate)
-	}
-
-	@Test
-	func `compose middleware with single item works correctly`() {
-		let middleware: [any DeepLinkMiddleware] = compose(.logging())
-
-		#expect(middleware.count == 1)
-		#expect(middleware[0] is LoggingMiddleware)
-	}
-
-	@Test
-	@MainActor func `compose with empty array creates empty composite`() throws {
-		let delegates: [DeepLinkCoordinatorDelegate] = []
-		let composite = compose(delegates)
-
-		#expect(composite is CompositeDeepLinkDelegate)
-
-		// Should not crash when calling methods
-		let url = try #require(URL(string: "test://example"))
-		let dummyCoordinator = DummyCoordinator()
-		composite.coordinator(dummyCoordinator, willProcess: url)
 	}
 
 	// MARK: - Test Helpers
@@ -181,23 +132,30 @@ struct CompositionTests {
 		func handle(_: TestRoute) async throws {}
 	}
 
-	final class DummyCoordinator {}
-
-	final class DelegateSpy: DeepLinkCoordinatorDelegate, @unchecked Sendable {
+	@MainActor
+	final class DelegateSpy: DeepLinkCoordinatorDelegate {
 		var willProcessCalled = false
 		var didProcessCalled = false
 		var didFailProcessingCalled = false
 
-		func coordinator(_: AnyObject, willProcess _: URL) {
+		func coordinator(_: DeepLinkCoordinator<TestRoute>, willProcess _: URL) {
 			willProcessCalled = true
 		}
 
-		func coordinator(_: AnyObject, didProcess _: URL, result _: DeepLinkResultProtocol) {
+		func coordinator(_: DeepLinkCoordinator<TestRoute>, didProcess _: URL, result _: DeepLinkResult<TestRoute>) {
 			didProcessCalled = true
 		}
 
-		func coordinator(_: AnyObject, didFailProcessing _: URL, error _: Error) {
+		func coordinator(_: DeepLinkCoordinator<TestRoute>, didFailProcessing _: URL, error _: Error) {
 			didFailProcessingCalled = true
 		}
+	}
+
+	@MainActor
+	private func makeTestCoordinator() throws -> DeepLinkCoordinator<TestRoute> {
+		try DeepLinkCoordinatorBuilder<TestRoute>()
+			.routing(TestRouting())
+			.handler(TestHandler())
+			.build()
 	}
 }

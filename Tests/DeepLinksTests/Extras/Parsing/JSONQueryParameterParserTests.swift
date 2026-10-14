@@ -370,6 +370,75 @@ struct JSONQueryParameterParserTests {
 	}
 
 	@Test
+	func `JSONQueryParameterParser parse with fromAll decodes single-value keys as arrays when the model requires it`() throws {
+		let parser = JSONQueryParameterParser()
+		let parameters = ["tags": ["electronics"]]
+
+		struct RequiresArrayParameters: Decodable {
+			let tags: [String]
+		}
+
+		let result = try parser.parse(RequiresArrayParameters.self, fromAll: parameters)
+
+		#expect(result.tags == ["electronics"])
+	}
+
+	@Test
+	func `JSONQueryParameterParser parse with fromAll rethrows the first-pass error when a required key is missing`() {
+		let parser = JSONQueryParameterParser()
+		let parameters = ["name": ["John"]]
+
+		struct RequiresMissingField: Decodable {
+			let userID: String
+			let name: String
+		}
+
+		do {
+			_ = try parser.parse(RequiresMissingField.self, fromAll: parameters)
+			Issue.record("Expected decoding to throw because userID is missing")
+		} catch let error as DecodingError {
+			guard case let .keyNotFound(key, _) = error else {
+				Issue.record("Expected keyNotFound, got \(error)")
+				return
+			}
+			#expect(key.stringValue == "userID")
+		} catch {
+			Issue.record("Expected DecodingError, got \(error)")
+		}
+	}
+
+	@Test
+	func `JSONQueryParameterParser parse with fromAll surfaces the scalar-shape error when both passes fail on mixed-type models`() {
+		let parser = JSONQueryParameterParser()
+		// Every key carries a single value, but the model asks for a scalar
+		// for `category` and an array for `tags`. Neither normalisation can
+		// satisfy both fields, so the first-pass error (expected array,
+		// found string for `tags`) surfaces.
+		let parameters = [
+			"category": ["phones"],
+			"tags": ["electronics"],
+		]
+
+		struct MixedScalarAndArrayParameters: Decodable {
+			let category: String
+			let tags: [String]
+		}
+
+		do {
+			_ = try parser.parse(MixedScalarAndArrayParameters.self, fromAll: parameters)
+			Issue.record("Expected decoding to throw for single-value URL + mixed scalar/array model")
+		} catch let error as DecodingError {
+			guard case let .typeMismatch(_, context) = error else {
+				Issue.record("Expected typeMismatch, got \(error)")
+				return
+			}
+			#expect(context.codingPath.last?.stringValue == "tags")
+		} catch {
+			Issue.record("Expected DecodingError, got \(error)")
+		}
+	}
+
+	@Test
 	func `JSONQueryParameterParser parse with fromAll handles empty array`() throws {
 		let parser = JSONQueryParameterParser()
 		let parameters = [

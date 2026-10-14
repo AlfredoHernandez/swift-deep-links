@@ -7,6 +7,9 @@ let package = Package(
 	platforms: [
 		.iOS(.v16),
 		.macOS(.v13),
+		.tvOS(.v16),
+		.watchOS(.v9),
+		.visionOS(.v1),
 	],
 	products: [
 		.library(name: "DeepLinks", targets: ["DeepLinks"]),
@@ -15,7 +18,7 @@ let package = Package(
 	targets: [
 		.target(name: "DeepLinks"),
 		.target(name: "DeepLinksTesting", dependencies: ["DeepLinks"]),
-		.testTarget(name: "DeepLinksTests", dependencies: ["DeepLinks"]),
+		.testTarget(name: "DeepLinksTests", dependencies: ["DeepLinks", "DeepLinksTesting"]),
 		.testTarget(name: "DeepLinksTestingTests", dependencies: ["DeepLinks", "DeepLinksTesting"]),
 	],
 )

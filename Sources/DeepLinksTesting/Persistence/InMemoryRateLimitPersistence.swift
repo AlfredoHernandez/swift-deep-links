@@ -33,7 +33,7 @@ import Foundation
 ///         persistence: persistence
 ///     )
 ///
-///     let coordinator = try await DeepLinkCoordinatorBuilder<AppRoute>()
+///     let coordinator = try DeepLinkCoordinatorBuilder<AppRoute>()
 ///         .routing(routing)
 ///         .handler(handler)
 ///         .build()
@@ -75,5 +75,13 @@ public actor InMemoryRateLimitPersistence: RateLimitPersistence {
 	/// Use this to reset the rate limit state during testing or between test cases.
 	public func clearRequests() {
 		timestamps.removeAll()
+	}
+
+	/// Applies `mutation` to the stored timestamps in one actor-isolated step.
+	///
+	/// - Parameter mutation: Reads and changes the timestamps; its result is returned.
+	/// - Returns: The value `mutation` returned.
+	public func mutateRequests<Output: Sendable>(_ mutation: @Sendable (inout [TimeInterval]) -> Output) -> Output {
+		mutation(&timestamps)
 	}
 }

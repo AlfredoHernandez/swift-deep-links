@@ -19,7 +19,7 @@ final class ReadinessShowcaseViewModel {
 	private let logger = Logger(subsystem: "swift-deep-link-sample-app", category: "ReadinessShowcase")
 	private let queue = DeepLinkReadinessQueue(maxQueueSize: 10)
 	private var drainDelay: Duration
-	private var coordinator: CoordinatorOf<AppRoute>?
+	private var coordinator: DeepLinkCoordinator<AppRoute>?
 
 	// MARK: - Initialization
 
@@ -94,7 +94,7 @@ final class ReadinessShowcaseViewModel {
 		guard !pending.isEmpty else { return }
 
 		Task { @MainActor in
-			let coordinator = await getOrCreateCoordinator(navigationRouter: navigationRouter)
+			let coordinator = getOrCreateCoordinator(navigationRouter: navigationRouter)
 
 			for (index, url) in pending.enumerated() {
 				logger.info("Processing queued URL: \(url.absoluteString)")
@@ -144,8 +144,10 @@ private extension ReadinessShowcaseViewModel {
 		pendingCount = queue.pendingCount
 	}
 
-	func getOrCreateCoordinator(navigationRouter: NavigationRouter) async -> CoordinatorOf<AppRoute> {
-		if let coordinator { return coordinator }
+	func getOrCreateCoordinator(navigationRouter: NavigationRouter) -> DeepLinkCoordinator<AppRoute> {
+		if let coordinator {
+			return coordinator
+		}
 
 		let parsers: [any DeepLinkParser<AppRoute>] = [
 			InformationParser(),

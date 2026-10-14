@@ -43,8 +43,7 @@ graph TB
         end
         
         subgraph "Result System"
-            Result["DeepLinkResult<br/>• originalURL: URL<br/>• processedURL: URL?<br/>• routes: [Route]<br/>• executionTime: TimeInterval<br/>• errors: [Error]<br/>• successfulRoutes: Int<br/>• failedRoutes: Int"]
-            ResultProtocol["DeepLinkResultProtocol<br/>• wasSuccessful: Bool<br/>• hasRoutes: Bool<br/>• hasErrors: Bool<br/>• summary: String"]
+            Result["DeepLinkResult&lt;Route&gt;<br/>• originalURL: URL<br/>• processedURL: URL?<br/>• routes: [Route]<br/>• executionTime: TimeInterval<br/>• errors: [any Error]<br/>• wasSuccessful: Bool<br/>• successfulRoutes: Int<br/>• failedRoutes: Int<br/>• wasStoppedByMiddleware: Bool<br/>• hasRoutes: Bool<br/>• hasErrors: Bool<br/>• summary: String"]
         end
         
         subgraph "Supporting Components"
@@ -94,7 +93,6 @@ graph TB
     
     %% Result system
     Coordinator --> Result
-    Result --> ResultProtocol
     
     %% Supporting components
     ParserProtocol --> DeepLinkURL
@@ -114,10 +112,10 @@ graph TB
     classDef delegate fill:#e0f2f1,stroke:#004d40,stroke-width:2px
     
     class Coordinator,CoordinatorProps,CoordinatorMethods coordinator
-    class RoutingProtocol,ParserProtocol,HandlerProtocol,RouteProtocol,ResultProtocol,CoordinatorDelegate protocol
+    class RoutingProtocol,ParserProtocol,HandlerProtocol,RouteProtocol,CoordinatorDelegate protocol
     class DefaultRouting,Parsers,Parser1,Parser2,Parser3,HandlerImpl implementation
     class Route1,Route2,Route3 route
-    class Result,ResultProtocol result
+    class Result result
     class DeepLinkURL,DeepLinkError,Logger support
     class CoordinatorDelegate delegate
 ```
@@ -149,8 +147,7 @@ graph TB
 - **DeepLinkParser**: Defines how to parse URLs into routes
 - **DeepLinkHandler**: Defines how to handle specific routes
 - **DeepLinkRoute**: Defines the structure of a route
-- **DeepLinkResultProtocol**: Defines result properties
-- **DeepLinkCoordinatorDelegate**: Defines coordinator notifications
+- **DeepLinkCoordinatorDelegate**: Generic over `Route`, defines coordinator notifications
 
 ### 🟢 Implementations (Green)
 **Concrete implementations of protocols**

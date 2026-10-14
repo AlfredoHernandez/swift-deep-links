@@ -4,45 +4,6 @@
 
 import Foundation
 
-/// A protocol that represents the essential properties of a deep link result.
-///
-/// This protocol allows delegates to work with any deep link result type
-/// without being tied to a specific route type.
-public protocol DeepLinkResultProtocol: Sendable {
-	/// The original URL that was processed
-	var originalURL: URL { get }
-
-	/// The URL after middleware processing, or nil if stopped
-	var processedURL: URL? { get }
-
-	/// The total execution time in seconds
-	var executionTime: TimeInterval { get }
-
-	/// A list of all errors encountered during processing
-	var errors: [any Error] { get }
-
-	/// The number of routes that were successfully handled
-	var successfulRoutes: Int { get }
-
-	/// The number of routes that failed to be handled
-	var failedRoutes: Int { get }
-
-	/// True if the deep link was processed without any errors
-	var wasSuccessful: Bool { get }
-
-	/// True if the deep link processing was stopped by middleware
-	var wasStoppedByMiddleware: Bool { get }
-
-	/// True if any routes were found during processing
-	var hasRoutes: Bool { get }
-
-	/// True if any errors were encountered during processing
-	var hasErrors: Bool { get }
-
-	/// A concise summary of the deep link processing result
-	var summary: String { get }
-}
-
 /// A protocol that allows objects to observe and respond to deep link coordinator events.
 ///
 /// The `DeepLinkCoordinatorDelegate` protocol provides a way to monitor the deep link
@@ -83,7 +44,10 @@ public protocol DeepLinkResultProtocol: Sendable {
 /// All delegate methods are called on the main thread to ensure thread safety
 /// and proper UI updates if needed.
 @MainActor
-public protocol DeepLinkCoordinatorDelegate: AnyObject, Sendable {
+public protocol DeepLinkCoordinatorDelegate<Route>: Sendable {
+	/// The route type handled by the associated coordinator.
+	associatedtype Route: DeepLinkRoute
+
 	/// Called before the coordinator begins processing a deep link URL.
 	///
 	/// This method is called immediately before the coordinator starts processing
@@ -97,7 +61,7 @@ public protocol DeepLinkCoordinatorDelegate: AnyObject, Sendable {
 	///   - coordinator: The coordinator that will process the URL
 	///   - url: The deep link URL that will be processed
 	func coordinator(
-		_ coordinator: AnyObject,
+		_ coordinator: DeepLinkCoordinator<Route>,
 		willProcess url: URL,
 	)
 
@@ -116,9 +80,9 @@ public protocol DeepLinkCoordinatorDelegate: AnyObject, Sendable {
 	///   - url: The deep link URL that was processed
 	///   - result: The result of the processing operation
 	func coordinator(
-		_ coordinator: AnyObject,
+		_ coordinator: DeepLinkCoordinator<Route>,
 		didProcess url: URL,
-		result: DeepLinkResultProtocol,
+		result: DeepLinkResult<Route>,
 	)
 
 	/// Called when the coordinator fails to process a deep link URL.
@@ -135,7 +99,7 @@ public protocol DeepLinkCoordinatorDelegate: AnyObject, Sendable {
 	///   - url: The deep link URL that failed to process
 	///   - error: The error that caused the processing to fail
 	func coordinator(
-		_ coordinator: AnyObject,
+		_ coordinator: DeepLinkCoordinator<Route>,
 		didFailProcessing url: URL,
 		error: Error,
 	)
@@ -148,31 +112,25 @@ public extension DeepLinkCoordinatorDelegate {
 	///
 	/// This allows implementers to only override the methods they need.
 	func coordinator(
-		_: AnyObject,
+		_: DeepLinkCoordinator<Route>,
 		willProcess _: URL,
-	) {
-		// Default: do nothing
-	}
+	) {}
 
 	/// Default implementation that does nothing.
 	///
 	/// This allows implementers to only override the methods they need.
 	func coordinator(
-		_: AnyObject,
+		_: DeepLinkCoordinator<Route>,
 		didProcess _: URL,
-		result _: DeepLinkResultProtocol,
-	) {
-		// Default: do nothing
-	}
+		result _: DeepLinkResult<Route>,
+	) {}
 
 	/// Default implementation that does nothing.
 	///
 	/// This allows implementers to only override the methods they need.
 	func coordinator(
-		_: AnyObject,
+		_: DeepLinkCoordinator<Route>,
 		didFailProcessing _: URL,
 		error _: Error,
-	) {
-		// Default: do nothing
-	}
+	) {}
 }

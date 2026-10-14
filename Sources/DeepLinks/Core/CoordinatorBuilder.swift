@@ -13,7 +13,7 @@ import Foundation
 /// ## Basic Usage
 ///
 /// ```swift
-/// let coordinator = try await DeepLinkCoordinatorBuilder<AppRoute>()
+/// let coordinator = try DeepLinkCoordinatorBuilder<AppRoute>()
 ///     .routing(DefaultDeepLinkRouting(parsers: parsers))
 ///     .handler(appHandler)
 ///     .middleware(myMiddleware)
@@ -21,10 +21,19 @@ import Foundation
 ///     .build()
 /// ```
 ///
+/// ## Shorter Style Using Parser And Handler Factories
+///
+/// ```swift
+/// let coordinator = try DeepLinkCoordinatorBuilder<AppRoute>()
+///     .parser(MyParser())
+///     .handler(.from { route in await navigate(route) })
+///     .build()
+/// ```
+///
 /// ## Multiple Middleware and Delegates
 ///
 /// ```swift
-/// let coordinator = try await DeepLinkCoordinatorBuilder<AppRoute>()
+/// let coordinator = try DeepLinkCoordinatorBuilder<AppRoute>()
 ///     .routing(DefaultDeepLinkRouting(parsers: parsers))
 ///     .handler(appHandler)
 ///     .middleware(.security(), .rateLimit(), .logging())
@@ -37,13 +46,20 @@ public struct DeepLinkCoordinatorBuilder<Route: DeepLinkRoute>: Sendable {
 	private var _routing: (any DeepLinkRouting<Route>)?
 	private var _handler: (any DeepLinkHandler<Route>)?
 	private var _middlewareCoordinator: DeepLinkMiddlewareCoordinator?
-	private var middlewareEntries: [MiddlewareEntry] = []
-	private var _delegates: [DeepLinkCoordinatorDelegate] = []
+	private var middlewareEntries: [any DeepLinkMiddleware] = []
+	private var _delegates: [any DeepLinkCoordinatorDelegate<Route>] = []
+	private var _routeExecutionDelay: Duration = .zero
+	private var _sleep: (@Sendable (Duration) async -> Void)?
+	private var _logPrivacy = DeepLinkLogPrivacy.redacted
 
 	/// Creates a new builder instance.
 	public init() {}
 
 	/// Sets the routing implementation for the coordinator.
+	///
+	/// ``routing(_:)`` shares storage with ``parser(_:)`` and ``parsers(_:)``.
+	/// Calling them together is last-one-wins: the final call decides which
+	/// routing implementation is used when ``build()`` runs.
 	///
 	/// - Parameter routing: The routing implementation
 	/// - Returns: A new builder with the routing configured
@@ -51,6 +67,93 @@ public struct DeepLinkCoordinatorBuilder<Route: DeepLinkRoute>: Sendable {
 		var copy = self
 		copy._routing = routing
 		return copy
+	}
+
+	/// Sets the routing implementation to a ``DefaultDeepLinkRouting`` backed
+	/// by the supplied parser.
+	///
+	/// Use this shortcut when you don't need a custom routing implementation;
+	/// it wraps the parser in ``DefaultDeepLinkRouting`` and stores it as the
+	/// builder's routing.
+	///
+	/// ``parser(_:)`` and ``parsers(_:)`` share storage with ``routing(_:)``.
+	/// Calling them together is last-one-wins: the final call decides which
+	/// routing implementation is used when ``build()`` runs.
+	///
+	/// ## Example
+	///
+	/// ```swift
+	/// let coordinator = try DeepLinkCoordinatorBuilder<AppRoute>()
+	///     .parser(MyParser())
+	///     .handler(.from { route in await navigate(route) })
+	///     .build()
+	/// ```
+	///
+	/// - Parameter parser: A parser used to route URLs into `Route` values.
+	/// - Returns: A new builder whose routing wraps the supplied parser.
+	public func parser(_ parser: any DeepLinkParser<Route>) -> Self {
+		parsers([parser])
+	}
+
+	/// Sets the routing implementation to a ``DefaultDeepLinkRouting`` backed
+	/// by the supplied parsers.
+	///
+	/// Parsers are tried in order; the first one to succeed decides the
+	/// route. This mirrors the behaviour of ``DefaultDeepLinkRouting``.
+	///
+	/// ``parser(_:)`` and ``parsers(_:)`` share storage with ``routing(_:)``.
+	/// Calling them together is last-one-wins: the final call decides which
+	/// routing implementation is used when ``build()`` runs.
+	///
+	/// ## Example
+	///
+	/// ```swift
+	/// let coordinator = try DeepLinkCoordinatorBuilder<AppRoute>()
+	///     .parsers([UserParser(), ProductParser()])
+	///     .handler(.from { route in await navigate(route) })
+	///     .build()
+	/// ```
+	///
+	/// - Parameter parsers: Parsers tried in order when routing URLs.
+	/// - Returns: A new builder whose routing wraps the supplied parsers.
+	public func parsers(_ parsers: [any DeepLinkParser<Route>]) -> Self {
+		var copy = self
+		copy._routing = DefaultDeepLinkRouting(parsers: parsers)
+		return copy
+	}
+
+	/// Variadic convenience for ``parsers(_:)``.
+	///
+	/// The signature requires at least one leading parser so that
+	/// `.parsers()` with no arguments is rejected at compile time — an empty
+	/// parser list would produce a coordinator that silently fails every URL
+	/// with ``DeepLinkError/routeNotFound(_:)``. If you genuinely need a
+	/// deferred configuration (zero parsers now, overridden later via
+	/// ``routing(_:)``), use the array overload with an explicit empty array
+	/// instead.
+	///
+	/// ``parser(_:)`` and ``parsers(_:)`` share storage with ``routing(_:)``.
+	/// Calling them together is last-one-wins: the final call decides which
+	/// routing implementation is used when ``build()`` runs.
+	///
+	/// ## Example
+	///
+	/// ```swift
+	/// let coordinator = try DeepLinkCoordinatorBuilder<AppRoute>()
+	///     .parsers(UserParser(), ProductParser())
+	///     .handler(.from { route in await navigate(route) })
+	///     .build()
+	/// ```
+	///
+	/// - Parameters:
+	///   - first: The leading parser. Required so the call has at least one parser.
+	///   - rest: Additional parsers tried after `first`, in order.
+	/// - Returns: A new builder whose routing wraps the supplied parsers.
+	public func parsers(
+		_ first: any DeepLinkParser<Route>,
+		_ rest: any DeepLinkParser<Route>...,
+	) -> Self {
+		parsers([first] + rest)
 	}
 
 	/// Sets the handler implementation for the coordinator.
@@ -81,7 +184,7 @@ public struct DeepLinkCoordinatorBuilder<Route: DeepLinkRoute>: Sendable {
 	/// - Returns: A new builder with the middleware appended
 	public func middleware(_ middleware: any DeepLinkMiddleware...) -> Self {
 		var copy = self
-		copy.middlewareEntries.append(contentsOf: middleware.map { .standard($0) })
+		copy.middlewareEntries.append(contentsOf: middleware)
 		return copy
 	}
 
@@ -91,17 +194,7 @@ public struct DeepLinkCoordinatorBuilder<Route: DeepLinkRoute>: Sendable {
 	/// - Returns: A new builder with the middleware appended
 	public func middleware(_ middleware: [any DeepLinkMiddleware]) -> Self {
 		var copy = self
-		copy.middlewareEntries.append(contentsOf: middleware.map { .standard($0) })
-		return copy
-	}
-
-	/// Adds one or more advanced middleware to the coordinator.
-	///
-	/// - Parameter middleware: The advanced middleware to add
-	/// - Returns: A new builder with the advanced middleware appended
-	public func advancedMiddleware(_ middleware: any AdvancedDeepLinkMiddleware...) -> Self {
-		var copy = self
-		copy.middlewareEntries.append(contentsOf: middleware.map { .advanced($0) })
+		copy.middlewareEntries.append(contentsOf: middleware)
 		return copy
 	}
 
@@ -112,7 +205,7 @@ public struct DeepLinkCoordinatorBuilder<Route: DeepLinkRoute>: Sendable {
 	///
 	/// - Parameter delegate: The delegates to add
 	/// - Returns: A new builder with the delegates appended
-	public func delegate(_ delegate: DeepLinkCoordinatorDelegate...) -> Self {
+	public func delegate(_ delegate: any DeepLinkCoordinatorDelegate<Route>...) -> Self {
 		var copy = self
 		copy._delegates.append(contentsOf: delegate)
 		return copy
@@ -122,17 +215,95 @@ public struct DeepLinkCoordinatorBuilder<Route: DeepLinkRoute>: Sendable {
 	///
 	/// - Parameter delegates: An array of delegates to add
 	/// - Returns: A new builder with the delegates appended
-	public func delegates(_ delegates: [DeepLinkCoordinatorDelegate]) -> Self {
+	public func delegates(_ delegates: [any DeepLinkCoordinatorDelegate<Route>]) -> Self {
 		var copy = self
 		copy._delegates.append(contentsOf: delegates)
 		return copy
 	}
 
+	/// Sets the delay inserted between consecutive route-handler executions.
+	///
+	/// Defaults to `.zero`; pass a positive ``Duration`` when a stack of
+	/// routes would otherwise trigger jarring, rapid navigation updates.
+	///
+	/// - Parameter delay: The inter-route delay to apply during
+	///   ``DeepLinkCoordinator/handle(url:)``.
+	/// - Returns: A new builder with the delay configured.
+	public func routeExecutionDelay(_ delay: Duration) -> Self {
+		var copy = self
+		copy._routeExecutionDelay = delay
+		return copy
+	}
+
+	/// Overrides the coordinator's sleep primitive used between route
+	/// executions when ``routeExecutionDelay(_:)`` is positive.
+	///
+	/// Intended as a test seam: pass a closure that records the requested
+	/// ``Duration`` or returns immediately so time-dependent assertions can
+	/// run without real wall-clock delays. In production, leave this
+	/// unconfigured — the coordinator's default is `Task.sleep(for:)`.
+	///
+	/// - Parameter sleep: A closure invoked with the configured
+	///   ``routeExecutionDelay(_:)`` before each non-terminal route executes.
+	/// - Returns: A new builder with the sleep primitive configured.
+	public func sleep(_ sleep: @Sendable @escaping (Duration) async -> Void) -> Self {
+		var copy = self
+		copy._sleep = sleep
+		return copy
+	}
+
+	/// Sets how the coordinator's error logs describe URLs and errors.
+	///
+	/// Defaults to ``DeepLinkLogPrivacy/redacted``. It does not affect
+	/// routing built by ``parser(_:)`` or ``parsers(_:)-(Array)``, which also
+	/// redact by default; pass a ``DefaultDeepLinkRouting`` with its own
+	/// `logPrivacy` to ``routing(_:)`` to change those.
+	///
+	/// - Parameter privacy: The privacy setting, for example ``DeepLinkLogPrivacy/unredacted`` while debugging.
+	/// - Returns: A new builder with the privacy configured.
+	public func logPrivacy(_ privacy: DeepLinkLogPrivacy) -> Self {
+		var copy = self
+		copy._logPrivacy = privacy
+		return copy
+	}
+
 	/// Builds and returns the configured `DeepLinkCoordinator`.
 	///
-	/// - Returns: A fully configured `DeepLinkCoordinator` instance
+	/// This method assembles all configured components into a functional coordinator
+	/// ready for deep link processing. It validates that all required components
+	/// (routing and handler) have been configured.
+	///
+	/// ## Configuration Validation
+	///
+	/// The builder ensures:
+	/// - Routing implementation is configured (required)
+	/// - Handler implementation is configured (required)
+	/// - Middleware is added in the correct order
+	/// - Multiple delegates are automatically composed
+	///
+	/// ## Examples
+	///
+	/// ```swift
+	/// // Basic usage
+	/// let coordinator = try DeepLinkCoordinatorBuilder<AppRoute>()
+	///     .routing(routing)
+	///     .handler(handler)
+	///     .build()
+	///
+	/// // With middleware and delegates
+	/// let coordinator = try DeepLinkCoordinatorBuilder<AppRoute>()
+	///     .routing(routing)
+	///     .handler(handler)
+	///     .middleware(.security(allowedSchemes: ["myapp"]))
+	///     .middleware(.logging())
+	///     .delegate(.analytics(provider: myProvider))
+	///     .delegate(.logging())
+	///     .build()
+	/// ```
+	///
+	/// - Returns: A fully configured `DeepLinkCoordinator` instance ready for use
 	/// - Throws: `DeepLinkError.missingRequiredConfiguration` if routing or handler are missing
-	public func build() async throws -> DeepLinkCoordinator<Route> {
+	public func build() throws -> DeepLinkCoordinator<Route> {
 		guard let routing = _routing else {
 			throw DeepLinkError.missingRequiredConfiguration("routing")
 		}
@@ -141,44 +312,41 @@ public struct DeepLinkCoordinatorBuilder<Route: DeepLinkRoute>: Sendable {
 			throw DeepLinkError.missingRequiredConfiguration("handler")
 		}
 
-		let coordinator = _middlewareCoordinator ?? DeepLinkMiddlewareCoordinator()
-
-		for entry in middlewareEntries {
-			switch entry {
-			case let .standard(m):
-				await coordinator.add(m)
-
-			case let .advanced(m):
-				await coordinator.add(m)
+		let coordinator: DeepLinkMiddlewareCoordinator
+		if let custom = _middlewareCoordinator {
+			guard middlewareEntries.isEmpty else {
+				throw DeepLinkError.missingRequiredConfiguration(
+					"Cannot combine a custom middlewareCoordinator with additional middleware entries; register middleware on the coordinator before passing it to the builder.",
+				)
 			}
+			coordinator = custom
+		} else {
+			coordinator = DeepLinkMiddlewareCoordinator(middleware: middlewareEntries)
 		}
 
 		let capturedDelegates = _delegates
-		let finalDelegate: (any DeepLinkCoordinatorDelegate)? = if capturedDelegates.count == 1 {
+		let finalDelegate: (any DeepLinkCoordinatorDelegate<Route>)? = if capturedDelegates.count == 1 {
 			capturedDelegates.first
 		} else if capturedDelegates.count > 1 {
-			await MainActor.run {
-				CompositeDeepLinkDelegate(delegates: capturedDelegates)
-			}
+			CompositeDeepLinkDelegate<Route>(delegates: capturedDelegates)
 		} else {
 			nil
 		}
 
+		let defaultSleep: @Sendable (Duration) async -> Void = { try? await Task.sleep(for: $0) }
 		return DeepLinkCoordinator(
 			routing: routing,
 			handler: handler,
 			middlewareCoordinator: coordinator,
+			routeExecutionDelay: _routeExecutionDelay,
 			delegate: finalDelegate,
+			sleep: _sleep ?? defaultSleep,
+			logPrivacy: _logPrivacy,
 		)
 	}
 }
 
 // MARK: - Supporting Types
-
-private enum MiddlewareEntry {
-	case standard(any DeepLinkMiddleware)
-	case advanced(any AdvancedDeepLinkMiddleware)
-}
 
 /// A composite delegate that combines multiple `DeepLinkCoordinatorDelegate` implementations.
 ///
@@ -187,8 +355,9 @@ private enum MiddlewareEntry {
 ///
 /// Thread safety is guaranteed by making the delegates array immutable after initialization.
 /// The array is set once during init and never modified, making it safe for concurrent access.
-public final class CompositeDeepLinkDelegate: DeepLinkCoordinatorDelegate {
-	private let delegates: [DeepLinkCoordinatorDelegate]
+@MainActor
+public final class CompositeDeepLinkDelegate<Route: DeepLinkRoute>: DeepLinkCoordinatorDelegate {
+	private let delegates: [any DeepLinkCoordinatorDelegate<Route>]
 
 	/// Creates a composite delegate with the provided delegates.
 	///
@@ -196,24 +365,50 @@ public final class CompositeDeepLinkDelegate: DeepLinkCoordinatorDelegate {
 	/// Delegate implementations should be lightweight and non-blocking,
 	/// as a slow delegate will delay all subsequent delegates in the chain.
 	///
+	/// This initializer is `nonisolated` because it only captures an
+	/// immutable array; no `@MainActor`-isolated state is touched.
+	///
 	/// - Parameter delegates: Array of delegates to combine
-	public init(delegates: [DeepLinkCoordinatorDelegate]) {
+	public nonisolated init(delegates: [any DeepLinkCoordinatorDelegate<Route>]) {
 		self.delegates = delegates
 	}
 
-	public func coordinator(_ coordinator: AnyObject, willProcess url: URL) {
+	/// Called before the coordinator begins processing a deep link URL.
+	///
+	/// This method forwards the call to all contained delegates in sequence.
+	///
+	/// - Parameters:
+	///   - coordinator: The coordinator that will process the URL
+	///   - url: The deep link URL that will be processed
+	public func coordinator(_ coordinator: DeepLinkCoordinator<Route>, willProcess url: URL) {
 		for delegate in delegates {
 			delegate.coordinator(coordinator, willProcess: url)
 		}
 	}
 
-	public func coordinator(_ coordinator: AnyObject, didProcess url: URL, result: DeepLinkResultProtocol) {
+	/// Called after the coordinator processes a deep link URL.
+	///
+	/// This method forwards the call to all contained delegates in sequence.
+	///
+	/// - Parameters:
+	///   - coordinator: The coordinator that processed the URL
+	///   - url: The deep link URL that was processed
+	///   - result: The result of the processing operation
+	public func coordinator(_ coordinator: DeepLinkCoordinator<Route>, didProcess url: URL, result: DeepLinkResult<Route>) {
 		for delegate in delegates {
 			delegate.coordinator(coordinator, didProcess: url, result: result)
 		}
 	}
 
-	public func coordinator(_ coordinator: AnyObject, didFailProcessing url: URL, error: Error) {
+	/// Called when the coordinator fails to process a deep link URL.
+	///
+	/// This method forwards the call to all contained delegates in sequence.
+	///
+	/// - Parameters:
+	///   - coordinator: The coordinator that failed to process the URL
+	///   - url: The deep link URL that failed to process
+	///   - error: The error that caused the processing to fail
+	public func coordinator(_ coordinator: DeepLinkCoordinator<Route>, didFailProcessing url: URL, error: Error) {
 		for delegate in delegates {
 			delegate.coordinator(coordinator, didFailProcessing: url, error: error)
 		}

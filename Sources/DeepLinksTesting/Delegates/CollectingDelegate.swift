@@ -15,8 +15,8 @@ import Foundation
 ///
 /// Create a `CollectingDelegate`, attach it to your coordinator, and inspect the recorded events:
 ///
-///     let delegate = CollectingDelegate()
-///     let coordinator = try await DeepLinkCoordinatorBuilder<AppRoute>()
+///     let delegate = CollectingDelegate<AppRoute>()
+///     let coordinator = try DeepLinkCoordinatorBuilder<AppRoute>()
 ///         .routing(routing)
 ///         .handler(handler)
 ///         .delegate(delegate)
@@ -31,8 +31,8 @@ import Foundation
 ///
 /// Track the full lifecycle of URL processing:
 ///
-///     let delegate = CollectingDelegate()
-///     let coordinator = try await DeepLinkCoordinatorBuilder<AppRoute>()
+///     let delegate = CollectingDelegate<AppRoute>()
+///     let coordinator = try DeepLinkCoordinatorBuilder<AppRoute>()
 ///         .routing(routing)
 ///         .handler(handler)
 ///         .delegate(delegate)
@@ -53,7 +53,7 @@ import Foundation
 /// - Note: This delegate is `@MainActor` isolated; all methods must be called from the main thread.
 /// - SeeAlso: `DeepLinkCoordinatorDelegate`
 @MainActor
-public final class CollectingDelegate: DeepLinkCoordinatorDelegate {
+public final class CollectingDelegate<Route: DeepLinkRoute>: DeepLinkCoordinatorDelegate {
 	/// An event captured when the coordinator finishes successfully processing a URL.
 	///
 	/// Represents the result of a complete deep link processing operation.
@@ -62,7 +62,7 @@ public final class CollectingDelegate: DeepLinkCoordinatorDelegate {
 		public let url: URL
 
 		/// The result of processing the deep link.
-		public let result: DeepLinkResultProtocol
+		public let result: DeepLinkResult<Route>
 	}
 
 	/// An event captured when the coordinator fails to process a URL.
@@ -94,15 +94,15 @@ public final class CollectingDelegate: DeepLinkCoordinatorDelegate {
 	/// Initializes a new collecting delegate with no recorded events.
 	public init() {}
 
-	public func coordinator(_: AnyObject, willProcess url: URL) {
+	public func coordinator(_: DeepLinkCoordinator<Route>, willProcess url: URL) {
 		willProcessURLs.append(url)
 	}
 
-	public func coordinator(_: AnyObject, didProcess url: URL, result: DeepLinkResultProtocol) {
+	public func coordinator(_: DeepLinkCoordinator<Route>, didProcess url: URL, result: DeepLinkResult<Route>) {
 		processedEvents.append(ProcessedEvent(url: url, result: result))
 	}
 
-	public func coordinator(_: AnyObject, didFailProcessing url: URL, error: Error) {
+	public func coordinator(_: DeepLinkCoordinator<Route>, didFailProcessing url: URL, error: Error) {
 		failedEvents.append(FailedEvent(url: url, error: error))
 	}
 }

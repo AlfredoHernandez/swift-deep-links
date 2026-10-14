@@ -4,107 +4,6 @@
 
 import Foundation
 
-/// Middleware for security validation.
-///
-/// This middleware validates URLs against security policies to prevent
-/// malicious deep links and ensure only authorized URLs are processed.
-///
-/// ## Features
-/// - **Scheme validation**: Validate allowed URL schemes
-/// - **Host validation**: Restrict access to specific hosts
-/// - **Pattern blocking**: Block URLs matching regex patterns
-/// - **Multiple strategies**: Different security validation approaches
-///
-/// ## Use Cases
-/// - Prevent malicious deep link attacks
-/// - Restrict access to specific domains
-/// - Block suspicious URL patterns
-/// - Implement security policies
-///
-/// ## Usage Examples
-///
-/// ### Basic Usage
-/// ```swift
-/// let middleware = SecurityMiddleware(
-///     allowedSchemes: ["https", "myapp"],
-///     allowedHosts: ["myapp.com", "secure.myapp.com"]
-/// )
-/// ```
-///
-/// ### Strict Security
-/// ```swift
-/// let strictMiddleware = SecurityMiddleware(
-///     allowedSchemes: ["https"],
-///     allowedHosts: ["trusted-domain.com"],
-///     blockedPatterns: [try NSRegularExpression(pattern: "malicious")],
-///     strategy: .strict
-/// )
-/// ```
-///
-/// ### Scheme-Only Validation
-/// ```swift
-/// let schemeMiddleware = SecurityMiddleware(
-///     allowedSchemes: ["myapp"],
-///     strategy: .schemeOnly
-/// )
-/// ```
-///
-/// ## Available Strategies
-/// - `.standard`: Validates schemes, hosts, and blocked patterns
-/// - `.strict`: Enforces all security checks with additional validations
-/// - `.permissive`: Only checks schemes and blocked patterns
-/// - `.schemeOnly`: Only validates URL schemes
-/// - `.hostOnly`: Only validates hosts
-/// - `.patternOnly`: Only checks blocked patterns
-/// - `.whitelist`: Only allows URLs matching specific patterns
-///
-/// ## Error Handling
-/// When security validation fails, the middleware throws appropriate `DeepLinkError`
-/// types which can be handled by your error handling logic.
-///
-/// ## Thread Safety
-/// This middleware is thread-safe and can be used concurrently.
-public final class SecurityMiddleware: DeepLinkMiddleware {
-	private let allowedSchemes: Set<String>
-	private let allowedHosts: Set<String>
-	private let blockedPatterns: [NSRegularExpression]
-	private let strategy: SecurityStrategy
-
-	/// Creates a new security middleware.
-	///
-	/// - Parameters:
-	///   - allowedSchemes: Set of allowed URL schemes
-	///   - allowedHosts: Set of allowed hosts (empty means all hosts are allowed)
-	///   - blockedPatterns: Array of regex patterns for blocked URLs
-	///   - strategy: The security validation strategy to use (defaults to .standard)
-	public init(
-		allowedSchemes: Set<String>,
-		allowedHosts: Set<String> = [],
-		blockedPatterns: [NSRegularExpression] = [],
-		strategy: SecurityStrategy = .standard,
-	) {
-		self.allowedSchemes = allowedSchemes
-		self.allowedHosts = allowedHosts
-		self.blockedPatterns = blockedPatterns
-		self.strategy = strategy
-	}
-
-	public func intercept(_ url: URL) async throws -> URL? {
-		try await strategy.validate(
-			url: url,
-			allowedSchemes: allowedSchemes,
-			allowedHosts: allowedHosts,
-			blockedPatterns: blockedPatterns,
-		)
-	}
-}
-
-//
-//  Copyright © 2025 Jesús Alfredo Hernández Alarcón. All rights reserved.
-//
-
-import Foundation
-
 /// Security validation strategies for deep links.
 ///
 /// This struct provides different strategies for validating deep link URLs against
@@ -124,6 +23,8 @@ import Foundation
 /// - `.hostOnly`: Only validates hosts
 /// - `.patternOnly`: Only checks blocked patterns
 /// - `.whitelist`: Only allows URLs matching specific patterns
+/// - `.hardened`: Canonicalizes the URL, then validates schemes, a required host,
+///   and blocked patterns case-insensitively against decoded forms (recommended)
 ///
 /// ## Usage Examples
 ///
@@ -162,18 +63,6 @@ import Foundation
 ///     strategy: .patternOnly
 /// )
 /// ```
-///
-/// ## Strategy Comparison
-///
-/// | Strategy | Schemes | Hosts | Patterns | Additional Checks |
-/// |----------|---------|-------|----------|-------------------|
-/// | `.standard` | ✅ | ✅ | ✅ | ❌ |
-/// | `.strict` | ✅ | ✅ | ✅ | ✅ |
-/// | `.permissive` | ✅ | ❌ | ✅ | ❌ |
-/// | `.schemeOnly` | ✅ | ❌ | ❌ | ❌ |
-/// | `.hostOnly` | ❌ | ✅ | ❌ | ❌ |
-/// | `.patternOnly` | ❌ | ❌ | ✅ | ❌ |
-/// | `.whitelist` | ✅ | ✅ | ❌ | ✅ |
 public struct SecurityStrategy: Sendable {
 	private let validateFunction: @Sendable (URL, Set<String>, Set<String>, [NSRegularExpression]) async throws -> URL?
 
@@ -191,61 +80,106 @@ public struct SecurityStrategy: Sendable {
 
 public extension SecurityStrategy {
 	/// Standard security strategy that validates schemes, hosts, and blocked patterns.
-	/// This is the default security validation approach.
+	/// This was the default before 2.0; ``hardened`` is the default now. An
+	/// empty host allow-list accepts every host, including for `http(s)`.
 	static let standard = SecurityStrategy { url, allowedSchemes, allowedHosts, blockedPatterns in
-		// Check scheme
 		guard let scheme = url.scheme, allowedSchemes.contains(scheme) else {
 			throw DeepLinkError.securityViolation("Unauthorized scheme: \(url.scheme ?? "nil")")
 		}
 
-		// Check host if allowedHosts is not empty
 		if !allowedHosts.isEmpty {
 			guard let host = url.host, allowedHosts.contains(host) else {
 				throw DeepLinkError.securityViolation("Unauthorized host: \(url.host ?? "nil")")
 			}
 		}
 
-		// Check blocked patterns
 		let urlString = url.absoluteString
 		for pattern in blockedPatterns {
 			if pattern.firstMatch(in: urlString, range: NSRange(urlString.startIndex..., in: urlString)) != nil {
-				throw DeepLinkError.blockedURL(urlString)
+				throw DeepLinkError.blockedURL(url)
 			}
 		}
 
 		return url
 	}
 
-	/// Strict security strategy that enforces all security checks.
-	/// More restrictive than standard, includes additional validations.
+	/// Hardened security strategy that validates the canonical form of the URL.
+	///
+	/// The URL is first canonicalized with ``URLCanonicalizer``, which rejects
+	/// userinfo, control characters, `..` path segments (path only) and
+	/// malformed percent-encoding. Then:
+	///
+	/// - the scheme must appear in the allowed schemes, compared case-insensitively;
+	/// - `http(s)` URLs require a host listed in the allowed hosts, compared
+	///   case-insensitively, so an empty host allow-list rejects every web link;
+	/// - custom-scheme URLs must have a listed host when the allow-list is not
+	///   empty; with an empty allow-list their host is not checked;
+	/// - blocked patterns are matched case-insensitively against the raw URL
+	///   and every percent-decoded form, so `%6A%61vascript:` matches `javascript:`.
+	///   A pattern that cannot be recompiled case-insensitively rejects the URL.
+	///
+	/// On success the canonical URL (lower-cased scheme and host) continues
+	/// down the chain.
+	///
+	/// ## Example
+	///
+	/// ```swift
+	/// let middleware = SecurityMiddleware(
+	///     allowedSchemes: ["https", "myapp"],
+	///     allowedHosts: ["myapp.com", "home"],
+	///     blockedPatterns: [try NSRegularExpression(pattern: "javascript:")],
+	///     strategy: .hardened
+	/// )
+	/// ```
+	static let hardened = SecurityStrategy { url, allowedSchemes, allowedHosts, blockedPatterns in
+		let canonicalizer = URLCanonicalizer()
+		let canonicalURL = try canonicalizer.canonicalize(url)
+
+		guard let scheme = canonicalURL.scheme, allowedSchemes.containsCaseInsensitive(scheme) else {
+			throw DeepLinkError.securityViolation("Unauthorized scheme: \(canonicalURL.scheme ?? "nil")")
+		}
+
+		let isWebLink = webSchemes.contains(scheme)
+		if isWebLink || !allowedHosts.isEmpty {
+			guard let host = canonicalURL.host(), !host.isEmpty else {
+				throw DeepLinkError.securityViolation("Missing host")
+			}
+
+			guard allowedHosts.containsCaseInsensitive(host) else {
+				throw DeepLinkError.securityViolation("Unauthorized host: \(host)")
+			}
+		}
+
+		let forms = canonicalizer.matchableForms(of: url)
+		for blockedPattern in blockedPatterns {
+			let pattern = try caseInsensitiveRegex(pattern: blockedPattern.pattern, options: blockedPattern.options)
+			if forms.contains(where: pattern.matches) {
+				throw DeepLinkError.blockedURL(url)
+			}
+		}
+
+		return canonicalURL
+	}
+
+	/// Strict security strategy that enforces scheme, host, and pattern checks.
+	///
+	/// Unlike ``standard``, this strategy always requires a host that appears in the
+	/// allowed-host set; URLs without a host (or with a host not on the allowlist) are
+	/// rejected outright.
 	static let strict = SecurityStrategy { url, allowedSchemes, allowedHosts, blockedPatterns in
-		// Check scheme (required)
 		guard let scheme = url.scheme, allowedSchemes.contains(scheme) else {
 			throw DeepLinkError.securityViolation("Unauthorized scheme: \(url.scheme ?? "nil")")
 		}
 
-		// Check host (required in strict mode)
 		guard let host = url.host, allowedHosts.contains(host) else {
 			throw DeepLinkError.securityViolation("Unauthorized host: \(url.host ?? "nil")")
 		}
 
-		// Check blocked patterns
 		let urlString = url.absoluteString
 		for pattern in blockedPatterns {
 			if pattern.firstMatch(in: urlString, range: NSRange(urlString.startIndex..., in: urlString)) != nil {
-				throw DeepLinkError.blockedURL(urlString)
+				throw DeepLinkError.blockedURL(url)
 			}
-		}
-
-		// Additional strict validations
-		// Check for suspicious characters in path
-		if url.path.contains("..") || url.path.contains("//") {
-			throw DeepLinkError.securityViolation("Suspicious path detected: \(url.path)")
-		}
-
-		// Check for suspicious query parameters
-		if let query = url.query, query.contains("script") || query.contains("javascript") {
-			throw DeepLinkError.securityViolation("Suspicious query parameters detected")
 		}
 
 		return url
@@ -254,16 +188,14 @@ public extension SecurityStrategy {
 	/// Permissive security strategy that only checks schemes.
 	/// Allows all hosts and only blocks explicitly defined patterns.
 	static let permissive = SecurityStrategy { url, allowedSchemes, _, blockedPatterns in
-		// Only check scheme
 		guard let scheme = url.scheme, allowedSchemes.contains(scheme) else {
 			throw DeepLinkError.securityViolation("Unauthorized scheme: \(url.scheme ?? "nil")")
 		}
 
-		// Check blocked patterns only
 		let urlString = url.absoluteString
 		for pattern in blockedPatterns {
 			if pattern.firstMatch(in: urlString, range: NSRange(urlString.startIndex..., in: urlString)) != nil {
-				throw DeepLinkError.blockedURL(urlString)
+				throw DeepLinkError.blockedURL(url)
 			}
 		}
 
@@ -284,7 +216,7 @@ public extension SecurityStrategy {
 	/// Only validates hosts, ignores schemes and patterns.
 	static let hostOnly = SecurityStrategy { url, _, allowedHosts, _ in
 		guard !allowedHosts.isEmpty else {
-			return url // Allow all if no hosts specified
+			return url
 		}
 
 		guard let host = url.host, allowedHosts.contains(host) else {
@@ -300,7 +232,7 @@ public extension SecurityStrategy {
 		let urlString = url.absoluteString
 		for pattern in blockedPatterns {
 			if pattern.firstMatch(in: urlString, range: NSRange(urlString.startIndex..., in: urlString)) != nil {
-				throw DeepLinkError.blockedURL(urlString)
+				throw DeepLinkError.blockedURL(url)
 			}
 		}
 
@@ -310,23 +242,47 @@ public extension SecurityStrategy {
 	/// Whitelist security strategy.
 	/// Only allows URLs that match specific patterns (opposite of blacklist).
 	static let whitelist = SecurityStrategy { url, allowedSchemes, allowedHosts, _ in
-		// Check scheme
 		guard let scheme = url.scheme, allowedSchemes.contains(scheme) else {
 			throw DeepLinkError.securityViolation("Unauthorized scheme: \(url.scheme ?? "nil")")
 		}
 
-		// Check host if specified
 		if !allowedHosts.isEmpty {
 			guard let host = url.host, allowedHosts.contains(host) else {
 				throw DeepLinkError.securityViolation("Unauthorized host: \(url.host ?? "nil")")
 			}
 		}
 
-		// Additional whitelist validation: ensure URL is in expected format
 		guard url.path.hasPrefix("/") || url.path.isEmpty else {
 			throw DeepLinkError.securityViolation("Invalid URL path format")
 		}
 
 		return url
+	}
+}
+
+// MARK: - Hardened Matching Helpers
+
+private let webSchemes: Set<String> = ["http", "https"]
+
+private extension Set<String> {
+	func containsCaseInsensitive(_ value: String) -> Bool {
+		contains { $0.caseInsensitiveCompare(value) == .orderedSame }
+	}
+}
+
+func caseInsensitiveRegex(
+	pattern: String,
+	options: NSRegularExpression.Options,
+) throws(DeepLinkError) -> NSRegularExpression {
+	do {
+		return try NSRegularExpression(pattern: pattern, options: options.union(.caseInsensitive))
+	} catch {
+		throw .securityViolation("Invalid blocked pattern")
+	}
+}
+
+private extension NSRegularExpression {
+	func matches(_ text: String) -> Bool {
+		firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) != nil
 	}
 }

@@ -24,7 +24,7 @@ final class DeepLinkViewModel {
 	private let deepLinkService: DeepLinkService
 	private let logger = Logger(subsystem: "swift-deep-link-sample-app", category: "DeepLinkViewModel")
 	private var processingTask: Task<Void, Never>?
-	private var coordinator: CoordinatorOf<AppRoute>?
+	private var coordinator: DeepLinkCoordinator<AppRoute>?
 
 	// MARK: - Public Properties
 
@@ -35,7 +35,7 @@ final class DeepLinkViewModel {
 	var isProcessing = false
 
 	/// Last processing result for debugging/display
-	var lastResult: ResultOf<AppRoute>?
+	var lastResult: DeepLinkResult<AppRoute>?
 
 	/// Processing error for user feedback
 	var processingError: Error?
@@ -62,7 +62,7 @@ final class DeepLinkViewModel {
 			processingError = nil
 
 			do {
-				let coordinator = try await getOrCreateCoordinator()
+				let coordinator = try getOrCreateCoordinator()
 				let result = await coordinator.handle(url: url)
 
 				guard !Task.isCancelled else { return }
@@ -104,16 +104,16 @@ final class DeepLinkViewModel {
 // MARK: - Private Methods
 
 private extension DeepLinkViewModel {
-	func getOrCreateCoordinator() async throws -> CoordinatorOf<AppRoute> {
+	func getOrCreateCoordinator() throws -> DeepLinkCoordinator<AppRoute> {
 		if let coordinator {
 			return coordinator
 		}
-		let newCoordinator = try await deepLinkService.createCoordinator()
+		let newCoordinator = try deepLinkService.createCoordinator()
 		coordinator = newCoordinator
 		return newCoordinator
 	}
 
-	func logResult(_ result: ResultOf<AppRoute>) {
+	func logResult(_ result: DeepLinkResult<AppRoute>) {
 		let status = result.wasSuccessful ? "success" : "failed"
 		let routes = result.routes.map(\.id).joined(separator: ", ")
 

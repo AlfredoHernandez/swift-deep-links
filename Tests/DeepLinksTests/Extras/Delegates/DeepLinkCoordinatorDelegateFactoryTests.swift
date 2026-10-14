@@ -3,101 +3,107 @@
 //
 
 @testable import DeepLinks
+import DeepLinksTesting
 import Foundation
 import Testing
 
 @MainActor
 struct DeepLinkCoordinatorDelegateFactoryTests {
-	@Test
-	func `Analytics delegate factory method creates delegate with correct type`() {
-		let provider = DefaultAnalyticsProvider()
-		let delegate: any DeepLinkCoordinatorDelegate = .analytics(provider: provider)
+	private let sampleURL = URL(string: "myapp://profile")!
 
-		#expect(delegate is DeepLinkAnalyticsDelegate)
+	// MARK: - Analytics
+
+	@Test
+	func `analytics factory forwards lifecycle events to the provider`() throws {
+		let provider = AnalyticsProviderSpy()
+		let delegate: any DeepLinkCoordinatorDelegate<TestRoute> = .analytics(provider: provider)
+		let coordinator = try makeCoordinator()
+
+		delegate.coordinator(coordinator, willProcess: sampleURL)
+
+		#expect(provider.trackedEvents.count == 1)
+		#expect(provider.trackedEvents.first?.event == "deep_link_attempted")
 	}
 
-	@Test
-	func `Logging delegate factory method creates delegate with correct type`() {
-		let delegate: any DeepLinkCoordinatorDelegate = .logging()
-
-		#expect(delegate is DeepLinkLoggingDelegate)
-	}
+	// MARK: - Logging
 
 	@Test
-	func `Logging delegate factory method with debug enabled creates delegate`() {
-		let delegate: any DeepLinkCoordinatorDelegate = .logging(enableDebugLogging: true)
-
-		#expect(delegate is DeepLinkLoggingDelegate)
-	}
-
-	@Test
-	func `Notification delegate factory method creates delegate with correct type`() {
-		let delegate: any DeepLinkCoordinatorDelegate = .notification()
-
-		#expect(delegate is DeepLinkNotificationDelegate)
-	}
-
-	@Test
-	func `Notification delegate factory method with all parameters creates delegate`() {
-		let delegate: any DeepLinkCoordinatorDelegate = .notification(
-			showSuccess: true,
-			showErrors: true,
-			showInfo: true,
+	func `logging factory receives every lifecycle hook without throwing`() throws {
+		let delegate: any DeepLinkCoordinatorDelegate<TestRoute> = .logging()
+		let coordinator = try makeCoordinator()
+		let succeeded = DeepLinkResult<TestRoute>(
+			originalURL: sampleURL,
+			processedURL: sampleURL,
+			routes: [.route1],
+			executionTime: 0,
+			errors: [],
+			successfulRoutes: 1,
+			failedRoutes: 0,
 		)
 
-		#expect(delegate is DeepLinkNotificationDelegate)
+		delegate.coordinator(coordinator, willProcess: sampleURL)
+		delegate.coordinator(coordinator, didProcess: sampleURL, result: succeeded)
+		delegate.coordinator(coordinator, didFailProcessing: sampleURL, error: DeepLinkError.unsupportedScheme("ftp"))
+	}
+
+	// MARK: - Notification
+
+	#if canImport(UserNotifications) && !os(tvOS)
+	@Test
+	func `notification factory threads its presenter through to the delegate`() async throws {
+		let presenter = CollectingNotificationPresenter()
+		let delegate: any DeepLinkCoordinatorDelegate<TestRoute> = .notification(
+			showSuccess: false,
+			showErrors: true,
+			showInfo: false,
+			presenter: presenter,
+		)
+		let coordinator = try makeCoordinator()
+
+		delegate.coordinator(coordinator, didFailProcessing: sampleURL, error: DeepLinkError.unsupportedScheme("ftp"))
+
+		let invocations = await presenter.waitFor(count: 1)
+		let invocation = try #require(invocations.first)
+
+		#expect(invocation.kind == .failure)
 	}
 
 	@Test
-	func `Factory methods can be used in arrays`() {
-		let provider = DefaultAnalyticsProvider()
+	func `notification factory defaults do not suppress error notifications`() async throws {
+		let presenter = CollectingNotificationPresenter()
+		let delegate: any DeepLinkCoordinatorDelegate<TestRoute> = .notification(presenter: presenter)
+		let coordinator = try makeCoordinator()
 
-		let delegates: [any DeepLinkCoordinatorDelegate] = [
-			.analytics(provider: provider),
-			.logging(enableDebugLogging: false),
-			.notification(showSuccess: false, showErrors: true),
-		]
+		delegate.coordinator(coordinator, didFailProcessing: sampleURL, error: DeepLinkError.unsupportedScheme("ftp"))
 
-		#expect(delegates.count == 3)
-		#expect(delegates[0] is DeepLinkAnalyticsDelegate)
-		#expect(delegates[1] is DeepLinkLoggingDelegate)
-		#expect(delegates[2] is DeepLinkNotificationDelegate)
+		let count = await presenter.waitFor(count: 1).count
+		#expect(count == 1)
 	}
+	#endif
+
+	// MARK: - Composition via builder
 
 	@Test
-	func `Factory methods work with DeepLinkCoordinatorBuilder`() async throws {
-		let provider = DefaultAnalyticsProvider()
-
-		let coordinator = try await DeepLinkCoordinatorBuilder<TestRoute>()
-			.routing(TestRouting())
-			.handler(TestHandler())
-			.middleware(.logging(), .analytics(provider: provider))
+	func `factory-produced delegates can compose through the builder`() async throws {
+		let provider = AnalyticsProviderSpy()
+		let coordinator = try DeepLinkCoordinatorBuilder<TestRoute>()
+			.routing(DeepLinkRoutingStub<TestRoute>())
+			.handler(DeepLinkHandlerSpy<TestRoute>())
 			.delegate(.logging(), .analytics(provider: provider))
 			.build()
 
-		// Verify coordinator was created successfully
 		let url = try #require(URL(string: "test://example"))
-		let result = await coordinator.handle(url: url)
-		#expect(result.routes.count == 1)
+		_ = await coordinator.handle(url: url)
+
+		#expect(provider.trackedEvents.isEmpty == false)
 	}
 
-	// MARK: - Test Helpers
+	// MARK: - Helpers
 
-	enum TestRoute: DeepLinkRoute {
-		case test
-
-		var id: String {
-			"test"
-		}
-	}
-
-	struct TestRouting: DeepLinkRouting {
-		func route(from _: URL) async throws -> [TestRoute] {
-			[.test]
-		}
-	}
-
-	struct TestHandler: DeepLinkHandler {
-		func handle(_: TestRoute) async throws {}
+	private func makeCoordinator() throws -> DeepLinkCoordinator<TestRoute> {
+		try DeepLinkCoordinatorBuilder<TestRoute>()
+			.routing(DeepLinkRoutingStub<TestRoute>())
+			.handler(DeepLinkHandlerSpy<TestRoute>())
+			.build()
 	}
 }

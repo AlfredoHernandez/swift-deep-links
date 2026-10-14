@@ -37,7 +37,7 @@
 /// - Use descriptive identifiers that include relevant parameters
 /// - Ensure identifiers are unique across all possible route combinations
 /// - Consider including parameter values in the identifier for better debugging
-public protocol DeepLinkRoute: Sendable {
+public protocol DeepLinkRoute: Sendable, Equatable, Hashable {
 	/// A unique identifier for this route.
 	///
 	/// This identifier should be unique across all possible route combinations

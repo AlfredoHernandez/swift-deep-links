@@ -30,6 +30,14 @@ public protocol ReadinessQueue: ReadinessCondition {
 	/// - Returns: The count of URLs waiting to be processed
 	var pendingCount: Int { get }
 
+	/// A snapshot of the URLs currently in the queue.
+	///
+	/// Unlike ``markReady()``, reading this property does not drain the queue,
+	/// so it is safe to use for recovery or inspection without losing URLs.
+	///
+	/// - Returns: The URLs currently waiting to be processed
+	var pendingURLs: [URL] { get }
+
 	/// Resets the queue to its initial not-ready state, discarding any pending URLs.
 	func reset()
 }

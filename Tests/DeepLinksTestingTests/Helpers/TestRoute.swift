@@ -5,7 +5,7 @@
 import DeepLinks
 import Foundation
 
-enum TestRoute: DeepLinkRoute, Equatable {
+enum TestRoute: DeepLinkRoute {
 	case routeA
 	case routeB
 

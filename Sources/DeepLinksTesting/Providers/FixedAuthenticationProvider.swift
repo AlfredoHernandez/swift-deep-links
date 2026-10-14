@@ -27,7 +27,7 @@ import DeepLinks
 ///     let auth = FixedAuthenticationProvider(isAuthenticated: true)
 ///     let middleware = AuthenticationMiddleware(provider: auth)
 ///
-///     let coordinator = try await DeepLinkCoordinatorBuilder<AppRoute>()
+///     let coordinator = try DeepLinkCoordinatorBuilder<AppRoute>()
 ///         .routing(routing)
 ///         .handler(handler)
 ///         .build()

@@ -21,11 +21,7 @@ import Foundation
 ///     print("Failed with errors: \(result.errors)")
 /// }
 /// ```
-///
-/// ## See Also
-///
-/// - ``ResultOf``
-public struct DeepLinkResult<Route: DeepLinkRoute>: DeepLinkResultProtocol {
+public struct DeepLinkResult<Route: DeepLinkRoute>: Sendable {
 	/// The original URL that was processed
 	public let originalURL: URL
 
@@ -50,16 +46,37 @@ public struct DeepLinkResult<Route: DeepLinkRoute>: DeepLinkResultProtocol {
 	/// The number of routes that failed during processing
 	public let failedRoutes: Int
 
-	/// Creates a new deep link result.
+	/// Creates a new deep link processing result.
+	///
+	/// This initializer constructs a result object that captures all aspects of deep link
+	/// processing, from the original URL through middleware processing, routing, and
+	/// handler execution.
+	///
+	/// The `wasSuccessful` property is automatically computed as:
+	/// - `processedURL != nil` (middleware didn't stop processing)
+	/// - AND `errors.isEmpty` (no errors occurred)
+	/// - AND `failedRoutes == 0` (all routes executed successfully)
 	///
 	/// - Parameters:
-	///   - originalURL: The original URL that was processed
-	///   - processedURL: The URL after middleware processing
-	///   - routes: The routes that were found
-	///   - executionTime: The total execution time
-	///   - errors: Any errors that occurred
-	///   - successfulRoutes: Number of successfully processed routes
-	///   - failedRoutes: Number of failed routes
+	///   - originalURL: The original URL that was submitted for processing. This is always
+	///     captured regardless of processing outcome.
+	///   - processedURL: The URL after all middleware processing. Set to `nil` if middleware
+	///     stopped the processing chain.
+	///   - routes: An array of routes found by the routing system. Empty if routing failed
+	///     or middleware stopped processing.
+	///   - executionTime: The total time taken for processing in seconds, measured from
+	///     the start of middleware processing to the completion of all route handlers.
+	///   - errors: An array of any errors that occurred during processing. Defaults to empty.
+	///     May contain middleware errors, routing errors, or handler execution errors.
+	///   - successfulRoutes: The count of routes that were successfully executed. Defaults to 0.
+	///   - failedRoutes: The count of routes that failed during execution. Defaults to 0.
+	///
+	/// ## Computing Success
+	///
+	/// A result is considered successful when all three conditions are met:
+	/// 1. Middleware allowed the URL to proceed (`processedURL != nil`)
+	/// 2. No errors occurred during processing (`errors.isEmpty`)
+	/// 3. All routes executed successfully (`failedRoutes == 0`)
 	public init(
 		originalURL: URL,
 		processedURL: URL?,
@@ -83,27 +100,79 @@ public struct DeepLinkResult<Route: DeepLinkRoute>: DeepLinkResultProtocol {
 // MARK: - Convenience Properties
 
 public extension DeepLinkResult {
-	/// Whether middleware stopped the processing
+	/// Whether middleware stopped the processing before routing.
+	///
+	/// Returns `true` if a middleware in the chain returned `nil` or stopped processing,
+	/// preventing the URL from reaching the routing system.
+	///
+	/// When this is `true`, `processedURL` will be `nil` and no routes will be found.
 	var wasStoppedByMiddleware: Bool {
 		processedURL == nil
 	}
 
-	/// Whether any routes were found
+	/// Whether any routes were found during routing.
+	///
+	/// Returns `true` if the routing system successfully found at least one route
+	/// for the processed URL.
 	var hasRoutes: Bool {
 		!routes.isEmpty
 	}
 
-	/// Whether any errors occurred
+	/// Whether any errors occurred during processing or route execution.
+	///
+	/// Returns `true` if any errors were encountered during middleware processing,
+	/// routing, or route handler execution.
 	var hasErrors: Bool {
 		!errors.isEmpty
 	}
 
-	/// The first error that occurred (if any)
+	/// The first error that occurred during processing, if any.
+	///
+	/// Returns the first error encountered, or `nil` if processing completed without errors.
+	/// Useful for quick error handling when you only need to know about the first failure.
 	var firstError: (any Error)? {
 		errors.first
 	}
 
-	/// A human-readable summary of the result
+	/// The first ``DeepLinkError`` in the error chain, if any.
+	///
+	/// Scans ``errors`` in order and returns the first entry that is a ``DeepLinkError``,
+	/// ignoring other error types. Useful when you want to branch on the framework's
+	/// typed error cases without losing non-framework errors from ``errors``.
+	///
+	/// ## Example
+	///
+	/// ```swift
+	/// let result = await coordinator.handle(url: deepLinkURL)
+	/// if let deepLinkError = result.firstDeepLinkError {
+	///     switch deepLinkError {
+	///     case .routeNotFound: showNotFoundAlert()
+	///     default: showGenericAlert()
+	///     }
+	/// }
+	/// ```
+	var firstDeepLinkError: DeepLinkError? {
+		errors.lazy.compactMap { $0 as? DeepLinkError }.first
+	}
+
+	/// A human-readable summary of the deep link processing result.
+	///
+	/// Provides a concise description of what happened during processing, including:
+	/// - Whether middleware stopped processing
+	/// - Number of successful and failed routes
+	/// - Total execution time
+	/// - Error count (if any)
+	///
+	/// ## Examples
+	///
+	/// ```swift
+	/// let result = await coordinator.handle(url: deepLinkURL)
+	///
+	/// // Possible summaries:
+	/// // "Processing stopped by middleware"
+	/// // "Successfully processed 2 route(s) in 0.043s"
+	/// // "Processed 1/2 routes with 1 error(s) in 0.156s"
+	/// ```
 	var summary: String {
 		if wasStoppedByMiddleware {
 			"Processing stopped by middleware"

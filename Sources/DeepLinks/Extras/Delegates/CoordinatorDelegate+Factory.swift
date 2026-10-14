@@ -6,7 +6,7 @@ import Foundation
 
 // MARK: - Static Factory Methods
 
-public extension DeepLinkCoordinatorDelegate where Self == DeepLinkAnalyticsDelegate {
+public extension DeepLinkCoordinatorDelegate {
 	/// Creates an analytics delegate that tracks deep link processing events.
 	///
 	/// This delegate automatically tracks deep link usage patterns, performance metrics,
@@ -15,7 +15,7 @@ public extension DeepLinkCoordinatorDelegate where Self == DeepLinkAnalyticsDele
 	/// ## Usage
 	///
 	/// ```swift
-	/// coordinator.delegate = .analytics(provider: myAnalyticsProvider)
+	/// builder.delegate(.analytics(provider: myAnalyticsProvider))
 	/// ```
 	///
 	/// ## Tracked Events
@@ -24,16 +24,18 @@ public extension DeepLinkCoordinatorDelegate where Self == DeepLinkAnalyticsDele
 	/// - **deep_link_processed**: When deep link processing completes
 	/// - **deep_link_failed**: When deep link processing fails
 	///
-	/// - Parameter provider: The analytics provider to use for tracking events
+	/// - Parameters:
+	///   - provider: The analytics provider to use for tracking events
+	///   - privacy: How URLs and errors are tracked (default: ``DeepLinkLogPrivacy/redacted``)
 	/// - Returns: A configured analytics delegate instance
-	static func analytics(
+	@MainActor
+	static func analytics<R: DeepLinkRoute>(
 		provider: AnalyticsProvider,
-	) -> DeepLinkAnalyticsDelegate {
-		DeepLinkAnalyticsDelegate(analyticsProvider: provider)
+		privacy: DeepLinkLogPrivacy = .redacted,
+	) -> DeepLinkAnalyticsDelegate<R> where Self == DeepLinkAnalyticsDelegate<R> {
+		DeepLinkAnalyticsDelegate<R>(analyticsProvider: provider, privacy: privacy)
 	}
-}
 
-public extension DeepLinkCoordinatorDelegate where Self == DeepLinkLoggingDelegate {
 	/// Creates a logging delegate that logs deep link processing events.
 	///
 	/// This delegate provides comprehensive logging for deep link processing lifecycle,
@@ -43,10 +45,10 @@ public extension DeepLinkCoordinatorDelegate where Self == DeepLinkLoggingDelega
 	///
 	/// ```swift
 	/// // Basic usage
-	/// coordinator.delegate = .logging()
+	/// builder.delegate(.logging())
 	///
 	/// // With debug logging enabled
-	/// coordinator.delegate = .logging(enableDebugLogging: true)
+	/// builder.delegate(.logging(enableDebugLogging: true))
 	/// ```
 	///
 	/// ## Log Levels
@@ -55,33 +57,38 @@ public extension DeepLinkCoordinatorDelegate where Self == DeepLinkLoggingDelega
 	/// - **Error**: Processing failures and errors
 	/// - **Debug**: Detailed processing information (when enabled)
 	///
-	/// - Parameter enableDebugLogging: Whether to enable detailed debug logging (default: false)
+	/// - Parameters:
+	///   - enableDebugLogging: Whether to enable detailed debug logging (default: false)
+	///   - privacy: How messages describe URLs and errors (default: ``DeepLinkLogPrivacy/redacted``)
 	/// - Returns: A configured logging delegate instance
-	static func logging(
+	@MainActor
+	static func logging<R: DeepLinkRoute>(
 		enableDebugLogging: Bool = false,
-	) -> DeepLinkLoggingDelegate {
-		DeepLinkLoggingDelegate(enableDebugLogging: enableDebugLogging)
+		privacy: DeepLinkLogPrivacy = .redacted,
+	) -> DeepLinkLoggingDelegate<R> where Self == DeepLinkLoggingDelegate<R> {
+		DeepLinkLoggingDelegate<R>(enableDebugLogging: enableDebugLogging, privacy: privacy)
 	}
-}
 
-public extension DeepLinkCoordinatorDelegate where Self == DeepLinkNotificationDelegate {
+	#if canImport(UserNotifications) && !os(tvOS)
 	/// Creates a notification delegate that shows user notifications for deep link events.
 	///
 	/// This delegate provides user feedback about deep link processing, particularly
 	/// useful for debugging, user education, or when deep links fail to process.
 	///
+	/// - Note: Not available on tvOS, which does not display banner notifications.
+	///
 	/// ## Usage
 	///
 	/// ```swift
 	/// // Basic usage (shows only error notifications)
-	/// coordinator.delegate = .notification()
+	/// builder.delegate(.notification())
 	///
 	/// // Show all notification types
-	/// coordinator.delegate = .notification(
+	/// builder.delegate(.notification(
 	///     showSuccess: true,
 	///     showErrors: true,
 	///     showInfo: true
-	/// )
+	/// ))
 	/// ```
 	///
 	/// ## Notification Types
@@ -94,16 +101,27 @@ public extension DeepLinkCoordinatorDelegate where Self == DeepLinkNotificationD
 	///   - showSuccess: Whether to show notifications for successful processing (default: false)
 	///   - showErrors: Whether to show notifications for processing errors (default: true)
 	///   - showInfo: Whether to show general info notifications (default: false)
+	///   - presenter: The presenter that receives each scheduled notification.
+	///     Defaults to ``DefaultDeepLinkNotificationPresenter``; inject a test
+	///     double in unit tests to suppress real system notifications.
+	///   - errorDetail: How much error text failure notifications show
+	///     (default: ``DeepLinkNotificationErrorDetail/redacted``; `.full` shows full URLs).
 	/// - Returns: A configured notification delegate instance
-	static func notification(
+	@MainActor
+	static func notification<R: DeepLinkRoute>(
 		showSuccess: Bool = false,
 		showErrors: Bool = true,
 		showInfo: Bool = false,
-	) -> DeepLinkNotificationDelegate {
-		DeepLinkNotificationDelegate(
+		presenter: any DeepLinkNotificationPresenter = DefaultDeepLinkNotificationPresenter(),
+		errorDetail: DeepLinkNotificationErrorDetail = .redacted,
+	) -> DeepLinkNotificationDelegate<R> where Self == DeepLinkNotificationDelegate<R> {
+		DeepLinkNotificationDelegate<R>(
 			showSuccessNotifications: showSuccess,
 			showErrorNotifications: showErrors,
 			showInfoNotifications: showInfo,
+			presenter: presenter,
+			errorDetail: errorDetail,
 		)
 	}
+	#endif
 }

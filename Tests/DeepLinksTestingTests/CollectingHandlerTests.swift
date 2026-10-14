@@ -2,6 +2,7 @@
 //  Copyright © 2026 Jesús Alfredo Hernández Alarcón. All rights reserved.
 //
 
+import DeepLinks
 import DeepLinksTesting
 import Testing
 
@@ -35,5 +36,17 @@ struct CollectingHandlerTests {
 		}
 
 		#expect(sut.handledRoutes.count == 100)
+	}
+
+	@Test
+	func `records the context of each route`() async throws {
+		let sut = CollectingHandler<TestRoute>()
+		let context = DeepLinkContext(source: .notification, sceneID: "scene-1")
+
+		try await sut.handle(.routeA, context: context)
+		try await sut.handle(.routeB)
+
+		#expect(sut.handledRoutes == [.routeA, .routeB])
+		#expect(sut.handledContexts == [context, .unknown])
 	}
 }

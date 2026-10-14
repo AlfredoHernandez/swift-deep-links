@@ -37,7 +37,7 @@ import os
 /// - Note: All parameter values are converted to strings for consistent, sendable storage.
 /// - Complexity: O(n) where n is the number of parameters being converted to strings.
 /// - SeeAlso: `AnalyticsProvider`
-public final class CollectingAnalyticsProvider: AnalyticsProvider, @unchecked Sendable {
+public final class CollectingAnalyticsProvider: AnalyticsProvider {
 	/// A captured analytics event with stringified parameters.
 	///
 	/// This structure stores both the event name and all its parameters

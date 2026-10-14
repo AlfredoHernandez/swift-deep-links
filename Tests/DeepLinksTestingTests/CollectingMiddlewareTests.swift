@@ -2,6 +2,7 @@
 //  Copyright © 2026 Jesús Alfredo Hernández Alarcón. All rights reserved.
 //
 
+import DeepLinks
 import DeepLinksTesting
 import Testing
 
@@ -20,6 +21,18 @@ struct CollectingMiddlewareTests {
 		let result = try await sut.intercept(testURL)
 
 		#expect(result == testURL)
+		#expect(sut.interceptedURLs == [testURL])
+	}
+
+	@Test
+	func `passes a request through and collects it with its context`() async throws {
+		let sut = CollectingMiddleware()
+		let request = DeepLinkRequest(url: testURL, context: DeepLinkContext(source: .notification))
+
+		let result = try await sut.intercept(request)
+
+		#expect(result == request)
+		#expect(sut.interceptedRequests == [request])
 		#expect(sut.interceptedURLs == [testURL])
 	}
 

@@ -17,9 +17,14 @@ This library provides:
 - **Extensibility**: Easy to add new deep link types without modifying existing code
 - **Error handling**: Comprehensive error handling and logging
 
-### What iOS versions are supported?
+### What platforms are supported?
 
-The library requires iOS 16.0+ and Swift 6.2+.
+iOS 16+, macOS 13+, tvOS 16+, watchOS 9+, and visionOS 1+. The library requires Swift 6.2+.
+
+Most APIs work on every supported platform. Two platform notes:
+
+- **tvOS:** `DeepLinkNotificationDelegate` is unavailable because tvOS does not display banner notifications. Use `DeepLinkLoggingDelegate` or a custom delegate for user feedback.
+- **watchOS:** `View.onDeepLink(_:)` attaches `onContinueUserActivity(NSUserActivityTypeBrowsingWeb)`, which is available on watchOS 9+ but Universal Link continuations only originate from paired-device Safari handoffs. If your app is watchOS-only, the SwiftUI modifier's `onOpenURL` branch is the one that matters in practice.
 
 ## Implementation Questions
 
@@ -95,34 +100,47 @@ You can implement custom parsers for any URL structure. The library is flexible 
 
 ### What happens if a deep link fails to parse?
 
-The library will try all registered parsers. If none succeed, it will throw a `DeepLinkError.routeNotFound` error.
+The library tries every registered parser in order. The outcome depends on how the chain behaves:
+
+- If **no parsers are configured**, `DefaultDeepLinkRouting` throws `DeepLinkError.routeNotFound(url)`.
+- If at least one parser is configured but **every parser throws**, `DefaultDeepLinkRouting` throws `DeepLinkError.parsingFailed(url:underlyingErrors:)` carrying the collected failures in order. Nested `parsingFailed` thrown by a delegating parser is flattened so callers never see `parsingFailed(parsingFailed(...))`.
+- If any parser succeeds, its routes are returned and no error is raised.
 
 ### How do I handle parsing errors gracefully?
 
-Implement error handling in your app's deep link coordinator:
+`coordinator.handle(url:)` is non-throwing — it always returns a `DeepLinkResult`. Inspect the result to decide how to react:
 
 ```swift
 func handle(url: URL) async {
-    do {
-        await coordinator.handle(url: url)
-    } catch {
-        // Handle error appropriately
-        print("Deep link error: \(error)")
-        // Maybe show an error alert or navigate to a default screen
+    let result = await coordinator.handle(url: url)
+
+    if result.wasSuccessful {
+        return
+    }
+
+    if let error = result.firstDeepLinkError {
+        switch error {
+        case .parsingFailed:
+            await navigationService.navigateToHome()
+        case .rateLimitExceeded:
+            await showRateLimitAlert()
+        default:
+            await showErrorAlert(error)
+        }
     }
 }
 ```
 
 ### Can I provide fallback behavior for failed deep links?
 
-Yes, you can implement fallback logic in your error handling:
+Yes — the result surface makes fallback explicit. `firstDeepLinkError` returns the first framework-owned error in `result.errors`, or `nil` if the failure came from a non-`DeepLinkError` source:
 
 ```swift
-do {
-    await coordinator.handle(url: url)
-} catch {
-    // Fallback to home screen or show error
+let result = await coordinator.handle(url: url)
+
+guard result.wasSuccessful else {
     await navigationService.navigateToHome()
+    return
 }
 ```
 
@@ -257,4 +275,4 @@ If you have questions not covered in this FAQ:
 1. Check the [Sample App](../DeepLinkSample/) for examples
 2. Review the [API Reference](./api-reference-en.md)
 3. Look at the [Tests](../Tests/) for usage patterns
-4. Open an [Issue](https://github.com/AlfredoHernandez/swift-deep-link/issues) on GitHub
+4. Open an [Issue](https://github.com/AlfredoHernandez/swift-deep-links/issues) on GitHub

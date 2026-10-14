@@ -48,7 +48,7 @@ struct AuthenticationMiddlewareTests {
 			_ = try await middleware.intercept(testURL)
 			#expect(Bool(false), "Expected unauthorized access error")
 		} catch let error as DeepLinkError {
-			#expect(error == .unauthorizedAccess("protected"))
+			#expect(error == .unauthorizedAccess(testURL))
 		}
 	}
 
@@ -82,7 +82,7 @@ struct AuthenticationMiddlewareTests {
 			_ = try await middleware.intercept(testURL)
 			#expect(Bool(false), "Expected unauthorized access error")
 		} catch let error as DeepLinkError {
-			#expect(error == .unauthorizedAccess("protected"))
+			#expect(error == .unauthorizedAccess(testURL))
 		}
 	}
 
@@ -160,7 +160,7 @@ struct AuthenticationMiddlewareTests {
 			_ = try await middleware.intercept(testURL)
 			#expect(Bool(false), "Expected unauthorized access error")
 		} catch let error as DeepLinkError {
-			#expect(error == .unauthorizedAccess("protected"))
+			#expect(error == .unauthorizedAccess(testURL))
 		}
 	}
 
@@ -208,7 +208,7 @@ struct AuthenticationMiddlewareTests {
 			_ = try await middleware.intercept(testURL)
 			#expect(Bool(false), "Expected unauthorized access error")
 		} catch let error as DeepLinkError {
-			#expect(error == .unauthorizedAccess("https"))
+			#expect(error == .unauthorizedAccess(testURL))
 		}
 	}
 
@@ -288,7 +288,7 @@ struct AuthenticationMiddlewareTests {
 			_ = try await middleware.intercept(testURL)
 			#expect(Bool(false), "Expected unauthorized access error")
 		} catch let error as DeepLinkError {
-			#expect(error == .unauthorizedAccess("anyhost"))
+			#expect(error == .unauthorizedAccess(testURL))
 		}
 	}
 
@@ -322,7 +322,6 @@ struct AuthenticationMiddlewareTests {
 	func `PermissiveAuthenticationProvider returns consistent authentication status`() {
 		let provider = PermissiveAuthenticationProvider()
 
-		// Test multiple calls to ensure consistency
 		let firstCall = provider.isAuthenticated()
 		let secondCall = provider.isAuthenticated()
 		let thirdCall = provider.isAuthenticated()
@@ -398,7 +397,6 @@ struct AuthenticationMiddlewareTests {
 	func `PermissiveAuthenticationProvider is thread-safe`() async {
 		let provider = PermissiveAuthenticationProvider()
 
-		// Test concurrent access
 		await withTaskGroup(of: Bool.self) { group in
 			for _ in 0 ..< 10 {
 				group.addTask {
@@ -411,7 +409,6 @@ struct AuthenticationMiddlewareTests {
 				results.append(result)
 			}
 
-			// All results should be true
 			#expect(results.count == 10)
 			#expect(results.allSatisfy { $0 == true })
 		}

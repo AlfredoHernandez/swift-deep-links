@@ -160,7 +160,10 @@ struct DeepLinkURLTests {
 
 	@Test
 	func `DeepLinkURL init throws invalidURL error on empty URL`() throws {
-		let emptyURL = try #require(URL(string: "not-a-valid-url"))
+		// A URL with only a scheme and no content (no host, no path, no query)
+		// is the canonical "empty URL" case against `DeepLinkURL`'s validation,
+		// which requires both a scheme and a host.
+		let emptyURL = try #require(URL(string: "myapp:"))
 
 		#expect(throws: DeepLinkError.invalidURL(emptyURL)) {
 			try DeepLinkURL(url: emptyURL)
@@ -208,7 +211,6 @@ struct DeepLinkURLTests {
 		let url = try #require(URL(string: urlString))
 		let deepLinkURL = try DeepLinkURL(url: url)
 
-		// queryParameters should only have the last value
 		#expect(deepLinkURL.queryParameters["tags"] == "sale")
 		#expect(deepLinkURL.queryParameters.count == 1)
 	}

@@ -83,7 +83,7 @@ struct SecurityMiddlewareTests {
 			_ = try await middleware.intercept(testURL)
 			#expect(Bool(false), "Expected blocked URL error")
 		} catch let error as DeepLinkError {
-			#expect(error == .blockedURL(testURL.absoluteString))
+			#expect(error == .blockedURL(testURL))
 		}
 	}
 
