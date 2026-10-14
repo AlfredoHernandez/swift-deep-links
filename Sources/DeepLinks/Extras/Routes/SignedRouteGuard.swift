@@ -13,7 +13,9 @@ import Foundation
 /// link that carries a signature, whatever its URL rule says, and records the
 /// result in ``DeepLinkContext/isSignatureVerified``, which entry points and
 /// app code cannot set. Keep the middleware in the chain; without it no link
-/// is ever verified and protected routes always fail.
+/// is ever verified and protected routes always fail (the guard fails
+/// closed). ``SignedLinkMiddleware`` needs CryptoKit, so on a platform without
+/// it the guard rejects every protected route.
 ///
 /// ```swift
 /// .handler(

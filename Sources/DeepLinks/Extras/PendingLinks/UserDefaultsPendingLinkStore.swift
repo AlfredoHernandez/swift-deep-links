@@ -7,11 +7,14 @@ import Foundation
 /// A ``PendingLinkStore`` persisted in `UserDefaults`, so a protected link
 /// survives the app being terminated during sign-in.
 ///
-/// Each entry stores only the URL and the time it was saved, as JSON under
-/// `key`. `UserDefaults` is not encrypted: a link whose query carries a
-/// secret (a password-reset token, a one-time code) is written to disk in
-/// plain text. Use ``InMemoryPendingLinkStore`` for such links, or keep
-/// them out of the protected set.
+/// Each entry stores the URL, the time it was saved and the link's context
+/// (source, the opening app's bundle identifier and the scene identifier,
+/// never the signature-verified flag), as versioned JSON under `key`.
+/// `UserDefaults` is not encrypted: a link whose query carries a secret (a
+/// password-reset token, a one-time code) is written to disk in plain text,
+/// and the source application reveals which app opened the link. Use
+/// ``InMemoryPendingLinkStore`` for such links, or keep them out of the
+/// protected set; ``removeAll()`` clears everything.
 public actor UserDefaultsPendingLinkStore: PendingLinkStore {
 	private let userDefaults: UserDefaults
 	private let key: String

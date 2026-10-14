@@ -155,6 +155,20 @@ struct RouteGuardTests {
 	}
 
 	@Test
+	func `without signed link middleware every protected route fails closed`() async throws {
+		let handler = CollectingHandler<TestRoute>()
+		let coordinator = DeepLinkCoordinator(
+			routing: DefaultDeepLinkRouting(parsers: [ImmediateParser(routes: [TestRoute.route1])]),
+			handler: handler.requiringSignature(for: .all),
+		)
+
+		let result = try await coordinator.handle(url: SignedLinkBuilder(key: key).sign(#require(URL(string: "myapp://pay"))))
+
+		#expect(result.firstDeepLinkError == .securityViolation(SignedRouteGuard<TestRoute>.unsignedRouteReason))
+		#expect(handler.handledRoutes.isEmpty)
+	}
+
+	@Test
 	func `entry point contexts are never verified`() throws {
 		#expect(!DeepLinkContext(source: .universalLink).isSignatureVerified)
 		#expect(try !DeepLinkContext.openedURL(#require(URL(string: "myapp://x"))).isSignatureVerified)
