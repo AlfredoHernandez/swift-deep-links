@@ -101,7 +101,11 @@ public final class InMemoryNonceStore: NonceStore {
 	///   - maxEntries: Maximum number of live nonces, reservations included; clamped to at least `1`.
 	///   - reservationTTL: How long a reservation holds a nonce if it is never
 	///     committed or released (for example the app was suspended mid-link).
-	///     Keep it longer than your slowest confirmation prompt. Defaults to
+	///     ``SignedLinkMiddleware`` also refuses a nonce whose link it is still
+	///     processing, so a lapse never lets a link run twice in this process;
+	///     the time to live matters across processes and middleware instances
+	///     sharing the store, so keep it longer than your slowest confirmation
+	///     prompt (give prompts a `timeout`). Defaults to
 	///     ``defaultReservationTTL``; negative and NaN values count as `0`.
 	///   - dateProvider: Supplies the current time; inject a manual clock in tests.
 	public init(

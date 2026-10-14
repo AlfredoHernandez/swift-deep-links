@@ -136,7 +136,10 @@ let link = try SignedLinkBuilder(key: currentKey, keyID: "2026-10").sign(
   confirmation or the parsers stop the link before any handler runs, the
   nonce is released, so the user can retry,
   and a link saved for sign-in resumes once. A reservation never settled (the
-  app was killed mid-link) lapses after `reservationTTL`. Calling the
+  app was killed mid-link) lapses after `reservationTTL`; while the link is
+  still in flight, `SignedLinkMiddleware` refuses the same nonce regardless,
+  so a slow prompt cannot let it run twice. Give confirmation prompts a
+  `timeout` shorter than `reservationTTL` when several processes share a store. Calling the
   middleware directly, outside a coordinator, consumes at once. Pass
   `reusedNonce: .drop` to stop reused links silently instead of with an error.
   `InMemoryNonceStore` is bounded and forgets on relaunch; use

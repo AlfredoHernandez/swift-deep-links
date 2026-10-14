@@ -264,6 +264,10 @@ middleware order and a hardening checklist.
   before any handler ran, so the user can retry (including after sign-in
   through `resumePendingLinks(from:)`); concurrent deliveries still admit one.
   Make handlers idempotent where a repeat could double a side effect.
+  While its link is in flight, `SignedLinkMiddleware` refuses the same nonce
+  even if the store's reservation lapsed (a long confirmation prompt), so a
+  link never runs twice in one process; keep prompt timeouts below the
+  reservation time to live for stores shared across processes.
   `DeepLinkMiddlewareCoordinator.process(...)` called from a handler runs
   standalone (it consumes at once), so it cannot disturb the outer link's nonce.
   `NonceStore` gains `reserve(_:expiresAt:)`, `commit(_:)` and `release(_:)`

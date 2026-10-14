@@ -140,6 +140,45 @@ struct SignedLinkTwoPhaseTests {
 		}
 	}
 
+	@Test(.timeLimit(.minutes(1)))
+	func `a link still waiting for confirmation keeps its nonce past the reservation time to live`() async throws {
+		let clock = ManualDateProvider()
+		let prompts = AsyncStream<CheckedContinuation<Bool, Never>>.makeStream()
+		let promptCount = OSAllocatedUnfairLock(initialState: 0)
+		let handler = CollectingHandler<TestRoute>().confirming(.all) { _, _ in
+			let isFirst = promptCount.withLock { count in
+				count += 1
+				return count == 1
+			}
+			guard isFirst else { return false }
+			return await withCheckedContinuation { prompts.continuation.yield($0) }
+		}
+		let coordinator = DeepLinkCoordinator(
+			routing: DefaultDeepLinkRouting(parsers: [ImmediateParser(routes: [TestRoute.route1])]),
+			handler: handler,
+			middlewareCoordinator: DeepLinkMiddlewareCoordinator(middleware: [
+				SignedLinkMiddleware(
+					keys: SigningKeyring(key: key),
+					nonceStore: InMemoryNonceStore(reservationTTL: 30, dateProvider: clock.dateProvider),
+					dateProvider: clock.dateProvider,
+				),
+			]),
+		)
+		let link = try SignedLinkBuilder(key: key).sign(#require(URL(string: "https://example.com/pay")), expiresAt: clock.now + 600, nonce: "n-1")
+		var pending = prompts.stream.makeAsyncIterator()
+
+		let first = Task { await coordinator.handle(url: link) }
+		let prompt = try #require(await pending.next())
+		clock.advance(by: 31)
+
+		let second = await coordinator.handle(url: link)
+		prompt.resume(returning: true)
+
+		#expect(second.firstDeepLinkError == .securityViolation(SignedLinkMiddleware.reusedNonceReason))
+		#expect(await first.value.wasSuccessful)
+		#expect(await coordinator.handle(url: link).firstDeepLinkError == .securityViolation(SignedLinkMiddleware.reusedNonceReason))
+	}
+
 	@Test
 	func `concurrent deliveries through the coordinator admit exactly one`() async {
 		let sut = Pipeline()

@@ -37,6 +37,7 @@ public struct ConfirmingHandler<Route: DeepLinkRoute>: DeepLinkHandler {
 	///   - handler: The handler that runs approved routes.
 	///   - matcher: The routes that need confirmation.
 	///   - timeout: How long to wait for an answer before denying; `nil` (default) waits indefinitely.
+	///     For signed links, keep it below the nonce store's reservation time to live.
 	///   - sleep: Waits for the timeout; inject a controllable sleep in tests.
 	///   - confirm: Asks the user; returns `true` to run the route.
 	public init(

@@ -46,6 +46,7 @@ public final class ConfirmationMiddleware: DeepLinkMiddleware {
 	///   - matcher: The links that need confirmation. Defaults to ``DeepLinkMatcher/all``.
 	///   - redactor: Redacts the URL handed to the provider. Defaults to a default ``URLRedactor``.
 	///   - timeout: How long to wait for an answer before denying; `nil` (default) waits indefinitely.
+	///     For signed links, keep it below the nonce store's reservation time to live.
 	///   - sleep: Waits for the timeout; inject a controllable sleep in tests.
 	public init(
 		provider: any DeepLinkConfirmationProvider,

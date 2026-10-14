@@ -127,7 +127,7 @@ public final class SignedLinkMiddleware: DeepLinkMiddleware {
 	private let reusedNonce: ReusedNonceResponse
 	private let stripsSignatureParameters: Bool
 	private let dateProvider: @Sendable () -> Date
-	private let reservations = OSAllocatedUnfairLock<[UUID: [NonceReservation]]>(initialState: [:])
+	private let settlements = OSAllocatedUnfairLock(initialState: NonceSettlements())
 
 	/// Creates a signed-link middleware.
 	///
@@ -185,13 +185,8 @@ public final class SignedLinkMiddleware: DeepLinkMiddleware {
 	/// failed before any handler ran.
 	public func didFinish(_: DeepLinkRequest, outcome: DeepLinkOutcome) async {
 		guard let nonceStore, let runID = DeepLinkRun.id,
-		      let reservation = reservations.withLock({ $0[runID]?.popLast() })
+		      let reservation = settlements.withLock({ $0.settle(runID) })
 		else { return }
-		reservations.withLock {
-			if $0[runID]?.isEmpty == true {
-				$0[runID] = nil
-			}
-		}
 
 		switch outcome {
 		case .succeeded, .deferred, .handlerFailed:
@@ -249,12 +244,22 @@ private extension SignedLinkMiddleware {
 
 	/// Inside a ``DeepLinkCoordinator`` pass the nonce is only reserved and
 	/// settled in ``didFinish(_:outcome:)``; called directly, it is consumed.
+	///
+	/// A nonce whose link is still being processed by this middleware is
+	/// rejected whatever the store says, so a store reservation that lapses
+	/// mid-link (a long confirmation prompt) never lets the link run twice.
 	func admit(_ nonce: String, until validUntil: Date, in nonceStore: any NonceStore) async -> Bool {
+		let now = dateProvider()
 		guard let runID = DeepLinkRun.id else {
+			guard !settlements.withLock({ $0.isInFlight(nonce, at: now) }) else { return false }
 			return await nonceStore.consume(nonce, expiresAt: validUntil)
 		}
-		guard let reservation = await nonceStore.reserve(nonce, expiresAt: validUntil) else { return false }
-		reservations.withLock { $0[runID, default: []].append(reservation) }
+		guard settlements.withLock({ $0.claim(nonce, until: validUntil, at: now) }) else { return false }
+		guard let reservation = await nonceStore.reserve(nonce, expiresAt: validUntil) else {
+			settlements.withLock { $0.unclaim(nonce) }
+			return false
+		}
+		settlements.withLock { $0.hold(reservation, for: runID) }
 		return true
 	}
 
@@ -311,6 +316,42 @@ private extension DeepLinkRequest {
 		var request = self
 		request.context.signatureVerifiedURL = verified ? url : nil
 		return request
+	}
+}
+
+/// The reservations this middleware holds, by coordinator pass, and the
+/// nonces whose links are still in flight in this process.
+private struct NonceSettlements {
+	private var byRun: [UUID: [NonceReservation]] = [:]
+	private var inFlight: [String: Date] = [:]
+
+	func isInFlight(_ nonce: String, at now: Date) -> Bool {
+		inFlight[nonce].map { now < $0 } ?? false
+	}
+
+	/// Marks `nonce` in flight until its link expires, unless it already is.
+	mutating func claim(_ nonce: String, until expiry: Date, at now: Date) -> Bool {
+		guard !isInFlight(nonce, at: now) else { return false }
+		inFlight[nonce] = expiry
+		return true
+	}
+
+	mutating func unclaim(_ nonce: String) {
+		inFlight[nonce] = nil
+	}
+
+	mutating func hold(_ reservation: NonceReservation, for runID: UUID) {
+		byRun[runID, default: []].append(reservation)
+	}
+
+	/// Removes and returns the newest reservation of `runID`, ending its flight.
+	mutating func settle(_ runID: UUID) -> NonceReservation? {
+		guard let reservation = byRun[runID]?.popLast() else { return nil }
+		if byRun[runID]?.isEmpty == true {
+			byRun[runID] = nil
+		}
+		inFlight[reservation.nonce] = nil
+		return reservation
 	}
 }
 
