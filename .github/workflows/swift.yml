@@ -6,7 +6,7 @@
 # The Xcode matrix cross-compiles the package against each declared
 # platform's device SDK using `generic/platform=<plat>` destinations. Device
 # destinations require only the SDK to be installed, not a simulator
-# runtime — GitHub's `macos-15` runners ship every Apple SDK but the
+# runtime — GitHub's `xcode-27` runners ship every Apple SDK but the
 # `watchOS Simulator` / `visionOS Simulator` runtimes are opt-in, so using
 # the device destinations keeps the matrix stable without a simulator
 # runtime install step.
@@ -24,12 +24,12 @@ on:
 jobs:
   spm:
     name: SwiftPM build + test (macOS)
-    runs-on: macos-15
+    runs-on: xcode-27
     steps:
       - uses: actions/checkout@v4
 
       - name: Select Xcode Version
-        run: sudo xcode-select -switch /Applications/Xcode_26.0.app
+        run: sudo xcode-select -switch /Applications/Xcode_27.0.app
 
       - name: Build
         run: swift build -v
@@ -39,7 +39,7 @@ jobs:
 
   xcode-platforms:
     name: xcodebuild (${{ matrix.platform }})
-    runs-on: macos-15
+    runs-on: xcode-27
     strategy:
       fail-fast: false
       matrix:
@@ -58,7 +58,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Select Xcode Version
-        run: sudo xcode-select -switch /Applications/Xcode_26.0.app
+        run: sudo xcode-select -switch /Applications/Xcode_27.0.app
 
       - name: Hide sample workspace so xcodebuild resolves the package schemes
         run: mv DeepLink.xcworkspace "$RUNNER_TEMP/DeepLink.xcworkspace"
