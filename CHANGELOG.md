@@ -352,7 +352,10 @@ middleware order and a hardening checklist.
   and `ConfirmingHandler` / `handler.confirming(_:timeout:confirm:)` asks a
   route-aware closure first (`confirmationDenied` on denial or timeout).
   `DeepLinkContext.isSignatureVerified` records the result and only
-  `SignedLinkMiddleware` can set it; the middleware now also verifies any link
+  `SignedLinkMiddleware` can set it, bound to the URL it verified: rewriting
+  the URL afterwards (`replacingURL`, assigning `url`, a bridged 1.x
+  middleware, `URLTransformationMiddleware`) clears it, so place rewriting
+  middleware before `.signedLinks(...)`; the middleware now also verifies any link
   that carries a signature, not only those its URL rule selects (an invalid
   signature is rejected either way).
 - **Multi-scene routing (F9).** `SceneRoutingHandler<Route>` is a handler that

@@ -89,7 +89,7 @@ struct QueuedLinkContextTests {
 	func `the UserDefaults store never persists a verified signature`() async throws {
 		let suiteName = makeSuiteName()
 		var verified = context
-		verified.isSignatureVerified = true
+		verified.signatureVerifiedURL = url("myapp://a")
 		try await UserDefaultsPendingLinkStore(userDefaults: #require(UserDefaults(suiteName: suiteName)), key: "pending")
 			.save(DeepLinkRequest(url: url("myapp://a"), context: verified))
 

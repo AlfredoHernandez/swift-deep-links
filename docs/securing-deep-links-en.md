@@ -215,7 +215,10 @@ let isSensitive: @Sendable (AppRoute) -> Bool = {
 
 `SignedRouteGuard` relies on `DeepLinkContext.isSignatureVerified`, which only
 `SignedLinkMiddleware` sets, so keep `.signedLinks(...)` in the chain (it
-verifies every link carrying a signature, even ones no URL rule selects).
+verifies every link carrying a signature, even ones no URL rule selects). The
+flag is bound to the URL that was verified: a middleware that rewrites the
+URL afterwards clears it, so run URL transformations **before**
+`.signedLinks(...)` (or not at all on signed links).
 
 ## 6. Parse strictly
 

@@ -52,11 +52,20 @@ public struct DeepLinkContext: Sendable, Hashable {
 
 	/// Whether ``SignedLinkMiddleware`` verified this link's signature.
 	///
-	/// Only ``SignedLinkMiddleware`` sets it (to `true` after a valid
-	/// signature, `false` otherwise); entry points and app code cannot, so a
-	/// ``SignedRouteGuard`` can trust it. It is not persisted by
+	/// Only ``SignedLinkMiddleware`` sets it, for the URL it verified (and
+	/// stripped); entry points and app code cannot, so a ``SignedRouteGuard``
+	/// can trust it. It is bound to that URL: ``DeepLinkRequest/replacingURL(_:)``
+	/// with a different URL clears it, and ``DeepLinkCoordinator`` clears it
+	/// before routing when the request's URL no longer matches, so a
+	/// middleware rewriting the link after verification cannot keep the
+	/// signature for a different destination. It is not persisted by
 	/// ``UserDefaultsPendingLinkStore``; resumed links are verified again.
-	public internal(set) var isSignatureVerified = false
+	public var isSignatureVerified: Bool {
+		signatureVerifiedURL != nil
+	}
+
+	/// The URL ``SignedLinkMiddleware`` verified, if any.
+	var signatureVerifiedURL: URL?
 
 	/// Creates a context.
 	///
@@ -116,6 +125,14 @@ public struct DeepLinkRequest: Sendable, Hashable {
 
 	/// This request with `url` in place of its URL and the same context.
 	public func replacingURL(_ url: URL) -> DeepLinkRequest {
-		DeepLinkRequest(url: url, context: context)
+		DeepLinkRequest(url: url, context: context).bindingSignatureToURL()
+	}
+
+	/// This request with the signature flag cleared unless it was verified for this URL.
+	func bindingSignatureToURL() -> DeepLinkRequest {
+		guard let verified = context.signatureVerifiedURL, verified != url else { return self }
+		var request = self
+		request.context.signatureVerifiedURL = nil
+		return request
 	}
 }

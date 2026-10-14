@@ -294,7 +294,7 @@ private extension DeepLinkCoordinator {
 			return await (createMiddlewareStoppedResult(url: request.url, startTime: startTime), run.wasDeferred ? .deferred : .stopped)
 
 		case let .success(request?):
-			processed = request
+			processed = request.bindingSignatureToURL()
 		}
 
 		do {

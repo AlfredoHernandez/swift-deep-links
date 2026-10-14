@@ -131,7 +131,7 @@ struct PendingLinkStoreTests {
 	func `user defaults persists only the URL, the save time and the context`() async throws {
 		let suiteName = makeSuiteName()
 		var context = DeepLinkContext(source: .notification, sourceApplication: "com.example", sceneID: "scene")
-		context.isSignatureVerified = true
+		context.signatureVerifiedURL = link("a")
 		try await UserDefaultsPendingLinkStore(userDefaults: defaults(suiteName), key: "pending")
 			.save(DeepLinkRequest(url: link("a"), context: context))
 

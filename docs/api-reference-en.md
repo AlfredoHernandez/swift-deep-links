@@ -83,7 +83,7 @@ public struct DeepLinkContext: Sendable, Hashable {
     public var source: Source
     public var sourceApplication: String?
     public var sceneID: String?
-    public internal(set) var isSignatureVerified: Bool  // set only by SignedLinkMiddleware
+    public var isSignatureVerified: Bool { get }  // set only by SignedLinkMiddleware, bound to the verified URL
     public init(source: Source = .unknown, sourceApplication: String? = nil, sceneID: String? = nil)
     public static func openedURL(_ url: URL, sourceApplication: String? = nil, sceneID: String? = nil) -> DeepLinkContext
 }

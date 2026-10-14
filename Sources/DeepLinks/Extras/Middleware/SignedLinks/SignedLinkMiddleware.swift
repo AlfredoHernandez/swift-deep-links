@@ -309,7 +309,7 @@ private struct SignedLinkFields {
 private extension DeepLinkRequest {
 	func markingSignature(verified: Bool) -> DeepLinkRequest {
 		var request = self
-		request.context.isSignatureVerified = verified
+		request.context.signatureVerifiedURL = verified ? url : nil
 		return request
 	}
 }

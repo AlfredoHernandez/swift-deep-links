@@ -49,7 +49,7 @@ struct RouteGuardTests {
 		let inner = CollectingHandler<TestRoute>()
 		let sut = inner.requiringSignature(for: .routes { $0 == .route1 })
 		var verified = DeepLinkContext(source: .universalLink)
-		verified.isSignatureVerified = true
+		verified.signatureVerifiedURL = try #require(URL(string: "myapp://pay"))
 
 		try await sut.handle(.route1, context: verified)
 		try await sut.handle(.route2, context: .unknown)
@@ -108,11 +108,46 @@ struct RouteGuardTests {
 		#expect(handler.handledRoutes == [.route1])
 	}
 
+	@Test(arguments: [RewriteKind.replacingURL, .assigningURL, .bridgedLegacy])
+	func `a URL rewritten after verification no longer counts as signed`(kind: RewriteKind) async throws {
+		let handler = CollectingHandler<TestRoute>()
+		let coordinator = try DeepLinkCoordinator(
+			routing: DefaultDeepLinkRouting(parsers: [ImmediateParser(routes: [TestRoute.route1])]),
+			handler: handler.requiringSignature(for: .all),
+			middlewareCoordinator: DeepLinkMiddlewareCoordinator(middleware: [
+				SignedLinkMiddleware(keys: SigningKeyring(key: key), requiresExpiry: false),
+				kind.middleware(to: #require(URL(string: "myapp://admin"))),
+			]),
+		)
+
+		let result = try await coordinator.handle(url: SignedLinkBuilder(key: key).sign(#require(URL(string: "myapp://pay"))))
+
+		#expect(result.firstDeepLinkError == .securityViolation(SignedRouteGuard<TestRoute>.unsignedRouteReason))
+		#expect(handler.handledRoutes.isEmpty)
+	}
+
+	@Test
+	func `a middleware that keeps the verified URL keeps the signature`() async throws {
+		let handler = CollectingHandler<TestRoute>()
+		let coordinator = DeepLinkCoordinator(
+			routing: DefaultDeepLinkRouting(parsers: [ImmediateParser(routes: [TestRoute.route1])]),
+			handler: handler.requiringSignature(for: .all),
+			middlewareCoordinator: DeepLinkMiddlewareCoordinator(middleware: [
+				SignedLinkMiddleware(keys: SigningKeyring(key: key), requiresExpiry: false),
+				PassthroughMiddleware(),
+			]),
+		)
+
+		let result = try await coordinator.handle(url: SignedLinkBuilder(key: key).sign(#require(URL(string: "myapp://pay"))))
+
+		#expect(result.wasSuccessful)
+	}
+
 	@Test
 	func `signed link middleware clears a verified flag it did not set`() async throws {
 		let middleware = SignedLinkMiddleware(keys: SigningKeyring(key: key), requiredFor: .paths(["/nothing"]), requiresExpiry: false)
 		var context = DeepLinkContext()
-		context.isSignatureVerified = true
+		context.signatureVerifiedURL = try #require(URL(string: "myapp://x"))
 
 		let result = try await middleware.intercept(DeepLinkRequest(url: #require(URL(string: "myapp://x")), context: context))
 
@@ -189,6 +224,45 @@ private struct SignedPipeline {
 				SignedLinkMiddleware(keys: SigningKeyring(key: key), requiredFor: .paths(["/nothing"]), requiresExpiry: false),
 			]),
 		)
+	}
+}
+
+enum RewriteKind: Sendable, CaseIterable {
+	case replacingURL, assigningURL, bridgedLegacy
+
+	func middleware(to target: URL) -> any DeepLinkMiddleware {
+		switch self {
+		case .replacingURL: ReplacingMiddleware(target: target)
+		case .assigningURL: AssigningMiddleware(target: target)
+		case .bridgedLegacy: LegacyRewritingMiddleware(target: target)
+		}
+	}
+}
+
+private struct ReplacingMiddleware: DeepLinkMiddleware {
+	let target: URL
+
+	func intercept(_ request: DeepLinkRequest) async throws -> DeepLinkRequest? {
+		request.replacingURL(target)
+	}
+}
+
+private struct AssigningMiddleware: DeepLinkMiddleware {
+	let target: URL
+
+	func intercept(_ request: DeepLinkRequest) async throws -> DeepLinkRequest? {
+		var rewritten = request
+		rewritten.url = target
+		return rewritten
+	}
+}
+
+/// A 1.x middleware rewriting through the deprecated URL form.
+private struct LegacyRewritingMiddleware: DeepLinkMiddleware {
+	let target: URL
+
+	func intercept(_: URL) async throws -> URL? {
+		target
 	}
 }
 
