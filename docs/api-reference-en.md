@@ -47,7 +47,8 @@ public protocol DeepLinkRouting<Route>: Sendable {
 ```swift
 public protocol DeepLinkMiddleware: Sendable {
     func intercept(_ request: DeepLinkRequest) async throws -> DeepLinkRequest?  // 2.0
-    func intercept(_ url: URL) async throws -> URL?                              // deprecated, removed in 3.0
+    @available(*, deprecated)
+    func intercept(_ url: URL) async throws -> URL?                              // removed in 3.0
     func didFinish(_ request: DeepLinkRequest, outcome: DeepLinkOutcome) async   // default: no-op
 }
 
@@ -316,10 +317,10 @@ public actor DeepLinkMiddlewareCoordinator {
     public func add(_ middleware: any DeepLinkMiddleware)
     public func removeAll()
     public func remove<T: DeepLinkMiddleware>(_: T.Type)
-    public func process(_ url: URL) async throws -> URL?                     // context: .unknown
     public func process(_ request: DeepLinkRequest) async throws -> DeepLinkRequest?
-    public func process(_ url: URL, startingAfter anchor: some DeepLinkMiddleware & AnyObject) async throws -> URL?
     public func process(_ request: DeepLinkRequest, startingAfter anchor: some DeepLinkMiddleware & AnyObject) async throws -> DeepLinkRequest?
+    @available(*, deprecated) public func process(_ url: URL) async throws -> URL?   // context: .unknown; removed in 3.0
+    @available(*, deprecated) public func process(_ url: URL, startingAfter anchor: some DeepLinkMiddleware & AnyObject) async throws -> URL?
 }
 ```
 

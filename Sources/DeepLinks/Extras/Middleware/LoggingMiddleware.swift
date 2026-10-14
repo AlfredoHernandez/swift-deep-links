@@ -102,9 +102,9 @@ public final class LoggingMiddleware: DeepLinkMiddleware {
 	/// - Parameter url: The deep link URL to log
 	/// - Returns: The original URL unchanged, allowing middleware chain continuation
 	/// - Throws: Never throws - logging failures are handled gracefully
-	public func intercept(_ url: URL) async throws -> URL? {
-		let components = DeepLinkComponents(from: url)
-		format.log(url: url, components: components, loggingProvider: loggingProvider, logLevel: logLevel)
-		return url
+	public func intercept(_ request: DeepLinkRequest) async throws -> DeepLinkRequest? {
+		let components = DeepLinkComponents(from: request.url)
+		format.log(url: request.url, components: components, loggingProvider: loggingProvider, logLevel: logLevel)
+		return request
 	}
 }

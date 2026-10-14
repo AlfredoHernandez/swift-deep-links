@@ -274,14 +274,14 @@ struct DeepLinkCoordinatorBuilderTests {
 private final class MiddlewareSpy: DeepLinkMiddleware, @unchecked Sendable {
 	private(set) var requests: [URL] = []
 
-	func intercept(_ url: URL) async throws -> URL? {
-		requests.append(url)
-		return url
+	func intercept(_ request: DeepLinkRequest) async throws -> DeepLinkRequest? {
+		requests.append(request.url)
+		return request
 	}
 }
 
 private final class ErrorMiddleware: DeepLinkMiddleware {
-	func intercept(_: URL) async throws -> URL? {
+	func intercept(_: DeepLinkRequest) async throws -> DeepLinkRequest? {
 		throw DeepLinkError.securityViolation("Test security violation")
 	}
 }

@@ -17,7 +17,7 @@ struct DeepLinkMiddlewareCoordinatorResumptionTests {
 		let after = CollectingMiddleware()
 		let sut = DeepLinkMiddlewareCoordinator(middleware: [before, anchor, after])
 
-		let result = try await sut.process(url, startingAfter: anchor)
+		let result = try await sut.process(url: url, startingAfter: anchor)
 
 		#expect(result == url)
 		#expect(before.interceptedURLs.isEmpty)
@@ -30,7 +30,7 @@ struct DeepLinkMiddlewareCoordinatorResumptionTests {
 		let only = CollectingMiddleware()
 		let sut = DeepLinkMiddlewareCoordinator(middleware: [only])
 
-		let result = try await sut.process(url, startingAfter: only)
+		let result = try await sut.process(url: url, startingAfter: only)
 
 		#expect(result == url)
 		#expect(only.interceptedURLs.isEmpty)
@@ -41,7 +41,7 @@ struct DeepLinkMiddlewareCoordinatorResumptionTests {
 		let registered = CollectingMiddleware()
 		let sut = DeepLinkMiddlewareCoordinator(middleware: [registered])
 
-		let result = try await sut.process(url, startingAfter: CollectingMiddleware())
+		let result = try await sut.process(url: url, startingAfter: CollectingMiddleware())
 
 		#expect(result == url)
 		#expect(registered.interceptedURLs == [url])
@@ -52,7 +52,7 @@ struct DeepLinkMiddlewareCoordinatorResumptionTests {
 		let anchor = CollectingMiddleware()
 		let sut = DeepLinkMiddlewareCoordinator(middleware: [anchor, StoppingMiddleware()])
 
-		let result = try await sut.process(url, startingAfter: anchor)
+		let result = try await sut.process(url: url, startingAfter: anchor)
 
 		#expect(result == nil)
 	}

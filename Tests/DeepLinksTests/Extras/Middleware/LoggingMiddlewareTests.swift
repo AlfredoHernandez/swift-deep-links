@@ -14,7 +14,7 @@ struct LoggingMiddlewareTests {
 		let testURL = try #require(URL(string: "testapp://profile?userId=123&name=John"))
 		let middleware = LoggingMiddleware()
 
-		let result = try await middleware.intercept(testURL)
+		let result = try await middleware.intercept(url: testURL)
 
 		#expect(result == testURL)
 	}
@@ -24,7 +24,7 @@ struct LoggingMiddlewareTests {
 		let testURL = try #require(URL(string: "testapp://home"))
 		let middleware = LoggingMiddleware()
 
-		let result = try await middleware.intercept(testURL)
+		let result = try await middleware.intercept(url: testURL)
 
 		#expect(result == testURL)
 	}
@@ -34,7 +34,7 @@ struct LoggingMiddlewareTests {
 		let testURL = try #require(URL(string: "testapp://"))
 		let middleware = LoggingMiddleware()
 
-		let result = try await middleware.intercept(testURL)
+		let result = try await middleware.intercept(url: testURL)
 
 		#expect(result == testURL)
 	}
@@ -50,7 +50,7 @@ struct LoggingMiddlewareTests {
 			format: .singleLine,
 		)
 
-		let result = try await middleware.intercept(testURL)
+		let result = try await middleware.intercept(url: testURL)
 
 		#expect(result == testURL)
 		#expect(loggingProviderSpy.messageCount == 1)
@@ -72,7 +72,7 @@ struct LoggingMiddlewareTests {
 			format: .json,
 		)
 
-		let result = try await middleware.intercept(testURL)
+		let result = try await middleware.intercept(url: testURL)
 
 		#expect(result == testURL)
 		#expect(loggingProviderSpy.messageCount == 1)
@@ -101,7 +101,7 @@ struct LoggingMiddlewareTests {
 			format: .minimal,
 		)
 
-		let result = try await middleware.intercept(testURL)
+		let result = try await middleware.intercept(url: testURL)
 
 		#expect(result == testURL)
 		#expect(loggingProviderSpy.messageCount == 1)
@@ -119,7 +119,7 @@ struct LoggingMiddlewareTests {
 			format: .detailed,
 		)
 
-		let result = try await middleware.intercept(testURL)
+		let result = try await middleware.intercept(url: testURL)
 
 		#expect(result == testURL)
 		#expect(loggingProviderSpy.messageCount == 5)
@@ -143,7 +143,7 @@ struct LoggingMiddlewareTests {
 			format: .singleLine,
 		)
 
-		let result = try await middleware.intercept(testURL)
+		let result = try await middleware.intercept(url: testURL)
 
 		#expect(result == testURL)
 		#expect(loggingProviderSpy.messageCount == 1)
@@ -168,7 +168,7 @@ struct LoggingMiddlewareTests {
 		let testURL = try #require(URL(string: urlCase.absoluteString))
 		let middleware = LoggingMiddleware(format: formatCase.format)
 
-		let result = try await middleware.intercept(testURL)
+		let result = try await middleware.intercept(url: testURL)
 
 		#expect(result == testURL)
 	}
@@ -180,7 +180,7 @@ struct LoggingMiddlewareTests {
 		let testURL = try #require(URL(string: "testapp://product/123?category=electronics"))
 		let middleware = LoggingMiddleware()
 
-		let result = try await middleware.intercept(testURL)
+		let result = try await middleware.intercept(url: testURL)
 
 		#expect(result == testURL)
 	}
@@ -193,7 +193,7 @@ struct LoggingMiddlewareTests {
 			format: .singleLine,
 		)
 
-		let result = try await middleware.intercept(testURL)
+		let result = try await middleware.intercept(url: testURL)
 
 		#expect(result == testURL)
 	}
@@ -205,7 +205,7 @@ struct LoggingMiddlewareTests {
 			format: .singleLine,
 		)
 
-		let result = try await middleware.intercept(testURL)
+		let result = try await middleware.intercept(url: testURL)
 
 		#expect(result == testURL)
 	}
@@ -220,7 +220,7 @@ struct LoggingMiddlewareTests {
 			for _ in 0 ..< 10 {
 				group.addTask {
 					let middleware = LoggingMiddleware(format: .singleLine)
-					return try! await middleware.intercept(testURL)
+					return try! await middleware.intercept(url: testURL)
 				}
 			}
 
@@ -244,7 +244,7 @@ struct LoggingMiddlewareTests {
 			for format in formats {
 				group.addTask {
 					let middleware = LoggingMiddleware(format: format)
-					return try! await middleware.intercept(testURL)
+					return try! await middleware.intercept(url: testURL)
 				}
 			}
 

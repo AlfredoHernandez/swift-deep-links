@@ -165,7 +165,7 @@ private final class SwitchableAuthenticationProvider: AuthenticationProvider {
 private struct RewritingMiddleware: DeepLinkMiddleware {
 	let replacement: URL
 
-	func intercept(_: URL) async throws -> URL? {
-		replacement
+	func intercept(_ request: DeepLinkRequest) async throws -> DeepLinkRequest? {
+		request.replacingURL(replacement)
 	}
 }

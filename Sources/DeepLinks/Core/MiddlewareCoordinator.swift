@@ -35,7 +35,7 @@ import Foundation
 /// await coordinator.add(.authentication(provider: authProvider))
 /// await coordinator.add(.logging())
 ///
-/// let processedURL = try await coordinator.process(url)
+/// let processed = try await coordinator.process(DeepLinkRequest(url: url, context: context))
 /// ```
 ///
 /// ## Instruments
@@ -145,6 +145,7 @@ public actor DeepLinkMiddlewareCoordinator {
 	/// - Parameter url: The URL to process
 	/// - Returns: The processed URL, or `nil` if processing was stopped
 	/// - Throws: An error if any middleware throws an error
+	@available(*, deprecated, message: "Call process(_: DeepLinkRequest), which keeps the link's context; the URL form is removed in 3.0.")
 	public func process(_ url: URL) async throws -> URL? {
 		try await process(DeepLinkRequest(url: url))?.url
 	}
@@ -172,8 +173,8 @@ public actor DeepLinkMiddlewareCoordinator {
 	/// let readiness = ReadinessMiddleware(queue: queue)
 	/// let coordinator = DeepLinkMiddlewareCoordinator(middleware: [readiness, .authentication(provider: auth)])
 	///
-	/// for url in queue.markReady() {
-	///     let processedURL = try await coordinator.process(url, startingAfter: readiness)
+	/// for request in queue.markReadyReturningRequests() {
+	///     let processed = try await coordinator.process(request, startingAfter: readiness)
 	/// }
 	/// ```
 	///
@@ -182,6 +183,7 @@ public actor DeepLinkMiddlewareCoordinator {
 	///   - anchor: The registered middleware after which processing resumes
 	/// - Returns: The processed URL, or `nil` if processing was stopped
 	/// - Throws: An error if any of the remaining middleware throws an error
+	@available(*, deprecated, message: "Call process(_: DeepLinkRequest, startingAfter:), which keeps the link's context; the URL form is removed in 3.0.")
 	public func process(_ url: URL, startingAfter anchor: some DeepLinkMiddleware & AnyObject) async throws -> URL? {
 		try await process(DeepLinkRequest(url: url), startingAfter: anchor)?.url
 	}

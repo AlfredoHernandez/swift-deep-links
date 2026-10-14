@@ -132,7 +132,7 @@ final class CoordinatorDelegateSpy: DeepLinkCoordinatorDelegate {
 
 /// Middleware that always returns `nil` to stop URL processing before routing.
 final class StoppingMiddleware: DeepLinkMiddleware {
-	func intercept(_: URL) async throws -> URL? {
+	func intercept(_: DeepLinkRequest) async throws -> DeepLinkRequest? {
 		nil
 	}
 }

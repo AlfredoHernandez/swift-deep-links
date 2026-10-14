@@ -84,7 +84,7 @@ public final class URLTransformationMiddleware: DeepLinkMiddleware {
 		self.strategy = strategy
 	}
 
-	public func intercept(_ url: URL) async throws -> URL? {
-		try strategy.transform(url: url, transformer: transformer)
+	public func intercept(_ request: DeepLinkRequest) async throws -> DeepLinkRequest? {
+		try strategy.transform(url: request.url, transformer: transformer).map(request.replacingURL)
 	}
 }

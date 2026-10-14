@@ -366,10 +366,10 @@ Deep links often carry tokens, codes or emails. Since 2.0 every built-in log, an
 ### Custom Middleware
 
 ```swift
-final class MyMiddleware: DeepLinkMiddleware {
-    func intercept(_ url: URL) async throws -> URL? {
-        // Return URL to continue, modified URL to transform, nil to stop
-        return url
+struct MyMiddleware: DeepLinkMiddleware {
+    func intercept(_ request: DeepLinkRequest) async throws -> DeepLinkRequest? {
+        // Return the request to continue, request.replacingURL(_:) to rewrite, nil to stop
+        request
     }
 }
 ```

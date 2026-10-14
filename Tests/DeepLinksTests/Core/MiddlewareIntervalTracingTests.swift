@@ -18,7 +18,7 @@ struct MiddlewareIntervalTracingTests {
 			tracing: tracing,
 		)
 
-		_ = try await sut.process(url)
+		_ = try await sut.process(url: url)
 
 		#expect(tracing.events == [
 			"begin PassingMiddleware",
@@ -33,7 +33,7 @@ struct MiddlewareIntervalTracingTests {
 		let tracing = RecordingIntervalTracing()
 		let sut = DeepLinkMiddlewareCoordinator(middleware: [ThrowingMiddleware(), PassingMiddleware()], tracing: tracing)
 
-		await #expect(throws: DeepLinkError.self) { try await sut.process(url) }
+		await #expect(throws: DeepLinkError.self) { try await sut.process(url: url) }
 
 		#expect(tracing.events == ["begin ThrowingMiddleware", "end ThrowingMiddleware"])
 	}
@@ -44,7 +44,7 @@ struct MiddlewareIntervalTracingTests {
 		let anchor = PassingMiddleware()
 		let sut = DeepLinkMiddlewareCoordinator(middleware: [anchor, StoppingMiddleware()], tracing: tracing)
 
-		_ = try await sut.process(url, startingAfter: anchor)
+		_ = try await sut.process(url: url, startingAfter: anchor)
 
 		#expect(tracing.events == ["begin StoppingMiddleware", "end StoppingMiddleware"])
 	}
@@ -54,7 +54,7 @@ struct MiddlewareIntervalTracingTests {
 		let traced = DeepLinkMiddlewareCoordinator(middleware: [PassingMiddleware()], tracing: RecordingIntervalTracing())
 		let plain = DeepLinkMiddlewareCoordinator(middleware: [PassingMiddleware()])
 
-		#expect(try await traced.process(url) == plain.process(url))
+		#expect(try await traced.process(url: url) == plain.process(url: url))
 	}
 }
 
@@ -82,13 +82,13 @@ private struct RecordingInterval: MiddlewareInterval {
 }
 
 private final class PassingMiddleware: DeepLinkMiddleware {
-	func intercept(_ url: URL) async throws -> URL? {
-		url
+	func intercept(_ request: DeepLinkRequest) async throws -> DeepLinkRequest? {
+		request
 	}
 }
 
 private struct ThrowingMiddleware: DeepLinkMiddleware {
-	func intercept(_: URL) async throws -> URL? {
+	func intercept(_: DeepLinkRequest) async throws -> DeepLinkRequest? {
 		throw DeepLinkError.securityViolation("test")
 	}
 }

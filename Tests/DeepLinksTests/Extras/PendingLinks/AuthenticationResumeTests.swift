@@ -20,7 +20,7 @@ struct AuthenticationResumeTests {
 		let sut = makeMiddleware(isAuthenticated: false, store: store)
 
 		await #expect(throws: DeepLinkError.unauthorizedAccess(protectedURL)) {
-			try await sut.intercept(protectedURL)
+			try await sut.intercept(url: protectedURL)
 		}
 		#expect(await store.takeAll() == [protectedURL])
 	}
@@ -30,7 +30,7 @@ struct AuthenticationResumeTests {
 		let store = InMemoryPendingLinkStore()
 		let sut = makeMiddleware(isAuthenticated: true, store: store)
 
-		_ = try await sut.intercept(protectedURL)
+		_ = try await sut.intercept(url: protectedURL)
 
 		#expect(await store.takeAll() == [])
 	}
@@ -40,7 +40,7 @@ struct AuthenticationResumeTests {
 		let store = InMemoryPendingLinkStore()
 		let sut = makeMiddleware(isAuthenticated: false, store: store)
 
-		_ = try await sut.intercept(publicURL)
+		_ = try await sut.intercept(url: publicURL)
 
 		#expect(await store.takeAll() == [])
 	}
@@ -54,7 +54,7 @@ struct AuthenticationResumeTests {
 			pendingLinks: store,
 		)
 
-		_ = try? await sut.intercept(protectedURL)
+		_ = try? await sut.intercept(url: protectedURL)
 
 		#expect(await store.takeAll() == [protectedURL])
 	}
@@ -185,8 +185,8 @@ private final class InterceptCounter: DeepLinkMiddleware {
 		state.withLock { $0 }
 	}
 
-	func intercept(_ url: URL) async throws -> URL? {
+	func intercept(_ request: DeepLinkRequest) async throws -> DeepLinkRequest? {
 		state.withLock { $0 += 1 }
-		return url
+		return request
 	}
 }

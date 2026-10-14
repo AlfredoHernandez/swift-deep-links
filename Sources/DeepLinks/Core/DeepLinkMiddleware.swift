@@ -62,7 +62,7 @@ import Foundation
 /// ```swift
 /// func intercept(_ request: DeepLinkRequest) async throws -> DeepLinkRequest? { … return request }
 /// ```
-public protocol DeepLinkMiddleware: Sendable {
+public protocol DeepLinkMiddleware: _DeepLinkURLIntercepting {
 	/// Intercepts a deep link before it reaches the parsers.
 	///
 	/// - Parameter request: The URL being processed and the context it arrived with
@@ -75,10 +75,13 @@ public protocol DeepLinkMiddleware: Sendable {
 	///
 	/// Deprecated in 2.0: implement ``intercept(_:)-(DeepLinkRequest)`` instead.
 	/// Calling this form runs the middleware with a ``DeepLinkContext/unknown`` context.
+	/// 1.x middleware implementing only this form keeps compiling, without a
+	/// warning, until 3.0 removes it.
 	///
 	/// - Parameter url: The deep link URL to intercept
 	/// - Returns: The URL to continue processing with, or `nil` to stop processing
 	/// - Throws: An error to stop processing and report the issue
+	@available(*, deprecated, message: "Implement and call intercept(_: DeepLinkRequest), which keeps the link's context; the URL form is removed in 3.0.")
 	func intercept(_ url: URL) async throws -> URL?
 
 	/// Called once the link this middleware intercepted has finished
@@ -122,11 +125,27 @@ public extension DeepLinkMiddleware {
 	/// URL and keeps the request's context.
 	func intercept(_ request: DeepLinkRequest) async throws -> DeepLinkRequest? {
 		try await ProtocolBridgeGuard.bridge(Self.self, .intercept, hop: .contextToLegacy) {
-			try await intercept(request.url).map(request.replacingURL)
+			try await Self.legacyIntercept(self, request.url).map(request.replacingURL)
 		}
 	}
 
-	/// Runs ``intercept(_:)-(DeepLinkRequest)`` with a ``DeepLinkContext/unknown`` context.
+	private static func legacyIntercept(_ middleware: some _DeepLinkURLIntercepting, _ url: URL) async throws -> URL? {
+		try await middleware.intercept(url)
+	}
+}
+
+/// The URL-only interception form of 1.x, which ``DeepLinkMiddleware``
+/// refines and deprecates.
+///
+/// It exists so the library can still call 1.x middleware through the
+/// request form without a deprecation warning; do not conform to it or call
+/// it directly. It is removed together with the URL form in 3.0.
+public protocol _DeepLinkURLIntercepting: Sendable {
+	func intercept(_ url: URL) async throws -> URL?
+}
+
+public extension _DeepLinkURLIntercepting where Self: DeepLinkMiddleware {
+	/// Runs ``DeepLinkMiddleware/intercept(_:)-(DeepLinkRequest)`` with a ``DeepLinkContext/unknown`` context.
 	func intercept(_ url: URL) async throws -> URL? {
 		try await ProtocolBridgeGuard.bridge(Self.self, .intercept, hop: .legacyToContext) {
 			try await intercept(DeepLinkRequest(url: url))?.url

@@ -19,7 +19,7 @@ struct RateLimitMiddlewareTests {
 		let (sut, _, _) = makeSUT(maxRequests: 3)
 
 		for _ in 0 ..< 3 {
-			let result = try await sut.intercept(testURL)
+			let result = try await sut.intercept(url: testURL)
 			#expect(result == testURL)
 		}
 	}
@@ -29,11 +29,11 @@ struct RateLimitMiddlewareTests {
 		let (sut, _, _) = makeSUT(maxRequests: 2)
 
 		for _ in 0 ..< 2 {
-			_ = try await sut.intercept(testURL)
+			_ = try await sut.intercept(url: testURL)
 		}
 
 		await #expect(throws: DeepLinkError.rateLimitExceeded(maxRequests: 2, timeWindow: 60.0)) {
-			try await sut.intercept(testURL)
+			try await sut.intercept(url: testURL)
 		}
 	}
 
@@ -41,12 +41,12 @@ struct RateLimitMiddlewareTests {
 	func `intercept resets count after time window expires`() async throws {
 		let (sut, _, clock) = makeSUT(maxRequests: 1, timeWindow: 0.1)
 
-		let result1 = try await sut.intercept(testURL)
+		let result1 = try await sut.intercept(url: testURL)
 		#expect(result1 == testURL)
 
 		clock.advance(by: 0.15)
 
-		let result2 = try await sut.intercept(testURL)
+		let result2 = try await sut.intercept(url: testURL)
 		#expect(result2 == testURL)
 	}
 
@@ -66,7 +66,7 @@ struct RateLimitMiddlewareTests {
 		)
 
 		for _ in 0 ..< 2 {
-			_ = try await middleware1.intercept(testURL)
+			_ = try await middleware1.intercept(url: testURL)
 		}
 
 		let middleware2 = RateLimitMiddleware(
@@ -76,7 +76,7 @@ struct RateLimitMiddlewareTests {
 		)
 
 		await #expect(throws: DeepLinkError.rateLimitExceeded(maxRequests: 2, timeWindow: 60.0)) {
-			try await middleware2.intercept(testURL)
+			try await middleware2.intercept(url: testURL)
 		}
 	}
 
@@ -85,7 +85,7 @@ struct RateLimitMiddlewareTests {
 		let (sut, persistence, _) = makeSUT(maxRequests: 2)
 
 		for _ in 0 ..< 2 {
-			_ = try await sut.intercept(testURL)
+			_ = try await sut.intercept(url: testURL)
 		}
 
 		let storedTimestamps = await persistence.loadRequests()
@@ -99,12 +99,12 @@ struct RateLimitMiddlewareTests {
 		let (sut, _, _) = makeSUT(maxRequests: 3, timeWindow: 1.0, strategy: .slidingWindow)
 
 		for _ in 0 ..< 3 {
-			let result = try await sut.intercept(testURL)
+			let result = try await sut.intercept(url: testURL)
 			#expect(result == testURL)
 		}
 
 		await #expect(throws: DeepLinkError.rateLimitExceeded(maxRequests: 3, timeWindow: 1.0)) {
-			try await sut.intercept(testURL)
+			try await sut.intercept(url: testURL)
 		}
 	}
 
@@ -113,16 +113,16 @@ struct RateLimitMiddlewareTests {
 		let (sut, _, clock) = makeSUT(maxRequests: 2, timeWindow: 0.2, strategy: .slidingWindow)
 
 		for _ in 0 ..< 2 {
-			_ = try await sut.intercept(testURL)
+			_ = try await sut.intercept(url: testURL)
 		}
 
 		await #expect(throws: DeepLinkError.rateLimitExceeded(maxRequests: 2, timeWindow: 0.2)) {
-			try await sut.intercept(testURL)
+			try await sut.intercept(url: testURL)
 		}
 
 		clock.advance(by: 0.25)
 
-		let result = try await sut.intercept(testURL)
+		let result = try await sut.intercept(url: testURL)
 		#expect(result == testURL)
 	}
 
@@ -131,16 +131,16 @@ struct RateLimitMiddlewareTests {
 		let (sut, _, clock) = makeSUT(maxRequests: 2, timeWindow: 1.0, strategy: .fixedWindow)
 
 		for _ in 0 ..< 2 {
-			_ = try await sut.intercept(testURL)
+			_ = try await sut.intercept(url: testURL)
 		}
 
 		await #expect(throws: DeepLinkError.rateLimitExceeded(maxRequests: 2, timeWindow: 1.0)) {
-			try await sut.intercept(testURL)
+			try await sut.intercept(url: testURL)
 		}
 
 		clock.advance(by: 1.1)
 
-		let result = try await sut.intercept(testURL)
+		let result = try await sut.intercept(url: testURL)
 		#expect(result == testURL)
 	}
 
@@ -149,13 +149,13 @@ struct RateLimitMiddlewareTests {
 		let (sut, _, clock) = makeSUT(maxRequests: 2, timeWindow: 1.0, strategy: .fixedWindow)
 
 		for _ in 0 ..< 2 {
-			_ = try await sut.intercept(testURL)
+			_ = try await sut.intercept(url: testURL)
 		}
 
 		clock.advance(by: 1.1)
 
 		for _ in 0 ..< 2 {
-			let result = try await sut.intercept(testURL)
+			let result = try await sut.intercept(url: testURL)
 			#expect(result == testURL)
 		}
 	}
@@ -165,7 +165,7 @@ struct RateLimitMiddlewareTests {
 		let (sut, persistence, _) = makeSUT(maxRequests: 1, strategy: .permissive)
 
 		for _ in 0 ..< 10 {
-			let result = try await sut.intercept(testURL)
+			let result = try await sut.intercept(url: testURL)
 			#expect(result == testURL)
 		}
 
@@ -183,7 +183,7 @@ struct RateLimitMiddlewareTests {
 			strategy: .permissive,
 		)
 
-		let result = try await sut.intercept(testURL)
+		let result = try await sut.intercept(url: testURL)
 		#expect(result == testURL)
 	}
 

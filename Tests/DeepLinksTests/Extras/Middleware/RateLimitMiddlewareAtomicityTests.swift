@@ -46,7 +46,7 @@ struct RateLimitMiddlewareAtomicityTests {
 		let allowed = await withTaskGroup(of: Bool.self) { group in
 			for index in 0 ..< 50 {
 				group.addTask { [url] in
-					await (try? instances[index % instances.count].intercept(url)) != nil
+					await (try? instances[index % instances.count].intercept(url: url)) != nil
 				}
 			}
 			return await group.reduce(0) { $1 ? $0 + 1 : $0 }
@@ -67,24 +67,24 @@ struct RateLimitMiddlewareAtomicityTests {
 
 		let cancelledRequest = Task { [url] in
 			withUnsafeCurrentTask { $0?.cancel() }
-			return try await sut.intercept(url)
+			return try await sut.intercept(url: url)
 		}
 
 		await #expect(throws: CancellationError.self) {
 			try await cancelledRequest.value
 		}
 		#expect(await persistence.loadRequests().isEmpty)
-		#expect(try await sut.intercept(url) == url)
+		#expect(try await sut.intercept(url: url) == url)
 	}
 
 	@Test(arguments: [0.0, -10.0])
 	func `fixed window with a non-positive time window still limits requests`(timeWindow: TimeInterval) async throws {
 		let sut = makeSUT(maxRequests: 1, timeWindow: timeWindow, strategy: .fixedWindow)
 
-		_ = try await sut.intercept(url)
+		_ = try await sut.intercept(url: url)
 
 		await #expect(throws: DeepLinkError.self) {
-			try await sut.intercept(url)
+			try await sut.intercept(url: url)
 		}
 	}
 
@@ -99,8 +99,8 @@ struct RateLimitMiddlewareAtomicityTests {
 			dateProvider: clock.next,
 		)
 
-		_ = try await sut.intercept(url)
-		let laterResult = try await sut.intercept(url)
+		_ = try await sut.intercept(url: url)
+		let laterResult = try await sut.intercept(url: url)
 
 		#expect(laterResult == url)
 	}
@@ -116,10 +116,10 @@ struct RateLimitMiddlewareAtomicityTests {
 			dateProvider: clock.next,
 		)
 
-		_ = try await sut.intercept(url)
+		_ = try await sut.intercept(url: url)
 
 		await #expect(throws: DeepLinkError.self) {
-			try await sut.intercept(url)
+			try await sut.intercept(url: url)
 		}
 	}
 
@@ -127,10 +127,10 @@ struct RateLimitMiddlewareAtomicityTests {
 	func `a NaN time window is treated as zero and still limits requests`(strategy: RateLimitStrategyCase) async throws {
 		let sut = makeSUT(maxRequests: 1, timeWindow: .nan, strategy: strategy.value)
 
-		_ = try await sut.intercept(url)
+		_ = try await sut.intercept(url: url)
 
 		await #expect(throws: DeepLinkError.rateLimitExceeded(maxRequests: 1, timeWindow: 0)) {
-			try await sut.intercept(url)
+			try await sut.intercept(url: url)
 		}
 	}
 
@@ -148,7 +148,7 @@ struct RateLimitMiddlewareAtomicityTests {
 		await withTaskGroup(of: Bool.self) { group in
 			for _ in 0 ..< concurrentRequests {
 				group.addTask { [url] in
-					await (try? sut.intercept(url)) != nil
+					await (try? sut.intercept(url: url)) != nil
 				}
 			}
 			return await group.reduce(0) { $1 ? $0 + 1 : $0 }

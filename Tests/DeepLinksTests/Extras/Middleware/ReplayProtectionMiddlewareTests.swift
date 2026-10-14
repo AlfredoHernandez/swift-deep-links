@@ -12,82 +12,82 @@ struct ReplayProtectionMiddlewareTests {
 	func `first occurrence passes through unchanged`() async throws {
 		let (sut, _) = makeSUT()
 
-		#expect(try await sut.intercept(url("myapp://product/1")) == url("myapp://product/1"))
+		#expect(try await sut.intercept(url: url("myapp://product/1")) == url("myapp://product/1"))
 	}
 
 	@Test
 	func `identical URL within the window is dropped`() async throws {
 		let (sut, clock) = makeSUT(window: 2)
-		_ = try await sut.intercept(url("myapp://product/1"))
+		_ = try await sut.intercept(url: url("myapp://product/1"))
 
 		clock.advance(by: 1.9)
 
-		#expect(try await sut.intercept(url("myapp://product/1")) == nil)
+		#expect(try await sut.intercept(url: url("myapp://product/1")) == nil)
 	}
 
 	@Test
 	func `identical URL after the window passes again`() async throws {
 		let (sut, clock) = makeSUT(window: 2)
-		_ = try await sut.intercept(url("myapp://product/1"))
+		_ = try await sut.intercept(url: url("myapp://product/1"))
 
 		clock.advance(by: 2)
 
-		#expect(try await sut.intercept(url("myapp://product/1")) != nil)
+		#expect(try await sut.intercept(url: url("myapp://product/1")) != nil)
 	}
 
 	@Test
 	func `dropped replays do not extend the window`() async throws {
 		let (sut, clock) = makeSUT(window: 2)
-		_ = try await sut.intercept(url("myapp://product/1"))
+		_ = try await sut.intercept(url: url("myapp://product/1"))
 
 		clock.advance(by: 1.5)
-		#expect(try await sut.intercept(url("myapp://product/1")) == nil)
+		#expect(try await sut.intercept(url: url("myapp://product/1")) == nil)
 
 		clock.advance(by: 0.5)
-		#expect(try await sut.intercept(url("myapp://product/1")) != nil)
+		#expect(try await sut.intercept(url: url("myapp://product/1")) != nil)
 	}
 
 	@Test
 	func `different URLs are not deduplicated`() async throws {
 		let (sut, _) = makeSUT()
-		_ = try await sut.intercept(url("myapp://product/1"))
+		_ = try await sut.intercept(url: url("myapp://product/1"))
 
-		#expect(try await sut.intercept(url("myapp://product/2")) != nil)
+		#expect(try await sut.intercept(url: url("myapp://product/2")) != nil)
 	}
 
 	@Test
 	func `reject response throws a security violation for a replay`() async throws {
 		let (sut, _) = makeSUT(response: .reject)
-		_ = try await sut.intercept(url("myapp://product/1"))
+		_ = try await sut.intercept(url: url("myapp://product/1"))
 
 		await #expect(throws: DeepLinkError.securityViolation("Replayed deep link")) {
-			try await sut.intercept(url("myapp://product/1"))
+			try await sut.intercept(url: url("myapp://product/1"))
 		}
 	}
 
 	@Test
 	func `ignored query keys do not distinguish URLs`() async throws {
 		let (sut, _) = makeSUT(ignoredQueryKeys: ["utm_source", "ts"])
-		_ = try await sut.intercept(url("myapp://product?id=1&utm_source=a&ts=1"))
+		_ = try await sut.intercept(url: url("myapp://product?id=1&utm_source=a&ts=1"))
 
-		#expect(try await sut.intercept(url("myapp://product?id=1&utm_source=b&ts=2")) == nil)
-		#expect(try await sut.intercept(url("myapp://product?id=2&utm_source=a&ts=1")) != nil)
+		#expect(try await sut.intercept(url: url("myapp://product?id=1&utm_source=b&ts=2")) == nil)
+		#expect(try await sut.intercept(url: url("myapp://product?id=2&utm_source=a&ts=1")) != nil)
 	}
 
 	@Test
 	func `query parameter order does not distinguish URLs`() async throws {
 		let (sut, _) = makeSUT()
-		_ = try await sut.intercept(url("myapp://product?a=1&b=2"))
+		_ = try await sut.intercept(url: url("myapp://product?a=1&b=2"))
 
-		#expect(try await sut.intercept(url("myapp://product?b=2&a=1")) == nil)
+		#expect(try await sut.intercept(url: url("myapp://product?b=2&a=1")) == nil)
 	}
 
 	@Test
 	func `scheme and host case do not distinguish URLs`() async throws {
 		let (sut, _) = makeSUT()
-		_ = try await sut.intercept(url("MyApp://Product/1"))
+		_ = try await sut.intercept(url: url("MyApp://Product/1"))
 
-		#expect(try await sut.intercept(url("myapp://product/1")) == nil)
+		#expect(try await sut.intercept(url: url("myapp://product/1")) == nil)
 	}
 
 	@Test(arguments: [
@@ -97,99 +97,99 @@ struct ReplayProtectionMiddlewareTests {
 	])
 	func `equivalent percent encodings do not distinguish URLs`(first: String, second: String) async throws {
 		let (sut, _) = makeSUT()
-		_ = try await sut.intercept(url(first))
+		_ = try await sut.intercept(url: url(first))
 
-		#expect(try await sut.intercept(url(second)) == nil)
+		#expect(try await sut.intercept(url: url(second)) == nil)
 	}
 
 	@Test
 	func `malformed escapes are kept literally in the key`() async throws {
 		let (sut, _) = makeSUT()
-		_ = try await sut.intercept(url("myapp://x/a%25%2BF"))
+		_ = try await sut.intercept(url: url("myapp://x/a%25%2BF"))
 
-		#expect(try await sut.intercept(url("myapp://x/a%25%0F")) != nil)
+		#expect(try await sut.intercept(url: url("myapp://x/a%25%0F")) != nil)
 	}
 
 	@Test
 	func `clock moved backwards admits the link instead of extending the window`() async throws {
 		let (sut, clock) = makeSUT(window: 2)
-		_ = try await sut.intercept(url("myapp://product/1"))
+		_ = try await sut.intercept(url: url("myapp://product/1"))
 
 		clock.advance(by: -60)
 
-		#expect(try await sut.intercept(url("myapp://product/1")) != nil)
+		#expect(try await sut.intercept(url: url("myapp://product/1")) != nil)
 	}
 
 	@Test
 	func `path case distinguishes URLs`() async throws {
 		let (sut, _) = makeSUT()
-		_ = try await sut.intercept(url("myapp://product/A"))
+		_ = try await sut.intercept(url: url("myapp://product/A"))
 
-		#expect(try await sut.intercept(url("myapp://product/a")) != nil)
+		#expect(try await sut.intercept(url: url("myapp://product/a")) != nil)
 	}
 
 	@Test
 	func `path key ignores query and fragment`() async throws {
 		let (sut, _) = makeSUT(key: .path)
-		_ = try await sut.intercept(url("myapp://product/1?ref=a#top"))
+		_ = try await sut.intercept(url: url("myapp://product/1?ref=a#top"))
 
-		#expect(try await sut.intercept(url("myapp://product/1?ref=b")) == nil)
-		#expect(try await sut.intercept(url("myapp://product/2?ref=a")) != nil)
+		#expect(try await sut.intercept(url: url("myapp://product/1?ref=b")) == nil)
+		#expect(try await sut.intercept(url: url("myapp://product/2?ref=a")) != nil)
 	}
 
 	@Test
 	func `query parameter key deduplicates by idempotency value`() async throws {
 		let (sut, _) = makeSUT(key: .queryParameter("nonce"))
-		_ = try await sut.intercept(url("myapp://pay/confirm?nonce=abc"))
+		_ = try await sut.intercept(url: url("myapp://pay/confirm?nonce=abc"))
 
-		#expect(try await sut.intercept(url("myapp://pay/retry?nonce=abc")) == nil)
-		#expect(try await sut.intercept(url("myapp://pay/confirm?nonce=def")) != nil)
+		#expect(try await sut.intercept(url: url("myapp://pay/retry?nonce=abc")) == nil)
+		#expect(try await sut.intercept(url: url("myapp://pay/confirm?nonce=def")) != nil)
 	}
 
 	@Test
 	func `query parameter key never deduplicates URLs without the parameter`() async throws {
 		let (sut, _) = makeSUT(key: .queryParameter("nonce"))
-		_ = try await sut.intercept(url("myapp://pay/confirm"))
+		_ = try await sut.intercept(url: url("myapp://pay/confirm"))
 
-		#expect(try await sut.intercept(url("myapp://pay/confirm")) != nil)
+		#expect(try await sut.intercept(url: url("myapp://pay/confirm")) != nil)
 	}
 
 	@Test
 	func `custom key returning nil never deduplicates`() async throws {
 		let (sut, _) = makeSUT(key: .custom { _ in nil })
-		_ = try await sut.intercept(url("myapp://product/1"))
+		_ = try await sut.intercept(url: url("myapp://product/1"))
 
-		#expect(try await sut.intercept(url("myapp://product/1")) != nil)
+		#expect(try await sut.intercept(url: url("myapp://product/1")) != nil)
 	}
 
 	@Test
 	func `custom key groups URLs by its result`() async throws {
 		let (sut, _) = makeSUT(key: .custom { $0.host() })
-		_ = try await sut.intercept(url("myapp://product/1"))
+		_ = try await sut.intercept(url: url("myapp://product/1"))
 
-		#expect(try await sut.intercept(url("myapp://product/2")) == nil)
+		#expect(try await sut.intercept(url: url("myapp://product/2")) == nil)
 	}
 
 	@Test
 	func `memory is bounded by evicting the oldest key`() async throws {
 		let (sut, _) = makeSUT(maxEntries: 2)
 		for path in ["a", "b", "c"] {
-			_ = try await sut.intercept(url("myapp://x/\(path)"))
+			_ = try await sut.intercept(url: url("myapp://x/\(path)"))
 		}
 
-		#expect(try await sut.intercept(url("myapp://x/a")) != nil)
-		#expect(try await sut.intercept(url("myapp://x/a")) == nil)
+		#expect(try await sut.intercept(url: url("myapp://x/a")) != nil)
+		#expect(try await sut.intercept(url: url("myapp://x/a")) == nil)
 		#expect(sut.trackedKeyCount == 2)
 	}
 
 	@Test
 	func `expired keys are pruned`() async throws {
 		let (sut, clock) = makeSUT(window: 1)
-		_ = try await sut.intercept(url("myapp://x/a"))
-		_ = try await sut.intercept(url("myapp://x/b"))
+		_ = try await sut.intercept(url: url("myapp://x/a"))
+		_ = try await sut.intercept(url: url("myapp://x/b"))
 
 		clock.advance(by: 5)
-		_ = try await sut.intercept(url("myapp://x/c"))
+		_ = try await sut.intercept(url: url("myapp://x/c"))
 
 		#expect(sut.trackedKeyCount == 1)
 	}
@@ -197,9 +197,9 @@ struct ReplayProtectionMiddlewareTests {
 	@Test(arguments: [0, -1, Double.nan])
 	func `non positive window disables protection`(window: TimeInterval) async throws {
 		let (sut, _) = makeSUT(window: window)
-		_ = try await sut.intercept(url("myapp://product/1"))
+		_ = try await sut.intercept(url: url("myapp://product/1"))
 
-		#expect(try await sut.intercept(url("myapp://product/1")) != nil)
+		#expect(try await sut.intercept(url: url("myapp://product/1")) != nil)
 	}
 
 	@Test
@@ -209,7 +209,7 @@ struct ReplayProtectionMiddlewareTests {
 
 		let admitted = await withTaskGroup(of: Bool.self) { group in
 			for _ in 0 ..< 20 {
-				group.addTask { await (try? sut.intercept(target)) != nil }
+				group.addTask { await (try? sut.intercept(url: target)) != nil }
 			}
 			return await group.reduce(0) { $0 + ($1 ? 1 : 0) }
 		}
@@ -226,10 +226,10 @@ struct ReplayProtectionMiddlewareTests {
 			response: .reject,
 			dateProvider: clock.dateProvider,
 		)
-		_ = try await sut.intercept(url("myapp://product/1?a=1"))
+		_ = try await sut.intercept(url: url("myapp://product/1?a=1"))
 
 		await #expect(throws: DeepLinkError.self) {
-			try await sut.intercept(url("myapp://product/1?a=2"))
+			try await sut.intercept(url: url("myapp://product/1?a=2"))
 		}
 	}
 

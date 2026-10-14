@@ -139,8 +139,9 @@ public final class RateLimitMiddleware: DeepLinkMiddleware {
 	/// - Throws: `DeepLinkError.rateLimitExceeded` if the rate limit is exceeded,
 	///   or `CancellationError` if the task is cancelled before its turn, in
 	///   which case no budget is consumed
-	public func intercept(_ url: URL) async throws -> URL? {
-		try await gate.run { [strategy, maxRequests, timeWindow, persistence, dateProvider] in
+	public func intercept(_ request: DeepLinkRequest) async throws -> DeepLinkRequest? {
+		let url = request.url
+		let checked = try await gate.run { [strategy, maxRequests, timeWindow, persistence, dateProvider] in
 			try await strategy.check(
 				url: url,
 				maxRequests: maxRequests,
@@ -149,5 +150,6 @@ public final class RateLimitMiddleware: DeepLinkMiddleware {
 				dateProvider: dateProvider,
 			)
 		}
+		return checked.map(request.replacingURL)
 	}
 }

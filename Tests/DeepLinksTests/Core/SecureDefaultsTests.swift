@@ -20,7 +20,7 @@ struct SecureDefaultsTests {
 		let url = try #require(URL(string: "myapp://home/a/%2e%2e/admin"))
 
 		await #expect(throws: DeepLinkError.securityViolation("Path traversal is not allowed")) {
-			try await sut.intercept(url)
+			try await sut.intercept(url: url)
 		}
 	}
 
@@ -29,7 +29,7 @@ struct SecureDefaultsTests {
 		let sut = SecurityMiddleware.security(allowedSchemes: ["myapp"])
 		let url = try #require(URL(string: "MyApp://Home/Profile"))
 
-		#expect(try await sut.intercept(url) == URL(string: "myapp://home/Profile"))
+		#expect(try await sut.intercept(url: url) == URL(string: "myapp://home/Profile"))
 	}
 
 	@Test
@@ -37,7 +37,7 @@ struct SecureDefaultsTests {
 		let sut = SecurityMiddleware(allowedSchemes: ["myapp"], strategy: .hardened)
 		let url = try #require(URL(string: "myapp://profile/42"))
 
-		#expect(try await sut.intercept(url) == url)
+		#expect(try await sut.intercept(url: url) == url)
 	}
 
 	@Test(arguments: ["https://example.com/a", "http://example.com/a"])
@@ -46,7 +46,7 @@ struct SecureDefaultsTests {
 		let url = try #require(URL(string: string))
 
 		await #expect(throws: DeepLinkError.securityViolation("Unauthorized host: example.com")) {
-			try await sut.intercept(url)
+			try await sut.intercept(url: url)
 		}
 	}
 
@@ -56,7 +56,7 @@ struct SecureDefaultsTests {
 		let url = try #require(URL(string: "myapp://admin/1"))
 
 		await #expect(throws: DeepLinkError.securityViolation("Unauthorized host: admin")) {
-			try await sut.intercept(url)
+			try await sut.intercept(url: url)
 		}
 	}
 
@@ -64,7 +64,7 @@ struct SecureDefaultsTests {
 	func `standard strategy is still available`() async throws {
 		let sut = SecurityMiddleware(allowedSchemes: ["https"], strategy: .standard)
 
-		#expect(try await sut.intercept(Self.sensitiveURL) == Self.sensitiveURL)
+		#expect(try await sut.intercept(url: Self.sensitiveURL) == Self.sensitiveURL)
 	}
 
 	// MARK: - Readiness Queue
@@ -178,7 +178,7 @@ struct SecureDefaultsTests {
 		let messages = MessageRecorder()
 		let sut = ReadinessMiddleware(queue: DeepLinkReadinessQueue(), log: messages.provider)
 
-		_ = try await sut.intercept(Self.sensitiveURL)
+		_ = try await sut.intercept(url: Self.sensitiveURL)
 
 		#expect(!messages.all.isEmpty)
 		#expect(!messages.joined.contains(Self.secret))

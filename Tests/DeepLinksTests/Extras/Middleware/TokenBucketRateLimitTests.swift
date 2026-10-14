@@ -13,7 +13,7 @@ struct TokenBucketRateLimitTests {
 		let (sut, _) = makeSUT(capacity: 3, refillRate: 1)
 
 		for _ in 0 ..< 3 {
-			#expect(try await sut.intercept(testURL) == testURL)
+			#expect(try await sut.intercept(url: testURL) == testURL)
 		}
 	}
 
@@ -23,7 +23,7 @@ struct TokenBucketRateLimitTests {
 		try await exhaust(sut, times: 3)
 
 		await #expect(throws: DeepLinkError.rateLimitExceeded(maxRequests: 3, timeWindow: 3)) {
-			try await sut.intercept(testURL)
+			try await sut.intercept(url: testURL)
 		}
 	}
 
@@ -33,11 +33,11 @@ struct TokenBucketRateLimitTests {
 		try await exhaust(sut, times: 2)
 
 		clock.advance(by: 0.25)
-		await #expect(throws: DeepLinkError.self) { try await sut.intercept(testURL) }
+		await #expect(throws: DeepLinkError.self) { try await sut.intercept(url: testURL) }
 
 		clock.advance(by: 0.25)
-		#expect(try await sut.intercept(testURL) == testURL)
-		await #expect(throws: DeepLinkError.self) { try await sut.intercept(testURL) }
+		#expect(try await sut.intercept(url: testURL) == testURL)
+		await #expect(throws: DeepLinkError.self) { try await sut.intercept(url: testURL) }
 	}
 
 	@Test
@@ -48,7 +48,7 @@ struct TokenBucketRateLimitTests {
 		clock.advance(by: 10000)
 
 		try await exhaust(sut, times: 2)
-		await #expect(throws: DeepLinkError.self) { try await sut.intercept(testURL) }
+		await #expect(throws: DeepLinkError.self) { try await sut.intercept(url: testURL) }
 	}
 
 	@Test
@@ -59,14 +59,14 @@ struct TokenBucketRateLimitTests {
 		clock.advance(by: 1)
 
 		try await exhaust(sut, times: 10)
-		await #expect(throws: DeepLinkError.self) { try await sut.intercept(testURL) }
+		await #expect(throws: DeepLinkError.self) { try await sut.intercept(url: testURL) }
 	}
 
 	@Test
 	func `zero capacity rejects every request`() async {
 		let (sut, _) = makeSUT(capacity: 0, refillRate: 1)
 
-		await #expect(throws: DeepLinkError.self) { try await sut.intercept(testURL) }
+		await #expect(throws: DeepLinkError.self) { try await sut.intercept(url: testURL) }
 	}
 
 	@Test(arguments: [0, -1, Double.nan])
@@ -76,7 +76,7 @@ struct TokenBucketRateLimitTests {
 
 		clock.advance(by: 1_000_000)
 
-		await #expect(throws: DeepLinkError.self) { try await sut.intercept(testURL) }
+		await #expect(throws: DeepLinkError.self) { try await sut.intercept(url: testURL) }
 	}
 
 	@Test
@@ -89,7 +89,7 @@ struct TokenBucketRateLimitTests {
 		clock.advance(by: 90)
 
 		await #expect(throws: DeepLinkError.rateLimitExceeded(maxRequests: 2, timeWindow: 120)) {
-			try await sut.intercept(testURL)
+			try await sut.intercept(url: testURL)
 		}
 	}
 
@@ -98,7 +98,7 @@ struct TokenBucketRateLimitTests {
 		let (sut, _) = makeSUT(capacity: 0, refillRate: 0)
 
 		await #expect(throws: DeepLinkError.rateLimitExceeded(maxRequests: 0, timeWindow: 0)) {
-			try await sut.intercept(testURL)
+			try await sut.intercept(url: testURL)
 		}
 	}
 
@@ -109,7 +109,7 @@ struct TokenBucketRateLimitTests {
 
 		clock.advance(by: 1_000_000)
 
-		await #expect(throws: DeepLinkError.self) { try await sut.intercept(testURL) }
+		await #expect(throws: DeepLinkError.self) { try await sut.intercept(url: testURL) }
 	}
 
 	@Test
@@ -139,10 +139,10 @@ struct TokenBucketRateLimitTests {
 		try await exhaust(sut, times: 1)
 
 		clock.advance(by: -1000)
-		await #expect(throws: DeepLinkError.self) { try await sut.intercept(testURL) }
+		await #expect(throws: DeepLinkError.self) { try await sut.intercept(url: testURL) }
 
 		clock.advance(by: 1)
-		#expect(try await sut.intercept(testURL) == testURL)
+		#expect(try await sut.intercept(url: testURL) == testURL)
 	}
 
 	@Test
@@ -164,7 +164,7 @@ struct TokenBucketRateLimitTests {
 
 		let second = makeMiddleware(capacity: 2, refillRate: 1, persistence: persistence, clock: clock)
 
-		await #expect(throws: DeepLinkError.self) { try await second.intercept(testURL) }
+		await #expect(throws: DeepLinkError.self) { try await second.intercept(url: testURL) }
 	}
 
 	@Test
@@ -173,7 +173,7 @@ struct TokenBucketRateLimitTests {
 
 		let admitted = await withTaskGroup(of: Bool.self) { group in
 			for _ in 0 ..< 50 {
-				group.addTask { await (try? sut.intercept(testURL)) != nil }
+				group.addTask { await (try? sut.intercept(url: testURL)) != nil }
 			}
 			return await group.reduce(0) { $0 + ($1 ? 1 : 0) }
 		}
@@ -204,7 +204,7 @@ struct TokenBucketRateLimitTests {
 
 	private func exhaust(_ sut: RateLimitMiddleware, times: Int) async throws {
 		for _ in 0 ..< times {
-			#expect(try await sut.intercept(testURL) == testURL)
+			#expect(try await sut.intercept(url: testURL) == testURL)
 		}
 	}
 }

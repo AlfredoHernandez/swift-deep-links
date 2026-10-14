@@ -308,6 +308,21 @@ middleware order and a hardening checklist.
   `handle(url:context:)`; no other payload value reaches the pipeline, and a
   payload without a URL returns `nil` without running it. All are main-actor
   isolated so the non-`Sendable` system objects can be passed directly.
+- **Deprecated the superseded URL forms.** `DeepLinkMiddleware.intercept(_: URL)`
+  and `DeepLinkMiddlewareCoordinator.process(_: URL)` /
+  `process(_: URL, startingAfter:)` are `@available(*, deprecated)` (removed in
+  3.0): they drop the link's context. 1.x middleware that implements the URL
+  form keeps compiling without a warning; calling the URL form through
+  `DeepLinkMiddleware` warns. Every built-in middleware and
+  `DeepLinksTesting.PassthroughMiddleware` now implement the request form.
+  Deliberately **not** deprecated: `DeepLinkCoordinator.handle(url:)` (a
+  convenience entry point equal to `handle(url:context: .unknown)`, for code
+  that has no context to give), `DeepLinkHandler.handle(_:)` (handlers that do
+  not need the context), and the URL requirements of `ReadinessQueue` and
+  `PendingLinkStore` (custom conformers must still implement them, and the new
+  request requirements default to them; deprecating them would warn every
+  conformer until 3.0 flips the defaults). The public `_DeepLinkURLIntercepting`
+  base protocol is an implementation detail of the bridge; do not use it.
 - **Queued and pending links keep their context.** `ReadinessQueue` gains
   `enqueue(_: DeepLinkRequest)`, `markReadyReturningRequests()` and
   `pendingRequests`, and `PendingLinkStore` gains `save(_: DeepLinkRequest)`

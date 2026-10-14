@@ -12,7 +12,7 @@ struct HardenedSecurityStrategyTests {
 		let sut = makeSUT(allowedSchemes: ["https"], allowedHosts: ["example.com"])
 		let url = try #require(URL(string: "HTTPS://Example.com/Products?ID=7"))
 
-		let result = try await sut.intercept(url)
+		let result = try await sut.intercept(url: url)
 
 		#expect(result?.absoluteString == "https://example.com/Products?ID=7")
 	}
@@ -22,7 +22,7 @@ struct HardenedSecurityStrategyTests {
 		let sut = makeSUT(allowedSchemes: ["MyApp"], allowedHosts: ["Home"])
 		let url = try #require(URL(string: "myapp://home"))
 
-		#expect(try await sut.intercept(url) == url)
+		#expect(try await sut.intercept(url: url) == url)
 	}
 
 	@Test
@@ -31,7 +31,7 @@ struct HardenedSecurityStrategyTests {
 		let url = try #require(URL(string: "otherapp://home"))
 
 		await #expect(throws: DeepLinkError.securityViolation("Unauthorized scheme: otherapp")) {
-			try await sut.intercept(url)
+			try await sut.intercept(url: url)
 		}
 	}
 
@@ -41,7 +41,7 @@ struct HardenedSecurityStrategyTests {
 		let url = try #require(URL(string: "myapp:home"))
 
 		await #expect(throws: DeepLinkError.securityViolation("Missing host")) {
-			try await sut.intercept(url)
+			try await sut.intercept(url: url)
 		}
 	}
 
@@ -51,7 +51,7 @@ struct HardenedSecurityStrategyTests {
 		let url = try #require(URL(string: "https://evil.com/path"))
 
 		await #expect(throws: DeepLinkError.securityViolation("Unauthorized host: evil.com")) {
-			try await sut.intercept(url)
+			try await sut.intercept(url: url)
 		}
 	}
 
@@ -61,7 +61,7 @@ struct HardenedSecurityStrategyTests {
 		let url = try #require(URL(string: "https://example.com/path"))
 
 		await #expect(throws: DeepLinkError.securityViolation("Unauthorized host: example.com")) {
-			try await sut.intercept(url)
+			try await sut.intercept(url: url)
 		}
 	}
 
@@ -71,7 +71,7 @@ struct HardenedSecurityStrategyTests {
 		let url = try #require(URL(string: "https://example.com@evil.com/path"))
 
 		await #expect(throws: DeepLinkError.securityViolation("Userinfo is not allowed")) {
-			try await sut.intercept(url)
+			try await sut.intercept(url: url)
 		}
 	}
 
@@ -81,7 +81,7 @@ struct HardenedSecurityStrategyTests {
 		let url = try #require(URL(string: "myapp://home/path?q=%00"))
 
 		await #expect(throws: DeepLinkError.securityViolation("Control characters are not allowed")) {
-			try await sut.intercept(url)
+			try await sut.intercept(url: url)
 		}
 	}
 
@@ -91,7 +91,7 @@ struct HardenedSecurityStrategyTests {
 		let url = try #require(URL(string: "myapp://home/files/%2e%2e/secrets"))
 
 		await #expect(throws: DeepLinkError.securityViolation("Path traversal is not allowed")) {
-			try await sut.intercept(url)
+			try await sut.intercept(url: url)
 		}
 	}
 
@@ -110,7 +110,7 @@ struct HardenedSecurityStrategyTests {
 		let url = try #require(URL(string: rawURL))
 
 		await #expect(throws: DeepLinkError.blockedURL(url)) {
-			try await sut.intercept(url)
+			try await sut.intercept(url: url)
 		}
 	}
 
@@ -123,7 +123,7 @@ struct HardenedSecurityStrategyTests {
 		)
 		let url = try #require(URL(string: "myapp://home/open?target=%2Fprofile"))
 
-		#expect(try await sut.intercept(url) == url)
+		#expect(try await sut.intercept(url: url) == url)
 	}
 
 	@Test
@@ -147,7 +147,7 @@ struct HardenedSecurityStrategyTests {
 		let url = try #require(URL(string: "myapp:home"))
 
 		await #expect(throws: DeepLinkError.securityViolation("Missing host")) {
-			try await sut.intercept(url)
+			try await sut.intercept(url: url)
 		}
 	}
 
@@ -176,7 +176,7 @@ struct ExistingSecurityStrategiesCompatibilityTests {
 		)
 		let url = try #require(URL(string: "myapp://home/open?target=%6A%61vascript:alert(1)"))
 
-		#expect(try await sut.intercept(url) == url)
+		#expect(try await sut.intercept(url: url) == url)
 	}
 
 	@Test
@@ -185,7 +185,7 @@ struct ExistingSecurityStrategiesCompatibilityTests {
 		let url = try #require(URL(string: "MYAPP://home"))
 
 		await #expect(throws: DeepLinkError.securityViolation("Unauthorized scheme: MYAPP")) {
-			try await sut.intercept(url)
+			try await sut.intercept(url: url)
 		}
 	}
 
@@ -194,7 +194,7 @@ struct ExistingSecurityStrategiesCompatibilityTests {
 		let sut = SecurityMiddleware(allowedSchemes: ["https"], strategy: .standard)
 		let url = try #require(URL(string: "https://example.com@evil.com/path"))
 
-		#expect(try await sut.intercept(url) == url)
+		#expect(try await sut.intercept(url: url) == url)
 	}
 
 	@Test
@@ -202,6 +202,6 @@ struct ExistingSecurityStrategiesCompatibilityTests {
 		let sut = SecurityMiddleware(allowedSchemes: ["https"], allowedHosts: ["Example.com"], strategy: .strict)
 		let url = try #require(URL(string: "https://Example.com/path"))
 
-		#expect(try await sut.intercept(url) == url)
+		#expect(try await sut.intercept(url: url) == url)
 	}
 }

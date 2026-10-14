@@ -16,7 +16,7 @@ struct DeepLinkMiddlewareFactoryTests {
 		let provider = AnalyticsProviderSpy()
 		let middleware: any DeepLinkMiddleware = .analytics(provider: provider)
 
-		let result = try await middleware.intercept(sampleURL)
+		let result = try await middleware.intercept(url: sampleURL)
 
 		#expect(result == sampleURL)
 		#expect(provider.trackedEvents.count == 1)
@@ -27,7 +27,7 @@ struct DeepLinkMiddlewareFactoryTests {
 		let provider = AnalyticsProviderSpy()
 		let middleware: any DeepLinkMiddleware = .analytics(provider: provider, strategy: .minimal)
 
-		_ = try await middleware.intercept(sampleURL)
+		_ = try await middleware.intercept(url: sampleURL)
 
 		let event = try #require(provider.trackedEvents.first)
 		#expect(event.parameters["url"] == nil)
@@ -40,7 +40,7 @@ struct DeepLinkMiddlewareFactoryTests {
 	func `logging factory passes URLs through unchanged`() async throws {
 		let middleware: any DeepLinkMiddleware = .logging()
 
-		let result = try await middleware.intercept(sampleURL)
+		let result = try await middleware.intercept(url: sampleURL)
 
 		#expect(result == sampleURL)
 	}
@@ -57,11 +57,11 @@ struct DeepLinkMiddlewareFactoryTests {
 			persistence: InMemoryRateLimitPersistence(),
 		)
 
-		_ = try await middleware.intercept(sampleURL)
-		_ = try await middleware.intercept(sampleURL)
+		_ = try await middleware.intercept(url: sampleURL)
+		_ = try await middleware.intercept(url: sampleURL)
 
 		await #expect(throws: DeepLinkError.rateLimitExceeded(maxRequests: 2, timeWindow: 60.0)) {
-			try await middleware.intercept(sampleURL)
+			try await middleware.intercept(url: sampleURL)
 		}
 	}
 
@@ -73,7 +73,7 @@ struct DeepLinkMiddlewareFactoryTests {
 		let blockedURL = try #require(URL(string: "https://example.com"))
 
 		await #expect(throws: DeepLinkError.self) {
-			try await middleware.intercept(blockedURL)
+			try await middleware.intercept(url: blockedURL)
 		}
 	}
 
@@ -81,7 +81,7 @@ struct DeepLinkMiddlewareFactoryTests {
 	func `security factory passes through when the URL matches policy`() async throws {
 		let middleware: any DeepLinkMiddleware = .security(allowedSchemes: ["myapp"])
 
-		let result = try await middleware.intercept(sampleURL)
+		let result = try await middleware.intercept(url: sampleURL)
 
 		#expect(result == sampleURL)
 	}
@@ -97,7 +97,7 @@ struct DeepLinkMiddlewareFactoryTests {
 		)
 
 		await #expect(throws: DeepLinkError.self) {
-			try await middleware.intercept(sampleURL)
+			try await middleware.intercept(url: sampleURL)
 		}
 	}
 
@@ -109,7 +109,7 @@ struct DeepLinkMiddlewareFactoryTests {
 			protectedHosts: ["profile"],
 		)
 
-		let result = try await middleware.intercept(sampleURL)
+		let result = try await middleware.intercept(url: sampleURL)
 
 		#expect(result == sampleURL)
 	}
@@ -122,7 +122,7 @@ struct DeepLinkMiddlewareFactoryTests {
 		let middleware: any DeepLinkMiddleware = .urlTransformation(transformer: transformer)
 		let messyURL = try #require(URL(string: "myapp://profile/?id=123&name="))
 
-		let result = try await middleware.intercept(messyURL)
+		let result = try await middleware.intercept(url: messyURL)
 
 		// `URLNormalizationTransformer` strips the trailing slash from the path
 		// and drops empty query values, so asserting the exact normalised URL

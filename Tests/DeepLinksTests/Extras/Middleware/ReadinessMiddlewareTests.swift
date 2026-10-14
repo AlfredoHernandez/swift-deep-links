@@ -18,7 +18,7 @@ struct ReadinessMiddlewareTests {
 		_ = queue.markReady()
 		let sut = ReadinessMiddleware(queue: queue)
 
-		let result = try await sut.intercept(testURL)
+		let result = try await sut.intercept(url: testURL)
 
 		#expect(result == testURL)
 	}
@@ -28,7 +28,7 @@ struct ReadinessMiddlewareTests {
 		let queue = DeepLinkReadinessQueue()
 		let sut = ReadinessMiddleware(queue: queue)
 
-		let result = try await sut.intercept(testURL)
+		let result = try await sut.intercept(url: testURL)
 
 		#expect(result == nil)
 		#expect(queue.pendingCount == 1)
@@ -39,8 +39,8 @@ struct ReadinessMiddlewareTests {
 		let queue = DeepLinkReadinessQueue()
 		let sut = ReadinessMiddleware(queue: queue)
 
-		_ = try await sut.intercept(testURL)
-		_ = try await sut.intercept(anotherURL)
+		_ = try await sut.intercept(url: testURL)
+		_ = try await sut.intercept(url: anotherURL)
 
 		#expect(queue.pendingCount == 2)
 	}
@@ -50,8 +50,8 @@ struct ReadinessMiddlewareTests {
 		let queue = DeepLinkReadinessQueue()
 		let sut = ReadinessMiddleware(queue: queue)
 
-		_ = try await sut.intercept(testURL)
-		_ = try await sut.intercept(anotherURL)
+		_ = try await sut.intercept(url: testURL)
+		_ = try await sut.intercept(url: anotherURL)
 
 		let pending = queue.markReady()
 
@@ -64,7 +64,7 @@ struct ReadinessMiddlewareTests {
 		let queue = DeepLinkReadinessQueue()
 		let sut = ReadinessMiddleware(queue: queue)
 
-		_ = try await sut.intercept(testURL)
+		_ = try await sut.intercept(url: testURL)
 
 		let first = queue.markReady()
 		let second = queue.markReady()
@@ -80,7 +80,7 @@ struct ReadinessMiddlewareTests {
 
 		_ = queue.markReady()
 
-		let result = try await sut.intercept(testURL)
+		let result = try await sut.intercept(url: testURL)
 
 		#expect(result == testURL)
 		#expect(queue.pendingCount == 0)

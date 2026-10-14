@@ -19,7 +19,7 @@ struct SecurityMiddlewareInputLimitsTests {
 		let url = try #require(URL(string: "myapp://home/a-path-longer-than-sixteen"))
 
 		await #expect(throws: DeepLinkError.securityViolation("URL exceeds maximum length")) {
-			try await sut.intercept(url)
+			try await sut.intercept(url: url)
 		}
 		#expect(strategy.validatedURLs.isEmpty)
 	}
@@ -35,7 +35,7 @@ struct SecurityMiddlewareInputLimitsTests {
 		let url = try #require(URL(string: "myapp://home?a=1&b=2"))
 
 		await #expect(throws: DeepLinkError.securityViolation("Too many query parameters")) {
-			try await sut.intercept(url)
+			try await sut.intercept(url: url)
 		}
 		#expect(strategy.validatedURLs.isEmpty)
 	}
@@ -50,7 +50,7 @@ struct SecurityMiddlewareInputLimitsTests {
 		)
 		let url = try #require(URL(string: "myapp://home?a=1"))
 
-		let result = try await sut.intercept(url)
+		let result = try await sut.intercept(url: url)
 
 		#expect(result == url)
 		#expect(strategy.validatedURLs == [url])
@@ -62,7 +62,7 @@ struct SecurityMiddlewareInputLimitsTests {
 		let value = String(repeating: "v", count: DeepLinkURL.defaultMaxLength)
 		let url = try #require(URL(string: "myapp://home?a=\(value)"))
 
-		#expect(try await sut.intercept(url) == url)
+		#expect(try await sut.intercept(url: url) == url)
 	}
 
 	@Test
@@ -71,7 +71,7 @@ struct SecurityMiddlewareInputLimitsTests {
 		let url = try #require(URL(string: "myapp://home?token=abc"))
 
 		await #expect(throws: DeepLinkError.securityViolation("Query parameter value exceeds maximum length")) {
-			try await sut.intercept(url)
+			try await sut.intercept(url: url)
 		}
 	}
 }

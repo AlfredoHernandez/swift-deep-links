@@ -3,6 +3,7 @@
 //
 
 @testable import DeepLinks
+import DeepLinksTesting
 import Foundation
 import os
 import Testing
@@ -71,7 +72,7 @@ struct DeepLinkContextTests {
 			try await EmptyMiddleware().intercept(DeepLinkRequest(url: customURL))
 		}
 		await #expect(throws: DeepLinkError.missingRequiredConfiguration("EmptyMiddleware implements neither intercept(_:) form")) {
-			try await EmptyMiddleware().intercept(customURL)
+			try await legacyIntercept(EmptyMiddleware(), customURL)
 		}
 	}
 
@@ -112,7 +113,7 @@ struct DeepLinkContextTests {
 	func `request middleware called with a URL sees an unknown context`() async throws {
 		let sut = ContextRecordingMiddleware()
 
-		let processed = try await sut.intercept(customURL)
+		let processed = try await legacyIntercept(sut, customURL)
 
 		#expect(processed == customURL)
 		#expect(sut.contexts == [.unknown])
@@ -132,12 +133,15 @@ struct DeepLinkContextTests {
 	}
 
 	@Test
-	func `middleware coordinator URL entry point uses an unknown context`() async throws {
+	func `deprecated middleware coordinator URL entry points use an unknown context`() async throws {
 		let recorder = ContextRecordingMiddleware()
-		let sut = DeepLinkMiddlewareCoordinator(middleware: [recorder])
+		let anchor = CollectingMiddleware()
+		let sut: any LegacyURLProcessing = DeepLinkMiddlewareCoordinator(middleware: [anchor, recorder])
 
 		#expect(try await sut.process(customURL) == customURL)
-		#expect(recorder.contexts == [.unknown])
+		#expect(try await sut.process(customURL, startingAfter: anchor) == customURL)
+		#expect(recorder.contexts == [.unknown, .unknown])
+		#expect(anchor.interceptedURLs == [customURL])
 	}
 
 	// MARK: - Coordinator
@@ -209,7 +213,7 @@ struct DeepLinkContextTests {
 		let sut = SecurityMiddleware(allowedSchemes: ["myapp"], allowedSources: [.customScheme], strategy: .schemeOnly)
 
 		await #expect(throws: DeepLinkError.securityViolation("Source not allowed")) {
-			try await sut.intercept(customURL)
+			try await sut.intercept(url: customURL)
 		}
 	}
 
@@ -333,7 +337,7 @@ private struct WrappingMiddleware: DeepLinkMiddleware {
 	let inner: any DeepLinkMiddleware
 
 	func intercept(_ url: URL) async throws -> URL? {
-		try await inner.intercept(url)
+		try await legacyIntercept(inner, url)
 	}
 }
 

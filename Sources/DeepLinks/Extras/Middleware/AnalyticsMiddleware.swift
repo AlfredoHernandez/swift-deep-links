@@ -105,8 +105,8 @@ public final class AnalyticsMiddleware: DeepLinkMiddleware {
 	/// - Parameter url: The deep link URL to track
 	/// - Returns: The same URL to allow continued processing, or `nil` if it should be cancelled
 	/// - Throws: Does not throw errors in the current implementation
-	public func intercept(_ url: URL) async throws -> URL? {
-		strategy.track(url: url, provider: analyticsProvider)
-		return url
+	public func intercept(_ request: DeepLinkRequest) async throws -> DeepLinkRequest? {
+		strategy.track(url: request.url, provider: analyticsProvider)
+		return request
 	}
 }

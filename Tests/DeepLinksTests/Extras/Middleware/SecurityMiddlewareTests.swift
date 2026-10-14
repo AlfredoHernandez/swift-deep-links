@@ -16,7 +16,7 @@ struct SecurityMiddlewareTests {
 			blockedPatterns: [],
 		)
 
-		let result = try await middleware.intercept(testURL)
+		let result = try await middleware.intercept(url: testURL)
 
 		#expect(result == testURL)
 	}
@@ -31,7 +31,7 @@ struct SecurityMiddlewareTests {
 		)
 
 		do {
-			_ = try await middleware.intercept(testURL)
+			_ = try await middleware.intercept(url: testURL)
 			#expect(Bool(false), "Expected security violation error")
 		} catch let error as DeepLinkError {
 			#expect(error == .securityViolation("Unauthorized scheme: http"))
@@ -47,7 +47,7 @@ struct SecurityMiddlewareTests {
 			blockedPatterns: [],
 		)
 
-		let result = try await middleware.intercept(testURL)
+		let result = try await middleware.intercept(url: testURL)
 
 		#expect(result == testURL)
 	}
@@ -62,7 +62,7 @@ struct SecurityMiddlewareTests {
 		)
 
 		do {
-			_ = try await middleware.intercept(testURL)
+			_ = try await middleware.intercept(url: testURL)
 			#expect(Bool(false), "Expected security violation error")
 		} catch let error as DeepLinkError {
 			#expect(error == .securityViolation("Unauthorized host: disallowed"))
@@ -80,7 +80,7 @@ struct SecurityMiddlewareTests {
 		)
 
 		do {
-			_ = try await middleware.intercept(testURL)
+			_ = try await middleware.intercept(url: testURL)
 			#expect(Bool(false), "Expected blocked URL error")
 		} catch let error as DeepLinkError {
 			#expect(error == .blockedURL(testURL))
@@ -96,7 +96,7 @@ struct SecurityMiddlewareTests {
 			blockedPatterns: [],
 		)
 
-		let result = try await middleware.intercept(testURL)
+		let result = try await middleware.intercept(url: testURL)
 
 		#expect(result == testURL)
 	}

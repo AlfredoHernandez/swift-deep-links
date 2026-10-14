@@ -18,7 +18,7 @@ struct CollectingMiddlewareTests {
 	func `passes URL through and collects it`() async throws {
 		let sut = CollectingMiddleware()
 
-		let result = try await sut.intercept(testURL)
+		let result = try await sut.intercept(url: testURL)
 
 		#expect(result == testURL)
 		#expect(sut.interceptedURLs == [testURL])
@@ -40,8 +40,8 @@ struct CollectingMiddlewareTests {
 	func `collects multiple URLs in order`() async throws {
 		let sut = CollectingMiddleware()
 
-		_ = try await sut.intercept(testURL)
-		_ = try await sut.intercept(anotherURL)
+		_ = try await sut.intercept(url: testURL)
+		_ = try await sut.intercept(url: anotherURL)
 
 		#expect(sut.interceptedURLs == [testURL, anotherURL])
 	}
@@ -52,7 +52,7 @@ struct CollectingMiddlewareTests {
 
 		await withTaskGroup(of: Void.self) { group in
 			for _ in 0 ..< 100 {
-				group.addTask { _ = try? await sut.intercept(testURL) }
+				group.addTask { _ = try? await sut.intercept(url: testURL) }
 			}
 		}
 
@@ -65,8 +65,8 @@ struct PassthroughMiddlewareTests {
 	func `always returns the same URL unchanged`() async throws {
 		let sut = PassthroughMiddleware()
 
-		let result1 = try await sut.intercept(testURL)
-		let result2 = try await sut.intercept(anotherURL)
+		let result1 = try await sut.intercept(url: testURL)
+		let result2 = try await sut.intercept(url: anotherURL)
 
 		#expect(result1 == testURL)
 		#expect(result2 == anotherURL)

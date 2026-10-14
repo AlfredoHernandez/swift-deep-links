@@ -20,7 +20,7 @@ struct RedactedLoggingAndAnalyticsTests {
 		let messages = MessageRecorder()
 		let sut = LoggingMiddleware(loggingProvider: messages.provider, format: .redacted(format))
 
-		let result = try await sut.intercept(Self.sensitiveURL)
+		let result = try await sut.intercept(url: Self.sensitiveURL)
 
 		#expect(result == Self.sensitiveURL)
 		#expect(!messages.all.isEmpty)
@@ -33,7 +33,7 @@ struct RedactedLoggingAndAnalyticsTests {
 		let messages = MessageRecorder()
 		let sut = LoggingMiddleware(loggingProvider: messages.provider, format: .redacted(.singleLine))
 
-		_ = try await sut.intercept(Self.sensitiveURL)
+		_ = try await sut.intercept(url: Self.sensitiveURL)
 
 		#expect(messages.all == [
 			"Deep link intercepted: https://example.com/reset?token=REDACTED&lang=en"
@@ -50,7 +50,7 @@ struct RedactedLoggingAndAnalyticsTests {
 			format: .redacted(.minimal, using: URLRedactor(sensitiveKeys: ["promo"])),
 		)
 
-		_ = try await sut.intercept(url)
+		_ = try await sut.intercept(url: url)
 
 		#expect(messages.all == ["Deep link: myapp://shop?promo=REDACTED"])
 	}
@@ -65,7 +65,7 @@ struct RedactedLoggingAndAnalyticsTests {
 		let messages = MessageRecorder()
 		let sut = LoggingMiddleware(loggingProvider: messages.provider, format: format)
 
-		_ = try await sut.intercept(Self.sensitiveURL)
+		_ = try await sut.intercept(url: Self.sensitiveURL)
 
 		#expect(!messages.all.isEmpty)
 		#expect(messages.all.allSatisfy { !$0.contains("abc123") })
@@ -76,7 +76,7 @@ struct RedactedLoggingAndAnalyticsTests {
 		let messages = MessageRecorder()
 		let sut = LoggingMiddleware(loggingProvider: messages.provider)
 
-		_ = try await sut.intercept(Self.sensitiveURL)
+		_ = try await sut.intercept(url: Self.sensitiveURL)
 
 		#expect(messages.all.allSatisfy { !$0.contains("abc123") })
 	}
@@ -86,7 +86,7 @@ struct RedactedLoggingAndAnalyticsTests {
 		let messages = MessageRecorder()
 		let sut = LoggingMiddleware(loggingProvider: messages.provider, format: .unredacted(.minimal))
 
-		_ = try await sut.intercept(Self.sensitiveURL)
+		_ = try await sut.intercept(url: Self.sensitiveURL)
 
 		#expect(messages.all == ["Deep link: \(Self.sensitiveURL.absoluteString)"])
 	}
@@ -96,7 +96,7 @@ struct RedactedLoggingAndAnalyticsTests {
 		let messages = MessageRecorder()
 		let sut = LoggingMiddleware(loggingProvider: messages.provider, format: .unredacted(.redacted(.minimal)))
 
-		_ = try await sut.intercept(Self.sensitiveURL)
+		_ = try await sut.intercept(url: Self.sensitiveURL)
 
 		#expect(messages.all == ["Deep link: \(Self.sensitiveURL.absoluteString)"])
 	}
@@ -106,7 +106,7 @@ struct RedactedLoggingAndAnalyticsTests {
 		let provider = AnalyticsProviderSpy()
 		let sut = AnalyticsMiddleware(analyticsProvider: provider, strategy: .redacted(.standard))
 
-		_ = try await sut.intercept(Self.sensitiveURL)
+		_ = try await sut.intercept(url: Self.sensitiveURL)
 
 		let event = try #require(provider.trackedEvents.first)
 		#expect(event.parameters["url"] as? String == "https://example.com/reset?token=REDACTED&lang=en")
@@ -117,7 +117,7 @@ struct RedactedLoggingAndAnalyticsTests {
 		let provider = AnalyticsProviderSpy()
 		let sut = AnalyticsMiddleware(analyticsProvider: provider, strategy: .redacted(.detailed))
 
-		_ = try await sut.intercept(Self.sensitiveURL)
+		_ = try await sut.intercept(url: Self.sensitiveURL)
 
 		let event = try #require(provider.trackedEvents.first)
 		#expect(event.parameters["query_parameters"] as? [String: String] == ["token": "REDACTED", "lang": "en"])
@@ -128,7 +128,7 @@ struct RedactedLoggingAndAnalyticsTests {
 		let provider = AnalyticsProviderSpy()
 		let sut = AnalyticsMiddleware(analyticsProvider: provider)
 
-		_ = try await sut.intercept(Self.sensitiveURL)
+		_ = try await sut.intercept(url: Self.sensitiveURL)
 
 		let event = try #require(provider.trackedEvents.first)
 		#expect(event.parameters["url"] as? String == "https://example.com/reset?token=REDACTED&lang=en")
@@ -139,7 +139,7 @@ struct RedactedLoggingAndAnalyticsTests {
 		let provider = AnalyticsProviderSpy()
 		let sut = AnalyticsMiddleware(analyticsProvider: provider, strategy: .detailed)
 
-		_ = try await sut.intercept(Self.sensitiveURL)
+		_ = try await sut.intercept(url: Self.sensitiveURL)
 
 		let event = try #require(provider.trackedEvents.first)
 		#expect(event.parameters["query_parameters"] as? [String: String] == ["token": "REDACTED", "lang": "en"])
@@ -150,7 +150,7 @@ struct RedactedLoggingAndAnalyticsTests {
 		let provider = AnalyticsProviderSpy()
 		let sut = AnalyticsMiddleware(analyticsProvider: provider, strategy: .unredacted(.standard))
 
-		_ = try await sut.intercept(Self.sensitiveURL)
+		_ = try await sut.intercept(url: Self.sensitiveURL)
 
 		let event = try #require(provider.trackedEvents.first)
 		#expect(event.parameters["url"] as? String == Self.sensitiveURL.absoluteString)

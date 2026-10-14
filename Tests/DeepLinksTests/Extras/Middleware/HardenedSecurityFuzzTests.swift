@@ -25,7 +25,7 @@ struct HardenedSecurityFuzzTests {
 	@Test(arguments: URLFuzzCorpus.hostile(scheme: "https", host: "example.com"))
 	func `hardened security rejects every hostile URL`(fuzzCase: URLFuzzCase) async {
 		await #expect(throws: DeepLinkError.self) {
-			try await sut.intercept(fuzzCase.url)
+			try await sut.intercept(url: fuzzCase.url)
 		}
 	}
 
@@ -39,7 +39,7 @@ struct HardenedSecurityFuzzTests {
 		)
 
 		await #expect(throws: DeepLinkError.self) {
-			try await customScheme.intercept(fuzzCase.url)
+			try await customScheme.intercept(url: fuzzCase.url)
 		}
 	}
 
@@ -47,6 +47,6 @@ struct HardenedSecurityFuzzTests {
 	func `the same configuration admits a benign URL`() async throws {
 		let benign = try #require(URL(string: "https://example.com/products/42?ref=home"))
 
-		#expect(try await sut.intercept(benign) == benign)
+		#expect(try await sut.intercept(url: benign) == benign)
 	}
 }

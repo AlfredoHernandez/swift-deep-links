@@ -42,7 +42,7 @@ struct DuplicateParameterRejectionTests {
 		)
 
 		await #expect(throws: Self.duplicateViolation) {
-			try await sut.intercept(Self.duplicateURL)
+			try await sut.intercept(url: Self.duplicateURL)
 		}
 	}
 

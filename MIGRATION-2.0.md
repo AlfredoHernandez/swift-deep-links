@@ -114,7 +114,8 @@ struct Observer: DeepLinkCoordinatorDelegate {
 
 `DeepLinkMiddleware` has a new requirement,
 `intercept(_ request: DeepLinkRequest) async throws -> DeepLinkRequest?`.
-1.x middleware implementing `intercept(_ url: URL)` keeps compiling and
+1.x middleware implementing `intercept(_ url: URL)` keeps compiling (without a
+warning; calling the URL form through `DeepLinkMiddleware` is what warns) and
 running (the context is preserved around it), but that form is deprecated and
 will be removed in 3.0. Implement exactly one form.
 
@@ -132,8 +133,21 @@ struct StripTracking: DeepLinkMiddleware {
 }
 ```
 
-`DeepLinkMiddlewareCoordinator.process(_:)` takes a `DeepLinkRequest`;
-`CollectingMiddleware` adds `interceptedRequests`. Links replayed from a
+`DeepLinkMiddlewareCoordinator.process(_:)` takes a `DeepLinkRequest`; the URL
+forms `process(_: URL)` and `process(_: URL, startingAfter:)` are deprecated:
+
+```swift
+// 1.x
+let processedURL = try await chain.process(url)
+
+// 2.0
+let processed = try await chain.process(DeepLinkRequest(url: url, context: context))
+```
+
+`CollectingMiddleware` adds `interceptedRequests`. `coordinator.handle(url:)`
+is **not** deprecated: it is the convenience entry point for code with no
+context to give (it uses `.unknown`); prefer `handle(url:context:)` wherever
+you know the source. Links replayed from a
 readiness queue or a pending-link store keep the context they arrived with.
 Custom `ReadinessQueue` / `PendingLinkStore` types that implement only the URL
 requirements still compile and replay with `.unknown`; implement

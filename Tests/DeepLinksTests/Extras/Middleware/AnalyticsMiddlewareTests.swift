@@ -13,7 +13,7 @@ struct AnalyticsMiddlewareTests {
 		let analyticsSpy = AnalyticsProviderSpy()
 		let middleware = AnalyticsMiddleware(analyticsProvider: analyticsSpy)
 
-		let result = try await middleware.intercept(testURL)
+		let result = try await middleware.intercept(url: testURL)
 
 		#expect(result == testURL)
 		#expect(analyticsSpy.trackedEvents.count == 1)
@@ -32,7 +32,7 @@ struct AnalyticsMiddlewareTests {
 		let analyticsSpy = AnalyticsProviderSpy()
 		let middleware = AnalyticsMiddleware(analyticsProvider: analyticsSpy)
 
-		let result = try await middleware.intercept(testURL)
+		let result = try await middleware.intercept(url: testURL)
 
 		#expect(result == testURL)
 		#expect(analyticsSpy.trackedEvents.count == 1)
@@ -53,7 +53,7 @@ struct AnalyticsMiddlewareTests {
 			strategy: .detailed,
 		)
 
-		let result = try await middleware.intercept(testURL)
+		let result = try await middleware.intercept(url: testURL)
 
 		#expect(result == testURL)
 		#expect(analyticsSpy.trackedEvents.count == 1)
@@ -83,7 +83,7 @@ struct AnalyticsMiddlewareTests {
 			strategy: .minimal,
 		)
 
-		let result = try await middleware.intercept(testURL)
+		let result = try await middleware.intercept(url: testURL)
 
 		#expect(result == testURL)
 		#expect(analyticsSpy.trackedEvents.count == 1)
@@ -108,7 +108,7 @@ struct AnalyticsMiddlewareTests {
 			strategy: .standard,
 		)
 
-		let result = try await middleware.intercept(testURL)
+		let result = try await middleware.intercept(url: testURL)
 
 		#expect(result == testURL)
 		#expect(analyticsSpy.trackedEvents.count == 1)
@@ -136,7 +136,7 @@ struct AnalyticsMiddlewareTests {
 			strategy: .detailed,
 		)
 
-		let result = try await middleware.intercept(testURL)
+		let result = try await middleware.intercept(url: testURL)
 
 		#expect(result == testURL)
 		#expect(analyticsSpy.trackedEvents.count == 1)
@@ -163,7 +163,7 @@ struct AnalyticsMiddlewareTests {
 			strategy: .detailed,
 		)
 
-		let result = try await middleware.intercept(testURL)
+		let result = try await middleware.intercept(url: testURL)
 
 		#expect(result == testURL)
 		#expect(analyticsSpy.trackedEvents.count == 1)
@@ -185,7 +185,7 @@ struct AnalyticsMiddlewareTests {
 			strategy: .detailed,
 		)
 
-		let result = try await middleware.intercept(testURL)
+		let result = try await middleware.intercept(url: testURL)
 
 		#expect(result == testURL)
 		#expect(analyticsSpy.trackedEvents.count == 1)
@@ -205,7 +205,7 @@ struct AnalyticsMiddlewareTests {
 		let testURL = try #require(URL(string: "testapp://product/123"))
 		let middleware = AnalyticsMiddleware(analyticsProvider: provider)
 
-		let result = try await middleware.intercept(testURL)
+		let result = try await middleware.intercept(url: testURL)
 
 		#expect(result == testURL)
 	}
@@ -219,21 +219,21 @@ struct AnalyticsMiddlewareTests {
 			analyticsProvider: provider,
 			strategy: .standard,
 		)
-		let standardResult = try await standardMiddleware.intercept(testURL)
+		let standardResult = try await standardMiddleware.intercept(url: testURL)
 		#expect(standardResult == testURL)
 
 		let detailedMiddleware = AnalyticsMiddleware(
 			analyticsProvider: provider,
 			strategy: .detailed,
 		)
-		let detailedResult = try await detailedMiddleware.intercept(testURL)
+		let detailedResult = try await detailedMiddleware.intercept(url: testURL)
 		#expect(detailedResult == testURL)
 
 		let minimalMiddleware = AnalyticsMiddleware(
 			analyticsProvider: provider,
 			strategy: .minimal,
 		)
-		let minimalResult = try await minimalMiddleware.intercept(testURL)
+		let minimalResult = try await minimalMiddleware.intercept(url: testURL)
 		#expect(minimalResult == testURL)
 	}
 
@@ -246,7 +246,7 @@ struct AnalyticsMiddlewareTests {
 			for _ in 0 ..< 10 {
 				group.addTask {
 					let middleware = AnalyticsMiddleware(analyticsProvider: provider)
-					return try! await middleware.intercept(testURL)
+					return try! await middleware.intercept(url: testURL)
 				}
 			}
 

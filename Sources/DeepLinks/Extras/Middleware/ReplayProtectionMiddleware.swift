@@ -96,18 +96,18 @@ public final class ReplayProtectionMiddleware: DeepLinkMiddleware {
 		self.dateProvider = dateProvider
 	}
 
-	/// Passes the URL through unless it replays a link seen within the window.
+	/// Passes the request through unless it replays a link seen within the window.
 	///
-	/// - Parameter url: The deep link URL to check.
-	/// - Returns: `url` unchanged, or `nil` for a replay with the ``Response/drop`` response.
+	/// - Parameter request: The deep link to check.
+	/// - Returns: `request` unchanged, or `nil` for a replay with the ``Response/drop`` response.
 	/// - Throws: ``DeepLinkError/securityViolation(_:)`` for a replay with the
 	///   ``Response/reject`` response.
-	public func intercept(_ url: URL) async throws -> URL? {
-		guard window > 0, let key = keyStrategy.key(for: removingIgnoredQueryKeys(from: url)) else {
-			return url
+	public func intercept(_ request: DeepLinkRequest) async throws -> DeepLinkRequest? {
+		guard window > 0, let key = keyStrategy.key(for: removingIgnoredQueryKeys(from: request.url)) else {
+			return request
 		}
 
-		guard isReplay(key, at: dateProvider()) else { return url }
+		guard isReplay(key, at: dateProvider()) else { return request }
 
 		switch response {
 		case .drop:
