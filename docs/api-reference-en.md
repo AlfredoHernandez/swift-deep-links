@@ -48,8 +48,18 @@ public protocol DeepLinkRouting<Route>: Sendable {
 public protocol DeepLinkMiddleware: Sendable {
     func intercept(_ request: DeepLinkRequest) async throws -> DeepLinkRequest?  // 2.0
     func intercept(_ url: URL) async throws -> URL?                              // deprecated, removed in 3.0
+    func didFinish(_ request: DeepLinkRequest, outcome: DeepLinkOutcome) async   // default: no-op
+}
+
+public enum DeepLinkOutcome: Sendable {
+    case succeeded          // routing and every handler succeeded
+    case stopped            // a middleware returned nil
+    case deferred           // a ReadinessMiddleware queued the link
+    case failed(any Error)  // a middleware, the router or a handler threw
 }
 ```
+
+`didFinish(_:outcome:)` lets middleware settle work once the link is done (`SignedLinkMiddleware` spends or releases its nonce there). `DeepLinkCoordinator` calls it, after the handler ran, for every middleware that ran in that pass (including one that threw), with the request that middleware received; middleware after a stop never ran and is not called. A drained link's pass only covers the middleware after the readiness gate. Calling `DeepLinkMiddlewareCoordinator.process` or `intercept` directly never triggers it.
 
 Implement exactly one form; each has a default that calls the other, and a type implementing neither throws `DeepLinkError.missingRequiredConfiguration` instead of recursing (the same holds for `DeepLinkHandler`). A 1.x middleware implementing only the URL form still compiles: the coordinator calls it through the request form, which keeps the request's context and swaps in the returned URL. Calling the URL form on request-aware middleware passes `DeepLinkContext.unknown`.
 
@@ -411,9 +421,16 @@ public struct SigningKeyring: SigningKeyProvider {
 
 public protocol NonceStore: Sendable {
     func consume(_ nonce: String, expiresAt: Date) async -> Bool  // atomic, true once
+    // Two-phase (defaults consume at once and never release):
+    func reserve(_ nonce: String, expiresAt: Date) async -> NonceReservation?
+    func commit(_ reservation: NonceReservation) async
+    func release(_ reservation: NonceReservation) async
 }
+public struct NonceReservation: Sendable, Hashable, Codable { public let nonce: String; public let expiresAt: Date; public let token: UUID }
 public final class InMemoryNonceStore: NonceStore {
-    public init(maxEntries: Int = 1000, dateProvider: @Sendable @escaping () -> Date = Date.init)
+    public static let defaultReservationTTL: TimeInterval  // 300
+    public init(maxEntries: Int = 1000, reservationTTL: TimeInterval = defaultReservationTTL,
+                dateProvider: @Sendable @escaping () -> Date = Date.init)
 }
 
 public struct SignedLinkBuilder: Sendable {
@@ -440,7 +457,7 @@ DLSIG1
 
 Path, query items and fragment first decode escapes of RFC 3986 unreserved characters (`A-Z a-z 0-9 - . _ ~`) and upper-case the remaining escapes. The signature is `base64url(HMAC-SHA256(key, canonical))` without padding, appended as the last `sig` parameter. `kid`, `exp` and `nonce` are ordinary query items and therefore signed. Userinfo (`user:pass@`) is not part of the canonical form: keep `.security(...)` with `.hardened` (which rejects userinfo) in front. Links from notifications, Spotlight and quick actions are checked like any other, so payloads pointing at a signed path must carry the signed URL.
 
-Checks run in order: one `sig` and at most one `kid`/`exp`/`nonce`; constant-time HMAC verification with the key returned for `kid` (an unknown key id fails like a bad signature); `exp` (whole seconds since 1970, valid while `now < exp + leeway`; `leeway` only extends validity after expiry and counts as `0` when negative, infinite or NaN), required when `requiresExpiry` is `true` or a nonce store is set; finally the nonce is consumed (only after the signature is verified, so forged links cannot burn nonces). Failures throw `DeepLinkError.securityViolation` with one of the fixed reasons. Links the matcher does not select pass unchanged. `InMemoryNonceStore` keeps nonces until their link expires and rejects new nonces when `maxEntries` live ones are stored, rather than evicting one that could then be replayed; it does not survive relaunch. The nonce is consumed when the link passes this middleware, before authentication, readiness or confirmation run, so a link those stages stop cannot be opened again (including through `resumePendingLinks(from:)`); place `.replayProtection(...)` before `.signedLinks(...)` so a duplicate delivery is dropped quietly, or pass `reusedNonce: .drop`.
+Checks run in order: one `sig` and at most one `kid`/`exp`/`nonce`; constant-time HMAC verification with the key returned for `kid` (an unknown key id fails like a bad signature); `exp` (whole seconds since 1970, valid while `now < exp + leeway`; `leeway` only extends validity after expiry and counts as `0` when negative, infinite or NaN), required when `requiresExpiry` is `true` or a nonce store is set; finally the nonce is consumed (only after the signature is verified, so forged links cannot burn nonces). Failures throw `DeepLinkError.securityViolation` with one of the fixed reasons. Links the matcher does not select pass unchanged. `InMemoryNonceStore` keeps nonces until their link expires and rejects new nonces when `maxEntries` live ones are stored, rather than evicting one that could then be replayed; it does not survive relaunch. Inside `DeepLinkCoordinator` the nonce is reserved when the link passes and settled through `didFinish(_:outcome:)`: committed when the link succeeds or readiness queues it, released when a later middleware, the router or a handler stops or fails it, so the link can be retried or resumed after sign-in. Called directly, the middleware consumes at once. Place `.replayProtection(...)` before `.signedLinks(...)` so a duplicate delivery is dropped quietly, or pass `reusedNonce: .drop`.
 
 ### ConfirmationMiddleware
 

@@ -1,0 +1,226 @@
+//
+//  Copyright © 2026 Jesús Alfredo Hernández Alarcón. All rights reserved.
+//
+
+#if canImport(CryptoKit)
+
+@testable import DeepLinks
+import CryptoKit
+import DeepLinksTesting
+import Foundation
+import os
+import Testing
+
+struct SignedLinkTwoPhaseTests {
+	@Test
+	func `a link that completes spends its nonce`() async {
+		let sut = Pipeline()
+
+		#expect(await sut.open(sut.link).wasSuccessful)
+
+		let replay = await sut.open(sut.link)
+		#expect(replay.firstDeepLinkError == .securityViolation(SignedLinkMiddleware.reusedNonceReason))
+	}
+
+	@Test
+	func `a link rejected by a later middleware can be retried`() async {
+		let gate = ToggleMiddleware(allows: false)
+		let sut = Pipeline(after: [gate])
+
+		#expect(await !sut.open(sut.link).wasSuccessful)
+		gate.allows = true
+
+		#expect(await sut.open(sut.link).wasSuccessful)
+	}
+
+	@Test
+	func `a link stopped by a later middleware can be retried`() async {
+		let gate = ToggleMiddleware(allows: false, stops: true)
+		let sut = Pipeline(after: [gate])
+
+		#expect(await sut.open(sut.link).wasStoppedByMiddleware)
+		gate.allows = true
+
+		#expect(await sut.open(sut.link).wasSuccessful)
+	}
+
+	@Test
+	func `a declined confirmation leaves the link usable`() async throws {
+		let confirmation = CollectingConfirmation(approves: false)
+		let sut = Pipeline(after: [ConfirmationMiddleware(provider: confirmation)])
+
+		#expect(try await sut.open(sut.link).firstDeepLinkError == .confirmationDenied(#require(URL(string: "https://example.com/reset"))))
+		confirmation.approves = true
+
+		#expect(await sut.open(sut.link).wasSuccessful)
+	}
+
+	@Test
+	func `a link the parsers reject can be retried`() async {
+		let parser = ToggleParser(succeeds: false)
+		let sut = Pipeline(parser: parser)
+
+		#expect(await !sut.open(sut.link).wasSuccessful)
+		parser.succeeds = true
+
+		#expect(await sut.open(sut.link).wasSuccessful)
+	}
+
+	@Test
+	func `a link whose handler fails can be retried`() async {
+		let handler = ToggleHandler(succeeds: false)
+		let sut = Pipeline(handler: handler)
+
+		#expect(await !sut.open(sut.link).wasSuccessful)
+		handler.succeeds = true
+
+		#expect(await sut.open(sut.link).wasSuccessful)
+	}
+
+	@Test
+	func `a protected link resumed after sign-in uses its nonce once`() async {
+		let auth = ToggleAuthentication()
+		let pending = InMemoryPendingLinkStore()
+		let sut = Pipeline(after: [AuthenticationMiddleware(authProvider: auth, protectedHosts: ["example.com"], pendingLinks: pending)])
+
+		#expect(await !sut.open(sut.link).wasSuccessful)
+		auth.isSignedIn = true
+		let resumed = await sut.coordinator.resumePendingLinks(from: pending)
+
+		#expect(resumed.map(\.wasSuccessful) == [true])
+		#expect(await sut.open(sut.link).firstDeepLinkError == .securityViolation(SignedLinkMiddleware.reusedNonceReason))
+	}
+
+	@Test
+	func `a link queued for readiness keeps its nonce spent`() async {
+		let queue = DeepLinkReadinessQueue()
+		let sut = Pipeline(after: [ReadinessMiddleware(queue: queue)])
+
+		#expect(await sut.open(sut.link).wasStoppedByMiddleware)
+
+		#expect(await sut.open(sut.link).firstDeepLinkError == .securityViolation(SignedLinkMiddleware.reusedNonceReason))
+		#expect(await sut.coordinator.markReadyAndDrain(queue: queue).map(\.wasSuccessful) == [true])
+	}
+
+	@Test
+	func `concurrent deliveries through the coordinator admit exactly one`() async {
+		let sut = Pipeline()
+		let link = sut.link
+
+		let successes = await withTaskGroup(of: Bool.self) { group in
+			for _ in 0 ..< 20 {
+				group.addTask { await sut.open(link).wasSuccessful }
+			}
+			return await group.reduce(0) { $0 + ($1 ? 1 : 0) }
+		}
+
+		#expect(successes == 1)
+	}
+}
+
+// MARK: - Helpers
+
+private let key = SymmetricKey(data: Data(repeating: 7, count: 32))
+
+private struct Pipeline: Sendable {
+	let clock = ManualDateProvider()
+	let coordinator: DeepLinkCoordinator<TestRoute>
+	let link: URL
+
+	init(
+		after: [any DeepLinkMiddleware] = [],
+		parser: any DeepLinkParser<TestRoute> = ImmediateParser(routes: [TestRoute.route1]),
+		handler: any DeepLinkHandler<TestRoute> = CollectingHandler<TestRoute>(),
+	) {
+		let signed = SignedLinkMiddleware(
+			keys: SigningKeyring(key: key),
+			nonceStore: InMemoryNonceStore(dateProvider: clock.dateProvider),
+			dateProvider: clock.dateProvider,
+		)
+		coordinator = DeepLinkCoordinator(
+			routing: DefaultDeepLinkRouting(parsers: [parser]),
+			handler: handler,
+			middlewareCoordinator: DeepLinkMiddlewareCoordinator(middleware: [signed] + after),
+		)
+		link = try! SignedLinkBuilder(key: key).sign(URL(string: "https://example.com/reset")!, expiresAt: clock.now + 600, nonce: "n-1")
+	}
+
+	func open(_ url: URL) async -> DeepLinkResult<TestRoute> {
+		await coordinator.handle(url: url, context: DeepLinkContext(source: .universalLink))
+	}
+}
+
+private final class ToggleMiddleware: DeepLinkMiddleware {
+	private let state: OSAllocatedUnfairLock<Bool>
+	private let stops: Bool
+
+	init(allows: Bool, stops: Bool = false) {
+		state = OSAllocatedUnfairLock(initialState: allows)
+		self.stops = stops
+	}
+
+	var allows: Bool {
+		get { state.withLock { $0 } }
+		set { state.withLock { $0 = newValue } }
+	}
+
+	func intercept(_ request: DeepLinkRequest) async throws -> DeepLinkRequest? {
+		if allows {
+			return request
+		}
+		if stops {
+			return nil
+		}
+		throw DeepLinkError.unauthorizedAccess(request.url)
+	}
+}
+
+private final class ToggleParser: DeepLinkParser {
+	private let state: OSAllocatedUnfairLock<Bool>
+
+	init(succeeds: Bool) {
+		state = OSAllocatedUnfairLock(initialState: succeeds)
+	}
+
+	var succeeds: Bool {
+		get { state.withLock { $0 } }
+		set { state.withLock { $0 = newValue } }
+	}
+
+	func parse(from url: URL) async throws -> [TestRoute] {
+		guard succeeds else { throw DeepLinkError.routeNotFound(url) }
+		return [.route1]
+	}
+}
+
+private final class ToggleHandler: DeepLinkHandler {
+	private let state: OSAllocatedUnfairLock<Bool>
+
+	init(succeeds: Bool) {
+		state = OSAllocatedUnfairLock(initialState: succeeds)
+	}
+
+	var succeeds: Bool {
+		get { state.withLock { $0 } }
+		set { state.withLock { $0 = newValue } }
+	}
+
+	func handle(_: TestRoute, context _: DeepLinkContext) async throws {
+		guard succeeds else { throw DeepLinkError.handlerError(message: "not yet", underlyingError: nil) }
+	}
+}
+
+private final class ToggleAuthentication: AuthenticationProvider {
+	private let state = OSAllocatedUnfairLock(initialState: false)
+
+	var isSignedIn: Bool {
+		get { state.withLock { $0 } }
+		set { state.withLock { $0 = newValue } }
+	}
+
+	func isAuthenticated() -> Bool {
+		isSignedIn
+	}
+}
+
+#endif

@@ -229,7 +229,7 @@ public final class DeepLinkCoordinator<Route: DeepLinkRoute>: Sendable {
 	@discardableResult
 	public func handle(url: URL, context: DeepLinkContext) async -> DeepLinkResult<Route> {
 		await handle(DeepLinkRequest(url: url, context: context)) { [middlewareCoordinator] in
-			try await middlewareCoordinator.process($0)
+			await middlewareCoordinator.trackedProcess($0)
 		}
 	}
 }
@@ -244,7 +244,7 @@ extension DeepLinkCoordinator {
 	@discardableResult
 	func handleResumingAfterReadiness(url: URL, of queue: any ReadinessQueue) async -> DeepLinkResult<Route> {
 		await handle(DeepLinkRequest(url: url)) { [middlewareCoordinator] in
-			try await middlewareCoordinator.process($0, resumingAfterReadinessOf: queue)
+			await middlewareCoordinator.trackedProcess($0, resumingAfterReadinessOf: queue)
 		}
 	}
 }
@@ -254,50 +254,63 @@ extension DeepLinkCoordinator {
 private extension DeepLinkCoordinator {
 	func handle(
 		_ request: DeepLinkRequest,
-		middlewareStage: (DeepLinkRequest) async throws -> DeepLinkRequest?,
+		middlewareStage: (DeepLinkRequest) async -> MiddlewareRun,
 	) async -> DeepLinkResult<Route> {
-		let url = request.url
-		await notifyDelegateWillProcess(url)
+		await DeepLinkRun.$id.withValue(UUID()) {
+			await DeepLinkRun.$arrival.withValue(request) {
+				await handleInRun(request, middlewareStage: middlewareStage)
+			}
+		}
+	}
+
+	func handleInRun(
+		_ request: DeepLinkRequest,
+		middlewareStage: (DeepLinkRequest) async -> MiddlewareRun,
+	) async -> DeepLinkResult<Route> {
+		await notifyDelegateWillProcess(request.url)
 
 		let startTime = Date()
-
-		let result: DeepLinkResult<Route>
-		do {
-			result = try await processDeepLink(request, startTime: startTime, middlewareStage: middlewareStage)
-		} catch {
-			result = await handleProcessingError(url: url, error: error, startTime: startTime)
-		}
+		let run = await middlewareStage(request)
+		let (result, outcome) = await process(request, after: run, startTime: startTime)
+		await run.finish(with: outcome)
 
 		broadcaster.publish(result)
 		return result
 	}
 
-	/// Processes the deep link through the complete pipeline.
-	///
-	/// - Parameters:
-	///   - request: The request to process
-	///   - startTime: The start time for execution timing
-	///   - middlewareStage: The middleware processing applied before routing
-	/// - Returns: The processing result
-	func processDeepLink(
+	/// Routes and handles the request the middleware chain produced, and
+	/// reports how processing ended for ``DeepLinkMiddleware/didFinish(_:outcome:)``.
+	func process(
 		_ request: DeepLinkRequest,
+		after run: MiddlewareRun,
 		startTime: Date,
-		middlewareStage: (DeepLinkRequest) async throws -> DeepLinkRequest?,
-	) async throws -> DeepLinkResult<Route> {
-		guard let processed = try await middlewareStage(request) else {
-			return await createMiddlewareStoppedResult(url: request.url, startTime: startTime)
+	) async -> (DeepLinkResult<Route>, DeepLinkOutcome) {
+		let processed: DeepLinkRequest
+		switch run.result {
+		case let .failure(error):
+			return await (handleProcessingError(url: request.url, error: error, startTime: startTime), .failed(error))
+
+		case .success(nil):
+			return await (createMiddlewareStoppedResult(url: request.url, startTime: startTime), run.wasDeferred ? .deferred : .stopped)
+
+		case let .success(request?):
+			processed = request
 		}
 
-		let routes = try await routeURL(processed.url)
-		let executionResult = await executeRoutes(routes, context: processed.context)
-
-		return await createSuccessResult(
-			originalURL: request.url,
-			processedURL: processed.url,
-			routes: routes,
-			executionResult: executionResult,
-			startTime: startTime,
-		)
+		do {
+			let routes = try await routeURL(processed.url)
+			let executionResult = await executeRoutes(routes, context: processed.context)
+			let result = await createSuccessResult(
+				originalURL: request.url,
+				processedURL: processed.url,
+				routes: routes,
+				executionResult: executionResult,
+				startTime: startTime,
+			)
+			return (result, executionResult.errors.first.map(DeepLinkOutcome.failed) ?? .succeeded)
+		} catch {
+			return await (handleProcessingError(url: request.url, error: error, startTime: startTime), .failed(error))
+		}
 	}
 
 	/// Routes the processed URL to determine the appropriate routes.

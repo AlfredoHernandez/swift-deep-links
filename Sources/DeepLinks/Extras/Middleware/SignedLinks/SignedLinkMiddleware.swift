@@ -6,6 +6,7 @@
 
 import CryptoKit
 import Foundation
+import os
 
 /// Middleware that requires an HMAC-SHA256 signature, and optionally an
 /// expiry and a single-use nonce, on sensitive deep links such as password
@@ -49,14 +50,15 @@ import Foundation
 ///
 /// ## Nonces
 ///
-/// A nonce is consumed as soon as the link passes this middleware, **before**
-/// later middleware runs. If authentication, readiness eviction or a
-/// confirmation denial then stops the link, it cannot be opened again: a link
-/// saved by ``AuthenticationMiddleware`` and replayed with
-/// ``DeepLinkCoordinator/resumePendingLinks(from:)`` is rejected as reused.
-/// Use nonces for links that should be lost rather than retried (one-time
-/// login codes, payment confirmations), and rely on expiry plus
-/// ``ReplayProtectionMiddleware`` for links that must survive sign-in. Nonces
+/// Inside ``DeepLinkCoordinator`` nonces are two-phase: the nonce is
+/// **reserved** when the signature verifies (a concurrent delivery of the same
+/// link is rejected as reused), then settled in
+/// ``didFinish(_:outcome:)``: **committed** when the link succeeded or a
+/// ``ReadinessMiddleware`` queued it, **released** when a later middleware,
+/// the router or a handler stopped or failed it, so the user can retry and a
+/// link saved by ``AuthenticationMiddleware`` resumes once after sign-in. A
+/// reservation never settled lapses after the store's time to live. Called
+/// directly (outside a coordinator) the middleware consumes at once. Nonces
 /// are global, not scoped to a key id, so use unguessable values.
 ///
 /// ## Placement
@@ -117,6 +119,7 @@ public final class SignedLinkMiddleware: DeepLinkMiddleware {
 	private let reusedNonce: ReusedNonceResponse
 	private let stripsSignatureParameters: Bool
 	private let dateProvider: @Sendable () -> Date
+	private let reservations = OSAllocatedUnfairLock<[UUID: NonceReservation]>(initialState: [:])
 
 	/// Creates a signed-link middleware.
 	///
@@ -165,6 +168,22 @@ public final class SignedLinkMiddleware: DeepLinkMiddleware {
 
 		return stripsSignatureParameters ? request.replacingURL(strippingSignatureParameters(from: request.url)) : request
 	}
+
+	/// Spends the nonce reserved for this link when it succeeded or was queued
+	/// for readiness, and frees it when a later stage stopped or failed it.
+	public func didFinish(_: DeepLinkRequest, outcome: DeepLinkOutcome) async {
+		guard let nonceStore, let runID = DeepLinkRun.id,
+		      let reservation = reservations.withLock({ $0.removeValue(forKey: runID) })
+		else { return }
+
+		switch outcome {
+		case .succeeded, .deferred:
+			await nonceStore.commit(reservation)
+
+		case .stopped, .failed:
+			await nonceStore.release(reservation)
+		}
+	}
 }
 
 // MARK: - Verification
@@ -199,7 +218,7 @@ private extension SignedLinkMiddleware {
 		guard let nonce, !nonce.isEmpty else {
 			throw DeepLinkError.securityViolation(Self.missingNonceReason)
 		}
-		if await nonceStore.consume(nonce, expiresAt: validUntil) {
+		if await admit(nonce, until: validUntil, in: nonceStore) {
 			return true
 		}
 		switch reusedNonce {
@@ -209,6 +228,17 @@ private extension SignedLinkMiddleware {
 		case .drop:
 			return false
 		}
+	}
+
+	/// Inside a ``DeepLinkCoordinator`` pass the nonce is only reserved and
+	/// settled in ``didFinish(_:outcome:)``; called directly, it is consumed.
+	func admit(_ nonce: String, until validUntil: Date, in nonceStore: any NonceStore) async -> Bool {
+		guard let runID = DeepLinkRun.id else {
+			return await nonceStore.consume(nonce, expiresAt: validUntil)
+		}
+		guard let reservation = await nonceStore.reserve(nonce, expiresAt: validUntil) else { return false }
+		reservations.withLock { $0[runID] = reservation }
+		return true
 	}
 
 	func strippingSignatureParameters(from url: URL) -> URL {

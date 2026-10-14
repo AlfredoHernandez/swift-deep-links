@@ -257,8 +257,20 @@ middleware order and a hardening checklist.
   `securityViolation` with fixed reasons (`SignedLinkMiddleware.*Reason`) that
   never include the key, signature or link, the nonce is consumed only after
   verification, and verified links continue with the signature parameters
-  stripped. A nonce is consumed when the link passes, before later middleware
-  runs; `reusedNonce: .drop` stops a reused link silently, and replay
+  stripped. Nonces are two-phase inside `DeepLinkCoordinator`: reserved when
+  the signature verifies, spent only when the whole link succeeds (or is
+  queued by readiness) and released when a later middleware, the router or a
+  handler stops or fails it, so the user can retry (including after sign-in
+  through `resumePendingLinks(from:)`); concurrent deliveries still admit one.
+  `NonceStore` gains `reserve(_:expiresAt:)`, `commit(_:)` and `release(_:)`
+  with defaults that consume at once, so 1.x-style stores keep compiling;
+  `InMemoryNonceStore(reservationTTL:)` lets abandoned reservations lapse
+  (default 300 s). `DeepLinkMiddleware` gains
+  `didFinish(_:outcome:)` (default no-op), which the coordinator calls for
+  every middleware that ran with a `DeepLinkOutcome` (`.succeeded`,
+  `.stopped`, `.deferred`, `.failed`). `AuthenticationMiddleware` now saves the
+  link as it entered the chain, so a resumed signed link still carries its
+  signature. `reusedNonce: .drop` stops a reused link silently, and replay
   protection belongs before signed links so double deliveries are dropped
   quietly. `SignedLinkBuilder` signs links for servers and tests. Matchers
   compare hosts and paths case-insensitively and match paths after

@@ -192,12 +192,16 @@ public actor DeepLinkMiddlewareCoordinator {
 		try await run(request, through: middleware(after: { ($0 as AnyObject) === anchor }))
 	}
 
-	func process(_ request: DeepLinkRequest, resumingAfterReadinessOf queue: any ReadinessQueue) async throws -> DeepLinkRequest? {
+	func trackedProcess(_ request: DeepLinkRequest) async -> MiddlewareRun {
+		await runTracked(request, through: middleware[...])
+	}
+
+	func trackedProcess(_ request: DeepLinkRequest, resumingAfterReadinessOf queue: any ReadinessQueue) async -> MiddlewareRun {
 		let remaining = middleware(after: { candidate in
 			guard let readiness = candidate as? ReadinessMiddleware else { return false }
 			return readiness.isGating(queue)
 		})
-		return try await run(request, through: remaining)
+		return await runTracked(request, through: remaining)
 	}
 }
 
@@ -223,6 +227,29 @@ private extension DeepLinkMiddlewareCoordinator {
 		}
 
 		return current
+	}
+
+	func runTracked(_ request: DeepLinkRequest, through chain: ArraySlice<any DeepLinkMiddleware>) async -> MiddlewareRun {
+		var run = MiddlewareRun(result: .success(request))
+		var current = request
+
+		for middleware in chain {
+			run.visited.append((middleware, current))
+			do {
+				guard let next = try await intercept(current, with: middleware) else {
+					run.result = .success(nil)
+					run.wasDeferred = middleware is ReadinessMiddleware
+					return run
+				}
+				current = next
+			} catch {
+				run.result = .failure(error)
+				return run
+			}
+		}
+
+		run.result = .success(current)
+		return run
 	}
 
 	func intercept(_ request: DeepLinkRequest, with middleware: any DeepLinkMiddleware) async throws -> DeepLinkRequest? {

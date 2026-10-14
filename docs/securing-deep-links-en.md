@@ -128,11 +128,13 @@ let link = try SignedLinkBuilder(key: currentKey, keyID: "2026-10").sign(
   the new key id, signing with it, and removing the old key once its links
   have expired.
 - Expiry: keep lifetimes short (minutes for resets, days for invitations).
-- Nonces: a nonce is consumed when the link passes `SignedLinkMiddleware`,
-  before authentication, readiness or confirmation run. A link those stages
-  stop is spent: it cannot be resumed after sign-in or retried after the user
-  declines. Use nonces for links that should be lost rather than retried, and
-  expiry plus replay protection for links that must survive sign-in. Pass
+- Nonces are two-phase: `SignedLinkMiddleware` reserves the nonce once the
+  signature verifies, and the coordinator spends it only when the whole link
+  succeeds (or readiness queues it). If authentication, confirmation, a parser
+  or a handler stops the link, the nonce is released, so the user can retry,
+  and a link saved for sign-in resumes once. A reservation never settled (the
+  app was killed mid-link) lapses after `reservationTTL`. Calling the
+  middleware directly, outside a coordinator, consumes at once. Pass
   `reusedNonce: .drop` to stop reused links silently instead of with an error.
   `InMemoryNonceStore` is bounded and forgets on relaunch; persist nonces in
   your own `NonceStore` when a link must stay single-use across launches.

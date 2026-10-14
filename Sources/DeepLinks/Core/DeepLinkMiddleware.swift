@@ -80,9 +80,44 @@ public protocol DeepLinkMiddleware: Sendable {
 	/// - Returns: The URL to continue processing with, or `nil` to stop processing
 	/// - Throws: An error to stop processing and report the issue
 	func intercept(_ url: URL) async throws -> URL?
+
+	/// Called once the link this middleware intercepted has finished
+	/// processing, so the middleware can settle work it started (for example
+	/// ``SignedLinkMiddleware`` spends a nonce only when the link succeeded).
+	///
+	/// ``DeepLinkCoordinator`` calls it for every middleware that ran on the
+	/// link in this pass, including one that threw, after routing and the
+	/// handler ran; middleware after the one that stopped the chain did not run
+	/// and is not called. Calling ``DeepLinkMiddlewareCoordinator`` or
+	/// `intercept` directly never triggers it. The default does nothing.
+	///
+	/// - Parameters:
+	///   - request: The request this middleware received.
+	///   - outcome: How processing ended.
+	func didFinish(_ request: DeepLinkRequest, outcome: DeepLinkOutcome) async
+}
+
+/// How processing of a deep link ended, as reported to
+/// ``DeepLinkMiddleware/didFinish(_:outcome:)``.
+public enum DeepLinkOutcome: Sendable {
+	/// Routing succeeded and every handler succeeded.
+	case succeeded
+
+	/// A middleware returned `nil`, dropping the link.
+	case stopped
+
+	/// A ``ReadinessMiddleware`` queued the link; it continues with the
+	/// middleware after the readiness gate when the queue drains.
+	case deferred
+
+	/// A middleware, the router or a handler threw.
+	case failed(any Error)
 }
 
 public extension DeepLinkMiddleware {
+	/// Does nothing.
+	func didFinish(_: DeepLinkRequest, outcome _: DeepLinkOutcome) async {}
+
 	/// Bridges 1.x middleware: runs ``intercept(_:)-(URL)`` on the request's
 	/// URL and keeps the request's context.
 	func intercept(_ request: DeepLinkRequest) async throws -> DeepLinkRequest? {

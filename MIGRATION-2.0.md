@@ -346,10 +346,12 @@ come first and side effects (prompts, analytics) last:
   authentication (or keep the window shorter than a sign-in), otherwise the
   resumed link is dropped as a replay.
 - **Signed links** before authentication, so parsers and later stages see
-  verified links with the signature parameters stripped. A nonce is consumed
-  when the link passes, even if a later stage rejects it, so a nonce-bearing
-  link cannot be resumed after sign-in; use expiry plus replay protection for
-  links that must survive sign-in, or `reusedNonce: .drop` to make reuse silent.
+  verified links with the signature parameters stripped. A nonce is only
+  reserved there and spent when the whole link succeeds; if authentication,
+  confirmation, a parser or a handler stops it, the nonce is released and the
+  link can be retried or resumed after sign-in. Custom `NonceStore`s that only
+  implement `consume` keep working but spend the nonce at once; implement
+  `reserve`/`commit`/`release` to get retries.
 - **Readiness** after the checks that do not need the app to be ready; queued
   links resume the chain after it, so later stages evaluate them at drain time.
 - **Confirmation** after readiness (the UI must be able to present) and after

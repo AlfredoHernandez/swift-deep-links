@@ -101,9 +101,10 @@ public final class AuthenticationMiddleware: DeepLinkMiddleware {
 	///   - pendingLinks: Where to save a link rejected with
 	///     ``DeepLinkError/unauthorizedAccess(_:)`` so it can be resumed after
 	///     sign-in with ``DeepLinkCoordinator/resumePendingLinks(from:)``. The
-	///     link is still rejected. The URL saved is the one this middleware
-	///     received, after any earlier middleware transformed it. Defaults to
-	///     `nil`, which saves nothing.
+	///     link is still rejected. Inside ``DeepLinkCoordinator`` the URL saved
+	///     is the link as it entered the chain (signature included), because a
+	///     resume runs the whole chain again; called directly, it is the URL
+	///     this middleware received. Defaults to `nil`, which saves nothing.
 	public init(
 		authProvider: AuthenticationProvider,
 		protectedHosts: Set<String>,
@@ -120,7 +121,7 @@ public final class AuthenticationMiddleware: DeepLinkMiddleware {
 		do {
 			return try strategy.validate(url: url, protectedHosts: protectedHosts, provider: authProvider)
 		} catch let DeepLinkError.unauthorizedAccess(rejectedURL) {
-			await pendingLinks?.save(rejectedURL)
+			await pendingLinks?.save(DeepLinkRun.arrival?.url ?? rejectedURL)
 			throw DeepLinkError.unauthorizedAccess(rejectedURL)
 		}
 	}
