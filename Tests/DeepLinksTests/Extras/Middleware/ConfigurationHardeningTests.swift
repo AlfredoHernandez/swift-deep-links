@@ -50,7 +50,6 @@ struct ConfigurationHardeningTests {
 		let otherKey = UserDefaultsRateLimitPersistence.shared(key: "test.config-hardening.other")
 
 		#expect(first === second)
-		#expect(first === UserDefaultsRateLimitPersistence.shared())
 		#expect(otherKey === UserDefaultsRateLimitPersistence.shared(key: "test.config-hardening.other"))
 		#expect(otherKey !== first)
 	}

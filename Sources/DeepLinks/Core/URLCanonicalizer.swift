@@ -143,16 +143,14 @@ private extension URLCanonicalizer {
 		var host = encodedHost
 		if encodedHost.contains("%") {
 			let decoded = DecodingPasses(of: encodedHost, limit: Self.maximumDecodingPasses).forms.last ?? encodedHost
-			let isASCII = decoded.unicodeScalars.allSatisfy(\.isASCII)
-			guard !isASCII || decoded.unicodeScalars.allSatisfy(Self.plainHostCharacters.contains) else {
+			guard decoded.unicodeScalars.allSatisfy({ !$0.isASCII || Self.plainHostCharacters.contains($0) }) else {
 				throw .securityViolation("Malformed host")
 			}
-			if isASCII {
+			if decoded.unicodeScalars.allSatisfy(\.isASCII) {
 				host = decoded
 			}
 		}
-		host = host.lowercased()
-		return host.hasSuffix(".") ? String(host.dropLast()) : host
+		return DeepLinkMatcher.normalizedHost(host)
 	}
 
 	static let plainHostCharacters = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-._~!$&'()*+,;="))

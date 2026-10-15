@@ -25,9 +25,11 @@ enum DeepLinkRun {
 	/// a handler that failed after it may have acted.
 	@TaskLocal static var routeDecline: RouteDecline?
 
-	/// Records that the current route was declined before its handler ran.
-	static func declineRoute() {
-		routeDecline?.markDeclined()
+	/// Records that the current route was declined with `error` before its
+	/// handler ran; the guard then throws `error`.
+	static func declineRoute(with error: DeepLinkError) -> DeepLinkError {
+		routeDecline?.markDeclined(with: error)
+		return error
 	}
 
 	/// Runs `body` as a standalone call, not part of the enclosing
@@ -50,16 +52,19 @@ enum DeepLinkRun {
 	}
 }
 
-/// Whether a route guard declined the route it was handling.
+/// The error a route guard declined the route with, if any.
 final class RouteDecline: Sendable {
-	private let declined = OSAllocatedUnfairLock(initialState: false)
+	private let declinedError = OSAllocatedUnfairLock<DeepLinkError?>(initialState: nil)
 
-	var isDeclined: Bool {
-		declined.withLock { $0 }
+	func markDeclined(with error: DeepLinkError) {
+		declinedError.withLock { $0 = error }
 	}
 
-	func markDeclined() {
-		declined.withLock { $0 = true }
+	/// Whether the route failed with the decline itself, so nothing ran; a
+	/// wrapper that caught the decline and failed differently may have acted.
+	func declined(_ error: any Error) -> Bool {
+		guard let thrown = error as? DeepLinkError else { return false }
+		return declinedError.withLock { $0 == thrown }
 	}
 }
 

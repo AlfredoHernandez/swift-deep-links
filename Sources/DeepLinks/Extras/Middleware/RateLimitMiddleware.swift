@@ -84,8 +84,11 @@ public final class RateLimitMiddleware: DeepLinkMiddleware {
 	///   - maxRequests: Maximum number of requests allowed in the time window. Must be greater than 0.
 	///   - timeWindow: Time window in seconds. Negative and NaN values are
 	///     treated as `0`, which only counts requests made at the same instant.
-	///   - persistence: Persistence mechanism for storing request data (defaults to
-	///     ``UserDefaultsRateLimitPersistence/shared(key:)``, shared by every rate limiter using the default)
+	///   - persistence: Persistence mechanism for storing request data. `nil` (the default)
+	///     uses ``UserDefaultsRateLimitPersistence/shared(key:)`` with a key derived from
+	///     the strategy, `maxRequests` and `timeWindow`, so limiters with the same
+	///     configuration share one budget and limiters with different ones never
+	///     prune each other's timestamps.
 	///   - strategy: The rate limiting strategy to use (defaults to .slidingWindow)
 	///   - dateProvider: Supplies the current time for rate-limit bookkeeping.
 	///     Defaults to `Date.init`; inject a deterministic provider in tests to
@@ -118,13 +121,17 @@ public final class RateLimitMiddleware: DeepLinkMiddleware {
 	public init(
 		maxRequests: Int = 100,
 		timeWindow: TimeInterval = 60.0,
-		persistence: RateLimitPersistence = UserDefaultsRateLimitPersistence.shared(),
+		persistence: RateLimitPersistence? = nil,
 		strategy: RateLimitStrategy = .slidingWindow,
 		dateProvider: @Sendable @escaping () -> Date = Date.init,
 	) {
-		self.maxRequests = max(maxRequests, 0)
-		self.timeWindow = timeWindow.isNaN ? 0 : Swift.max(timeWindow, 0)
-		self.persistence = persistence
+		let maxRequests = max(maxRequests, 0)
+		let timeWindow = timeWindow.isNaN ? 0 : Swift.max(timeWindow, 0)
+		self.maxRequests = maxRequests
+		self.timeWindow = timeWindow
+		self.persistence = persistence ?? UserDefaultsRateLimitPersistence.shared(
+			key: "\(UserDefaultsRateLimitPersistence.defaultKey).\(strategy.name).\(maxRequests).\(timeWindow)",
+		)
 		self.strategy = strategy
 		self.dateProvider = dateProvider
 	}

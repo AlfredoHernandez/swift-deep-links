@@ -119,8 +119,8 @@ public struct URLRedactor: Sendable {
 	/// Returns `text` with every embedded `scheme://` URL redacted.
 	///
 	/// Text longer than ``maximumRedactedTextLength`` is cut first, and a URL
-	/// the cut splits is replaced whole by ``placeholder``, so no fragment of a
-	/// secret survives. The scan is linear in the length of the text. Control
+	/// the cut splits, or one Foundation cannot parse, is replaced whole by
+	/// ``placeholder``, so no fragment of a secret survives. The scan is linear in the length of the text. Control
 	/// characters are escaped (`\n`) so the result stays on one log line.
 	func redactingURLs(in text: String) -> String {
 		let scalars = text.unicodeScalars
@@ -146,7 +146,7 @@ public struct URLRedactor: Sendable {
 	}
 
 	private func redactedURLText(_ text: String) -> String {
-		guard let url = URL(string: text) else { return text }
+		guard let url = URL(string: text) else { return placeholder }
 		let redacted = redact(url)
 		return redacted == url ? text : redacted.absoluteString
 	}

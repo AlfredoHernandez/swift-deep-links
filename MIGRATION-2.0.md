@@ -338,9 +338,11 @@ actor KeychainRateLimitPersistence: RateLimitPersistence {
 }
 ```
 
-Every rate limiter built with the default persistence shares
-`UserDefaultsRateLimitPersistence.shared()` (one actor per key), so two
-middleware for the same key never overwrite each other's records.
+`persistence` defaults to `nil`: the limiter then uses
+`UserDefaultsRateLimitPersistence.shared(key:)` with a key derived from its
+strategy, `maxRequests` and `timeWindow`, so identical limiters share one
+actor and differently configured ones keep separate records. The stored
+data moves to the new keys, so 1.x counts are not carried over.
 
 Persistences that prune old timestamps should also implement
 `mutateRequests(retaining:_:)` and keep at least `window` seconds, as

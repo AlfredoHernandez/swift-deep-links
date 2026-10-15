@@ -663,9 +663,11 @@ middleware order and a hardening checklist.
 - **Configuration hardening.** `SecurityMiddleware` normalizes its allow-lists
   (lower-cased; hosts without a trailing dot) and recompiles blocked patterns
   case-insensitively once, at init, instead of on every link. The default
-  rate-limit persistence is `UserDefaultsRateLimitPersistence.shared(key:)`,
-  one actor per key, so several `.rateLimit()` middleware no longer race
-  through separate actors on the same `UserDefaults` entry.
+  rate-limit persistence (`persistence: nil`) is
+  `UserDefaultsRateLimitPersistence.shared(key:)` with a key derived from the
+  strategy, `maxRequests` and `timeWindow`: limiters with the same
+  configuration share one actor and budget, and limiters with different
+  windows no longer prune each other's timestamps in one `UserDefaults` entry.
   `DeepLinkDiagnostics.checkMiddleware(_:)` warns
   (`.signedLinksWithoutNonceStore`) when `.signedLinks(...)` has no nonce
   store, leaving its links reusable until they expire; `nonceStore` stays

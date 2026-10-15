@@ -347,7 +347,7 @@ private extension DeepLinkCoordinator {
 				successfulRoutes += 1
 			} catch {
 				failedRoutes += 1
-				declinedRoutes += decline.isDeclined ? 1 : 0
+				declinedRoutes += decline.declined(error) ? 1 : 0
 				errors.append(error)
 				log.log(level: .error, "Error handling route \(route.id): \(logPrivacy.describe(error))")
 			}

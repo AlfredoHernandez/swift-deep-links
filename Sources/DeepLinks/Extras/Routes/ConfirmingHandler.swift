@@ -60,8 +60,7 @@ public struct ConfirmingHandler<Route: DeepLinkRoute>: DeepLinkHandler {
 				await confirm(route, context)
 			}
 			guard approved else {
-				DeepLinkRun.declineRoute()
-				throw DeepLinkError.confirmationDenied(DeepLinkRun.routedURL ?? URL(string: "about:blank")!)
+				throw DeepLinkRun.declineRoute(with: .confirmationDenied(DeepLinkRun.routedURL ?? URL(string: "about:blank")!))
 			}
 		}
 		try await wrapped.handle(route, context: context)

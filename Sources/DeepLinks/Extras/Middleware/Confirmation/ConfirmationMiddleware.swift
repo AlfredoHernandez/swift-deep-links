@@ -22,7 +22,9 @@ import os
 /// `securityViolation(ConfirmationMiddleware.tooManyPendingPromptsReason)`,
 /// so a flood of links cannot queue prompts the user has to dismiss one by
 /// one. A link whose task is cancelled before its prompt is shown throws
-/// `CancellationError` without being shown.
+/// `CancellationError` without being shown. On timeout the next link gets its
+/// turn at once, so a provider that ignores cancellation can leave its
+/// prompt on screen under the next one: dismiss it when its task is cancelled.
 ///
 /// ## Placement
 ///

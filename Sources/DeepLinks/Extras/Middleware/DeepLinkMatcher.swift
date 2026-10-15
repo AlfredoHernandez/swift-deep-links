@@ -121,10 +121,13 @@ extension DeepLinkMatcher {
 		return candidates.contains(where: normalizedHosts.contains)
 	}
 
-	/// Lower-cased, without a trailing dot.
+	/// Lower-cased, without trailing dots.
 	static func normalizedHost(_ host: String) -> String {
-		let lowercased = host.lowercased()
-		return lowercased.hasSuffix(".") ? String(lowercased.dropLast()) : lowercased
+		var normalized = host.lowercased()
+		while normalized.hasSuffix(".") {
+			normalized.removeLast()
+		}
+		return normalized
 	}
 
 	/// Every decoded, normalized form of the host, or of the first path

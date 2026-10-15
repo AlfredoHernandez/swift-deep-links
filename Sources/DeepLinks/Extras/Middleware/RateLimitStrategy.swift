@@ -55,9 +55,13 @@ import Foundation
 /// | `.tokenBucket` | Continuous refill | Up to `capacity` | High | Burst-tolerant limits |
 /// | `.permissive` | N/A | Unlimited | N/A | Testing/Development |
 public struct RateLimitStrategy: Sendable {
+	/// Identifies the strategy and its parameters in the default persistence key,
+	/// so limiters of different shapes never share stored state.
+	let name: String
 	private let checkFunction: @Sendable (URL, Int, TimeInterval, RateLimitPersistence, () -> Date) async throws -> URL?
 
-	init(_ checkFunction: @escaping @Sendable (URL, Int, TimeInterval, RateLimitPersistence, () -> Date) async throws -> URL?) {
+	init(name: String, _ checkFunction: @escaping @Sendable (URL, Int, TimeInterval, RateLimitPersistence, () -> Date) async throws -> URL?) {
+		self.name = name
 		self.checkFunction = checkFunction
 	}
 
@@ -101,7 +105,7 @@ public extension RateLimitStrategy {
 	/// - Tracks all requests in the last `timeWindow` seconds
 	/// - Removes expired requests automatically
 	/// - Provides consistent rate limiting without burst allowances
-	static let slidingWindow = RateLimitStrategy { url, maxRequests, timeWindow, persistence, dateProvider in
+	static let slidingWindow = RateLimitStrategy(name: "sliding") { url, maxRequests, timeWindow, persistence, dateProvider in
 		let now = dateProvider().timeIntervalSince1970
 
 		let isAdmitted = await persistence.mutateRequests(retaining: timeWindow) { timestamps in
@@ -144,7 +148,7 @@ public extension RateLimitStrategy {
 	/// - May allow bursts of requests at window transitions
 	/// - A zero window only counts requests made at the same instant; an
 	///   infinite window never resets
-	static let fixedWindow = RateLimitStrategy { url, maxRequests, timeWindow, persistence, dateProvider in
+	static let fixedWindow = RateLimitStrategy(name: "fixed") { url, maxRequests, timeWindow, persistence, dateProvider in
 		let now = dateProvider()
 		let windowStart = fixedWindowStart(containing: now, timeWindow: timeWindow).timeIntervalSince1970
 		let instant = now.timeIntervalSince1970
@@ -193,7 +197,7 @@ public extension RateLimitStrategy {
 	/// - No persistence operations are performed
 	/// - No performance overhead from rate limiting logic
 	/// - Thread-safe (no concurrent access needed)
-	static let permissive = RateLimitStrategy { url, _, _, _, _ in
+	static let permissive = RateLimitStrategy(name: "permissive") { url, _, _, _, _ in
 		url
 	}
 
@@ -234,7 +238,7 @@ public extension RateLimitStrategy {
 	/// - Returns: A token bucket strategy.
 	static func tokenBucket(capacity: Int, refillRate: Double) -> RateLimitStrategy {
 		let bucket = TokenBucket(capacity: capacity, refillRate: refillRate)
-		return RateLimitStrategy { url, _, _, persistence, dateProvider in
+		return RateLimitStrategy(name: "bucket.\(bucket.capacity).\(bucket.refillRate)") { url, _, _, persistence, dateProvider in
 			let now = dateProvider().timeIntervalSince1970
 
 			let outcome = await persistence.mutateRequests { state in

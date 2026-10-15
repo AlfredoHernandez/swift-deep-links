@@ -96,9 +96,18 @@ public extension ReplayKeyStrategy {
 private extension ReplayKeyStrategy {
 	static func origin(of components: URLComponents) -> String {
 		let scheme = components.scheme?.lowercased() ?? ""
-		let host = components.percentEncodedHost.map { DeepLinkMatcher.normalizedHost($0.removingPercentEncoding ?? $0) } ?? ""
+		let host = components.percentEncodedHost.map { DeepLinkMatcher.normalizedHost(fullyDecoded($0)) } ?? ""
 		let port = components.port.map { ":\($0)" } ?? ""
 		return "\(scheme)://\(host)\(port)"
+	}
+
+	static func fullyDecoded(_ text: String) -> String {
+		var decoded = text
+		for _ in 0 ..< URLCanonicalizer.maximumDecodingPasses {
+			guard let next = decoded.removingPercentEncoding, next != decoded else { break }
+			decoded = next
+		}
+		return decoded
 	}
 
 	static func sortedQuery(of components: URLComponents) -> String {
