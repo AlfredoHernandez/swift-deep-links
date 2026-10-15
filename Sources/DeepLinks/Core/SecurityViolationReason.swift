@@ -9,7 +9,12 @@ import Foundation
 ///
 /// Read it with ``DeepLinkError/securityViolationReason``. Built-in middleware
 /// keeps throwing the same reason strings, so existing comparisons keep
-/// working; a reason string this package does not throw maps to ``other``.
+/// working. The reason is derived from the string, so a custom middleware
+/// throwing one of the built-in strings gets that case; any other string
+/// maps to ``other``.
+///
+/// Minor releases may add cases as built-in checks grow, so a `switch` over
+/// this enum should end with a `default` branch.
 ///
 /// ```swift
 /// if result.firstDeepLinkError?.securityViolationReason == .expiredLink {
