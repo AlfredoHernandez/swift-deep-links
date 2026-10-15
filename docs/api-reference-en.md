@@ -337,6 +337,7 @@ All middleware can be created using static factory methods on `DeepLinkMiddlewar
 .security(allowedSchemes:allowedHosts:blockedPatterns:allowedSources:strategy:limits:)
 .rateLimit(maxRequests:timeWindow:persistence:strategy:)
 .authentication(provider:protectedHosts:strategy:pendingLinks:)
+.authentication(provider:requiredFor:pendingLinks:)
 .urlTransformation(transformer:strategy:)
 .analytics(provider:strategy:)
 .logging(provider:logLevel:format:)
@@ -357,7 +358,7 @@ All middleware can be created using static factory methods on `DeepLinkMiddlewar
 | `AnalyticsStrategy` | `.standard`, `.detailed`, `.minimal`, `.redacted(_:using:)`, `.unredacted(_:)` |
 | `URLTransformationStrategy` | `.standard`, `.conditional`, `.safe`, `.aggressive`, `.selective`, `.passthrough`, `.validation` |
 
-`SecurityStrategy.hardened` is the default strategy of `SecurityMiddleware` and `.security(...)` since 2.0. It canonicalizes the URL with `URLCanonicalizer`, compares schemes and hosts case-insensitively, and matches `blockedPatterns` case-insensitively against the raw URL and every percent-decoded form. `http(s)` links require a host on `allowedHosts`, so an empty `allowedHosts` rejects every web link; custom-scheme links must have a listed host only when `allowedHosts` is not empty. It passes the canonical URL (lower-cased scheme and host) down the chain. Pass `strategy: .standard` for the 1.x behavior.
+`SecurityStrategy.hardened` is the default strategy of `SecurityMiddleware` and `.security(...)` since 2.0. It canonicalizes the URL with `URLCanonicalizer`, compares schemes and hosts case-insensitively, and matches `blockedPatterns` case-insensitively against the raw URL and every percent-decoded form. `http(s)` links require a host on `allowedHosts`, so an empty `allowedHosts` rejects every web link; custom-scheme links must have a listed host only when `allowedHosts` is not empty. A URL with an authority but an empty host (`myapp:///account`) is rejected with `securityViolation("Missing host")`. It passes the canonical URL (lower-cased scheme, percent-decoded host without a trailing dot) down the chain; a host that decodes to a delimiter is rejected with `securityViolation("Malformed host")`. Pass `strategy: .standard` for the 1.x behavior.
 
 Built-in `LoggingFormat`s and `AnalyticsStrategy`s see a `URLRedactor`-redacted URL by default (2.0). `.redacted(_:using:)` swaps in a custom redactor; `.unredacted(_:)` logs and tracks full URLs.
 
@@ -512,14 +513,20 @@ public struct ConfirmingHandler<Route: DeepLinkRoute>: DeepLinkHandler {
                 confirm: @Sendable @escaping (Route, DeepLinkContext) async -> Bool)
 }
 
+public struct AuthenticatedHandler<Route: DeepLinkRoute>: DeepLinkHandler {
+    public init(_ handler: any DeepLinkHandler<Route>, requiredFor matcher: RouteMatcher<Route>,
+                provider: any AuthenticationProvider)
+}
+
 public extension DeepLinkHandler {
     func requiringSignature(for matcher: RouteMatcher<Route>) -> SignedRouteGuard<Route>
+    func requiringAuthentication(for matcher: RouteMatcher<Route>, provider: any AuthenticationProvider) -> AuthenticatedHandler<Route>
     func confirming(_ matcher: RouteMatcher<Route>, timeout: Duration? = nil,
                     confirm: @Sendable @escaping (Route, DeepLinkContext) async -> Bool) -> ConfirmingHandler<Route>
 }
 ```
 
-Route rules decide on the route the parsers produced, so they hold however the URL was spelled; they are the strongest protection. `SignedRouteGuard` throws `securityViolation(unsignedRouteReason)` for a protected route unless `context.isSignatureVerified`, which only `SignedLinkMiddleware` sets (it verifies every link carrying a signature, whatever its URL rule); keep that middleware in the chain: without it (or without CryptoKit, which it needs) the guard fails closed and rejects every protected route. `ConfirmingHandler` asks `confirm` with the route, so the prompt can describe the action; denial or timeout throws `confirmationDenied` with the URL the router received, signature parameters already stripped (`about:blank` outside a coordinator), and the timeout wins even if `confirm` ignores cancellation. Use URL rules (`DeepLinkMatcher`) in addition when you want to reject before parsing and other middleware run.
+Route rules decide on the route the parsers produced, so they hold however the URL was spelled; they are the strongest protection. `SignedRouteGuard` throws `securityViolation(unsignedRouteReason)` for a protected route unless `context.isSignatureVerified`, which only `SignedLinkMiddleware` sets (it verifies every link carrying a signature, whatever its URL rule); keep that middleware in the chain: without it (or without CryptoKit, which it needs) the guard fails closed and rejects every protected route. `ConfirmingHandler` asks `confirm` with the route, so the prompt can describe the action; denial or timeout throws `confirmationDenied` with the URL the router received, signature parameters already stripped (`about:blank` outside a coordinator), and the timeout wins even if `confirm` ignores cancellation. `AuthenticatedHandler` checks `provider.isAuthenticated()` when a protected route runs and throws `unauthorizedAccess` with the routed URL (`about:blank` outside a coordinator); it does not save pending links, so keep `AuthenticationMiddleware` in front when links should resume after sign-in. Use URL rules (`DeepLinkMatcher`) in addition when you want to reject before parsing and other middleware run.
 
 ### DeepLinkMatcher
 
@@ -538,7 +545,7 @@ public struct DeepLinkMatcher: Sendable {
 }
 ```
 
-Selects the links a policy middleware applies to. Hosts compare case-insensitively ignoring a trailing dot. `paths` matches a prefix on segment boundaries (`/reset` matches `/reset/abc`, not `/resetting`), case-insensitively, after percent-decoding (up to `URLCanonicalizer.maximumDecodingPasses` times), collapsing empty segments, treating `\` as a separator, dropping `;` parameters and invisible or control characters, and resolving `.`/`..`, so encoded spellings of a protected path stay protected. A path that cannot be decoded, or is still encoded after the last pass, matches every prefix (fail closed). For schemes other than `http(s)` the host is also matched as the first segment, so `.paths(["/reset"])` covers `myapp://reset` and `https://example.com/reset`; web hosts never count as path segments.
+Selects the links a policy middleware applies to. Hosts compare case-insensitively after percent-decoding, ignoring a trailing dot; a hostless custom-scheme link (`myapp:///reset`, `myapp:reset`) is matched by its first path segment, and an undecodable host matches. `paths` matches a prefix on segment boundaries (`/reset` matches `/reset/abc`, not `/resetting`), case-insensitively, after percent-decoding (up to `URLCanonicalizer.maximumDecodingPasses` times), collapsing empty segments, treating `\` as a separator, dropping `;` parameters and invisible or control characters, and resolving `.`/`..`, so encoded spellings of a protected path stay protected. A path that cannot be decoded, or is still encoded after the last pass, matches every prefix (fail closed). For schemes other than `http(s)` the host is also matched as the first segment, so `.paths(["/reset"])` covers `myapp://reset` and `https://example.com/reset`; web hosts never count as path segments.
 
 ### URLCanonicalizer
 
@@ -595,6 +602,8 @@ public extension DeepLinkCoordinator {
 ```
 
 `AuthenticationMiddleware` saves the link as it entered the chain, with its context, and `resumePendingLinks(from:)` replays it with that context through the whole chain. `UserDefaultsPendingLinkStore` persists the context as versioned JSON (`source`, `sourceApplication`, `sceneID`; plain text in `UserDefaults`, like the URL) but never the signature-verified flag, so a resumed link is verified again; links saved by 1.x or with an unknown source load as `.unknown`.
+
+`AuthenticationStrategy.standard` matches `protectedHosts` like `DeepLinkMatcher.hosts(_:)`: case-insensitively, after percent-decoding, ignoring a trailing dot, and reading the first path segment of a hostless custom-scheme link (`myapp:///account/x`, `myapp:/account`, `myapp:account/x`) as its host. `AuthenticationMiddleware(authProvider:requiredFor:pendingLinks:)` / `.authentication(provider:requiredFor:pendingLinks:)` takes any `DeepLinkMatcher` instead (for example `.paths(["/admin"])`). Route rules (`requiringAuthentication(for:provider:)`) are the strongest.
 
 Pass a store to `AuthenticationMiddleware(authProvider:protectedHosts:strategy:pendingLinks:)` (or `.authentication(..., pendingLinks:)`) and a link rejected with `unauthorizedAccess` is saved before the error propagates. After sign-in, `resumePendingLinks(from:)` runs each saved link through the **whole** chain again, so authentication, security and rate limiting are evaluated at resume time; a link that is still unauthorized is saved again. Stores keep at most `maxCount` links (oldest dropped, clamped to at least 1) and discard links older than `expiry` seconds. Only the URL and its save time are stored; the `UserDefaults` store writes them unencrypted, so prefer the in-memory store when protected links carry secrets. Call `removeAll()` on sign-out so one account's pending link never runs for another. Any app or page can trigger a protected link, so only protect routes that are safe to run after sign-in without a fresh user action, or confirm before acting.
 

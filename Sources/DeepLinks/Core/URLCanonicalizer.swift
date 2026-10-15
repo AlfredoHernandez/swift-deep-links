@@ -8,8 +8,11 @@ import Foundation
 /// structure is commonly used to smuggle payloads past validators.
 ///
 /// Canonicalization lower-cases the scheme and host (both are
-/// case-insensitive per RFC 3986) and leaves the path, query and fragment
-/// untouched. A URL is rejected with ``DeepLinkError/securityViolation(_:)``
+/// case-insensitive per RFC 3986), percent-decodes the host when it decodes
+/// to plain host characters, drops a trailing dot from the host
+/// (`myapp://Account%2E/x` becomes `myapp://account/x`), and leaves the path,
+/// query and fragment untouched. A host that decodes to a delimiter
+/// (`%2F`, `%40`, `%25`) is rejected. A URL is rejected with ``DeepLinkError/securityViolation(_:)``
 /// when it:
 ///
 /// - exceeds the configured ``DeepLinkInputLimits`` (checked first, before any decoding),
@@ -50,7 +53,7 @@ public struct URLCanonicalizer: Sendable {
 		self.limits = limits
 	}
 
-	/// Returns `url` with a lower-cased scheme and host.
+	/// Returns `url` with a lower-cased scheme and a canonical host.
 	///
 	/// - Parameter url: The URL to canonicalize.
 	/// - Returns: The canonical URL; `url` itself when it is already canonical.
@@ -75,7 +78,7 @@ public struct URLCanonicalizer: Sendable {
 			throw .securityViolation("Path traversal is not allowed")
 		}
 
-		return lowercasingSchemeAndHost(of: url)
+		return try canonicalSchemeAndHost(of: url)
 	}
 
 	/// Every form of `url` that pattern matching should consider: the raw
@@ -118,13 +121,13 @@ private extension URLCanonicalizer {
 			.contains("..")
 	}
 
-	func lowercasingSchemeAndHost(of url: URL) -> URL {
+	func canonicalSchemeAndHost(of url: URL) throws(DeepLinkError) -> URL {
 		guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
 			return url
 		}
 
 		let scheme = components.scheme?.lowercased()
-		let host = components.percentEncodedHost?.lowercased()
+		let host = try components.percentEncodedHost.map(canonicalHost)
 		guard scheme != components.scheme || host != components.percentEncodedHost else {
 			return url
 		}
@@ -133,6 +136,26 @@ private extension URLCanonicalizer {
 		components.percentEncodedHost = host
 		return components.url ?? url
 	}
+
+	/// Lower-cased, percent-decoded when it decodes to plain host characters,
+	/// and without a trailing dot, so `Account%2E` and `account.` both become `account`.
+	func canonicalHost(_ encodedHost: String) throws(DeepLinkError) -> String {
+		var host = encodedHost
+		if encodedHost.contains("%") {
+			let decoded = DecodingPasses(of: encodedHost, limit: Self.maximumDecodingPasses).forms.last ?? encodedHost
+			let isASCII = decoded.unicodeScalars.allSatisfy(\.isASCII)
+			guard !isASCII || decoded.unicodeScalars.allSatisfy(Self.plainHostCharacters.contains) else {
+				throw .securityViolation("Malformed host")
+			}
+			if isASCII {
+				host = decoded
+			}
+		}
+		host = host.lowercased()
+		return host.hasSuffix(".") ? String(host.dropLast()) : host
+	}
+
+	static let plainHostCharacters = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-._~!$&'()*+,;="))
 }
 
 // MARK: - Percent Decoding

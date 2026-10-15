@@ -44,15 +44,20 @@ public extension DeepLinkMatcher {
 	/// Matches every request.
 	static let all = DeepLinkMatcher { _ in true }
 
-	/// Matches requests whose host is listed, case-insensitively and ignoring
-	/// a trailing dot.
+	/// Matches requests whose host is listed, case-insensitively, after
+	/// percent-decoding and ignoring a trailing dot.
+	///
+	/// A custom-scheme link without a host (`myapp:///account/x`,
+	/// `myapp:/account`, `myapp:account/x`) is matched by its first path
+	/// segment, because a lenient parser may read that segment as the host.
+	/// A host that cannot be decoded matches.
 	///
 	/// - Parameter hosts: The hosts to match.
 	/// - Returns: A host matcher.
 	static func hosts(_ hosts: Set<String>) -> DeepLinkMatcher {
 		let normalizedHosts = Set(hosts.map(normalizedHost))
 		return DeepLinkMatcher { request in
-			request.url.host(percentEncoded: false).map { normalizedHosts.contains(normalizedHost($0)) } ?? false
+			matchesHost(of: request.url, in: normalizedHosts)
 		}
 	}
 
@@ -101,14 +106,46 @@ public extension DeepLinkMatcher {
 	}
 }
 
-// MARK: - Normalization
+// MARK: - Host Matching
 
-private extension DeepLinkMatcher {
+extension DeepLinkMatcher {
+	/// Whether any spelling of `url`'s host is in `normalizedHosts` (built
+	/// with ``normalizedHost(_:)``); `true` when the host cannot be decoded.
+	static func matchesHost(of url: URL, in normalizedHosts: Set<String>) -> Bool {
+		guard let candidates = hostCandidates(of: url) else { return true }
+		return candidates.contains(where: normalizedHosts.contains)
+	}
+
+	/// Lower-cased, without a trailing dot.
 	static func normalizedHost(_ host: String) -> String {
 		let lowercased = host.lowercased()
 		return lowercased.hasSuffix(".") ? String(lowercased.dropLast()) : lowercased
 	}
 
+	/// Every decoded, normalized form of the host, or of the first path
+	/// segment of a hostless custom-scheme link; `nil` when a form cannot be decoded.
+	private static func hostCandidates(of url: URL) -> [String]? {
+		if let host = url.host(percentEncoded: true), !host.isEmpty {
+			return decodedForms(of: host)?.map(normalizedHost)
+		}
+		guard !["http", "https"].contains(url.scheme?.lowercased()) else { return [] }
+		let pathForms = [url.path(percentEncoded: true)] + opaquePathForms(of: url)
+		var candidates: [String] = []
+		for encodedPath in pathForms {
+			guard let decoded = decodedForms(of: encodedPath) else { return nil }
+			candidates += decoded.compactMap(firstSegment).map(normalizedHost)
+		}
+		return candidates
+	}
+
+	private static func firstSegment(of path: String) -> String? {
+		path.split(whereSeparator: { $0 == "/" || $0 == "\\" }).first.map(String.init)
+	}
+}
+
+// MARK: - Normalization
+
+private extension DeepLinkMatcher {
 	static func normalizedPrefix(_ prefix: String) -> String {
 		var path = prefix.lowercased()
 		if !path.hasPrefix("/") {

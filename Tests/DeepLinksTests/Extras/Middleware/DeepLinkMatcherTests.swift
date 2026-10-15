@@ -22,6 +22,16 @@ struct DeepLinkMatcherTests {
 		#expect(!sut.matches(request("https://example.com/confirm")))
 	}
 
+	@Test(arguments: ["myapp://account%2e/x", "myapp://%61ccount", "myapp:///account/x", "myapp:/account", "myapp:account/x"])
+	func `hosts match decoded hosts and hostless custom-scheme paths`(link: String) {
+		#expect(DeepLinkMatcher.hosts(["account"]).matches(request(link)))
+	}
+
+	@Test(arguments: ["https:///account", "myapp://public/account", "myapp:///public/account"])
+	func `hosts do not treat a web path or a later segment as the host`(link: String) {
+		#expect(!DeepLinkMatcher.hosts(["account"]).matches(request(link)))
+	}
+
 	@Test(arguments: [
 		"https://example.com/reset",
 		"https://example.com/reset/",

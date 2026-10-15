@@ -212,6 +212,19 @@ public extension DeepLinkMiddleware where Self == AuthenticationMiddleware {
 	}
 }
 
+public extension DeepLinkMiddleware where Self == AuthenticationMiddleware {
+	/// Creates authentication middleware for the links `matcher` selects.
+	///
+	/// See ``AuthenticationMiddleware/init(authProvider:requiredFor:pendingLinks:)``.
+	static func authentication(
+		provider: AuthenticationProvider,
+		requiredFor matcher: DeepLinkMatcher,
+		pendingLinks: (any PendingLinkStore)? = nil,
+	) -> AuthenticationMiddleware {
+		AuthenticationMiddleware(authProvider: provider, requiredFor: matcher, pendingLinks: pendingLinks)
+	}
+}
+
 public extension DeepLinkMiddleware where Self == URLTransformationMiddleware {
 	/// Creates URL transformation middleware with the specified transformer.
 	///

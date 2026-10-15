@@ -204,4 +204,22 @@ struct ExistingSecurityStrategiesCompatibilityTests {
 
 		#expect(try await sut.intercept(url: url) == url)
 	}
+
+	@Test(arguments: ["myapp:///account/x", "myapp://?a=1", "MYAPP:///x"])
+	func `hardened rejects an empty authority host`(rawURL: String) async throws {
+		let url = try #require(URL(string: rawURL))
+		let sut = SecurityMiddleware(allowedSchemes: ["myapp"])
+
+		await #expect(throws: DeepLinkError.securityViolation("Missing host")) {
+			_ = try await sut.intercept(url: url)
+		}
+	}
+
+	@Test
+	func `hardened accepts a protected host spelled with a trailing dot or encoding as the canonical host`() async throws {
+		let sut = SecurityMiddleware(allowedSchemes: ["myapp"], allowedHosts: ["account"])
+
+		#expect(try await sut.intercept(url: #require(URL(string: "myapp://account./x"))) == URL(string: "myapp://account/x"))
+		#expect(try await sut.intercept(url: #require(URL(string: "myapp://account%2e/x"))) == URL(string: "myapp://account/x"))
+	}
 }

@@ -114,12 +114,14 @@ public extension SecurityStrategy {
 	///   case-insensitively, so an empty host allow-list rejects every web link;
 	/// - custom-scheme URLs must have a listed host when the allow-list is not
 	///   empty; with an empty allow-list their host is not checked;
+	/// - a URL with an authority but an empty host (`myapp:///account`) is
+	///   rejected, so the first path segment cannot stand in for a host;
 	/// - blocked patterns are matched case-insensitively against the raw URL
 	///   and every percent-decoded form, so `%6A%61vascript:` matches `javascript:`.
 	///   A pattern that cannot be recompiled case-insensitively rejects the URL.
 	///
-	/// On success the canonical URL (lower-cased scheme and host) continues
-	/// down the chain.
+	/// On success the canonical URL (lower-cased scheme, decoded host without
+	/// a trailing dot) continues down the chain.
 	///
 	/// ## Example
 	///
@@ -140,6 +142,9 @@ public extension SecurityStrategy {
 		}
 
 		let isWebLink = webSchemes.contains(scheme)
+		if hasEmptyAuthority(canonicalURL) {
+			throw DeepLinkError.securityViolation("Missing host")
+		}
 		if isWebLink || !allowedHosts.isEmpty {
 			guard let host = canonicalURL.host(), !host.isEmpty else {
 				throw DeepLinkError.securityViolation("Missing host")
@@ -263,6 +268,12 @@ public extension SecurityStrategy {
 // MARK: - Hardened Matching Helpers
 
 private let webSchemes: Set<String> = ["http", "https"]
+
+/// `myapp:///account` has an authority with an empty host; a parser reading
+/// the first path segment as the host would see `account`.
+private func hasEmptyAuthority(_ url: URL) -> Bool {
+	URLComponents(url: url, resolvingAgainstBaseURL: false)?.percentEncodedHost?.isEmpty == true
+}
 
 private extension Set<String> {
 	func containsCaseInsensitive(_ value: String) -> Bool {

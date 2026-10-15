@@ -166,4 +166,25 @@ struct URLCanonicalizerTests {
 
 		#expect(sut.matchableForms(of: url) == ["myapp://home/path"])
 	}
+
+	@Test(arguments: [
+		("myapp://account./x", "myapp://account/x"),
+		("https://Example.com./a", "https://example.com/a"),
+		("myapp://account%2e/x", "myapp://account/x"),
+		("myapp://%61CCOUNT/x", "myapp://account/x"),
+	])
+	func `canonicalize decodes the host and drops its trailing dot`(rawURL: String, expected: String) throws {
+		let url = try #require(URL(string: rawURL))
+
+		#expect(try sut.canonicalize(url).absoluteString == expected)
+	}
+
+	@Test(arguments: ["myapp://acc%2Fount/x", "myapp://acc%3Fount", "myapp://acc%40evil/x", "myapp://acc%25ount"])
+	func `canonicalize rejects a host that decodes to a delimiter`(rawURL: String) throws {
+		let url = try #require(URL(string: rawURL))
+
+		#expect(throws: DeepLinkError.securityViolation("Malformed host")) {
+			try sut.canonicalize(url)
+		}
+	}
 }

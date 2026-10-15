@@ -61,7 +61,7 @@ import Foundation
 /// ```
 ///
 /// ## Available Strategies
-/// - `.standard`: Validates authentication for protected hosts, allows URLs without hosts
+/// - `.standard`: Validates authentication for protected hosts, matched in every spelling
 /// - `.strict`: Requires authentication for all URLs regardless of host protection
 /// - `.permissive`: Never validates authentication, allows all URLs
 /// - `.schemeBased`: Validates authentication based on URL scheme rather than host
@@ -79,6 +79,15 @@ import Foundation
 /// await coordinator.resumePendingLinks(from: pendingLinks)
 /// ```
 ///
+/// ### Protecting Paths or Routes
+/// ```swift
+/// // URL rule: any DeepLinkMatcher
+/// AuthenticationMiddleware(authProvider: authProvider, requiredFor: .paths(["/admin"]))
+///
+/// // Route rule (strongest): holds for every URL spelling that parses to the route
+/// AppHandler().requiringAuthentication(for: .routes { $0.isPrivate }, provider: authProvider)
+/// ```
+///
 /// ## Error Handling
 /// When authentication fails, the middleware throws
 /// `DeepLinkError.unauthorizedAccess(url)` carrying the full URL that was
@@ -87,9 +96,7 @@ import Foundation
 /// ## Thread Safety
 /// This middleware is thread-safe and can be used concurrently.
 public final class AuthenticationMiddleware: DeepLinkMiddleware {
-	private let authProvider: AuthenticationProvider
-	private let protectedHosts: Set<String>
-	private let strategy: AuthenticationStrategy
+	private let authorize: @Sendable (DeepLinkRequest) throws -> URL?
 	private let pendingLinks: (any PendingLinkStore)?
 
 	/// Creates a new authentication middleware.
@@ -112,16 +119,39 @@ public final class AuthenticationMiddleware: DeepLinkMiddleware {
 		strategy: AuthenticationStrategy = .standard,
 		pendingLinks: (any PendingLinkStore)? = nil,
 	) {
-		self.authProvider = authProvider
-		self.protectedHosts = protectedHosts
-		self.strategy = strategy
+		authorize = { request in
+			try strategy.validate(url: request.url, protectedHosts: protectedHosts, provider: authProvider)
+		}
+		self.pendingLinks = pendingLinks
+	}
+
+	/// Creates a middleware requiring authentication for the links `matcher` selects.
+	///
+	/// Use it to protect paths, sources or any other URL rule, for example
+	/// `.paths(["/admin"])` under a public host. Like every URL rule it sees one
+	/// spelling of the link; protect sensitive routes with
+	/// ``DeepLinkHandler/requiringAuthentication(for:provider:)`` as well.
+	///
+	/// - Parameters:
+	///   - authProvider: The authentication provider to use.
+	///   - matcher: The links that require a signed-in user.
+	///   - pendingLinks: Where to save rejected links; see
+	///     ``init(authProvider:protectedHosts:strategy:pendingLinks:)``.
+	public init(
+		authProvider: AuthenticationProvider,
+		requiredFor matcher: DeepLinkMatcher,
+		pendingLinks: (any PendingLinkStore)? = nil,
+	) {
+		authorize = { request in
+			guard matcher.matches(request), !authProvider.isAuthenticated() else { return request.url }
+			throw DeepLinkError.unauthorizedAccess(request.url)
+		}
 		self.pendingLinks = pendingLinks
 	}
 
 	public func intercept(_ request: DeepLinkRequest) async throws -> DeepLinkRequest? {
 		do {
-			return try strategy.validate(url: request.url, protectedHosts: protectedHosts, provider: authProvider)
-				.map(request.replacingURL)
+			return try authorize(request).map(request.replacingURL)
 		} catch let DeepLinkError.unauthorizedAccess(rejectedURL) {
 			await pendingLinks?.save(DeepLinkRun.arrival ?? request.replacingURL(rejectedURL))
 			throw DeepLinkError.unauthorizedAccess(rejectedURL)

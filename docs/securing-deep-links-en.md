@@ -211,6 +211,7 @@ let isSensitive: @Sendable (AppRoute) -> Bool = {
 .handler(
     AppHandler()
         .requiringSignature(for: .routes(where: isSensitive))      // only verified signed links
+        .requiringAuthentication(for: .routes(where: isSensitive), provider: auth)
         .confirming(.routes { if case .payment = $0 { true } else { false } }) { route, _ in
             await alerts.confirm(route.summary)                      // describe the action, not the URL
         }

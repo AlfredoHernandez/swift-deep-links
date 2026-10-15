@@ -17,7 +17,7 @@ import Foundation
 /// - **Configurable strictness**: From permissive to strict validation
 ///
 /// ## Available Strategies
-/// - `.standard`: Validates authentication for protected hosts, allows URLs without hosts
+/// - `.standard`: Validates authentication for protected hosts, matched in every spelling
 /// - `.strict`: Requires authentication for all URLs
 /// - `.permissive`: Never validates authentication
 /// - `.schemeBased`: Scheme-based validation instead of host-based
@@ -77,10 +77,14 @@ public struct AuthenticationStrategy: Sendable {
 public extension AuthenticationStrategy {
 	/// Standard authentication strategy that checks protected hosts.
 	///
-	/// Validates authentication for URLs with hosts in the protected set.
-	/// URLs without hosts (like custom schemes) are allowed by default.
-	/// This is the most commonly used strategy for apps that have both public
-	/// and private sections.
+	/// Validates authentication for URLs with hosts in the protected set,
+	/// matched like ``DeepLinkMatcher/hosts(_:)``: case-insensitively, after
+	/// percent-decoding, ignoring a trailing dot, and reading the first path
+	/// segment of a hostless custom-scheme link (`myapp:///account`,
+	/// `myapp:account`) as its host, so a parser that ignores the host cannot
+	/// be reached through another spelling. Other URLs are allowed.
+	/// For the strongest rule, protect the parsed route with
+	/// ``DeepLinkHandler/requiringAuthentication(for:provider:)``.
 	///
 	/// ## Usage
 	/// Perfect for apps with mixed public/private content where only specific
@@ -96,16 +100,13 @@ public extension AuthenticationStrategy {
 	/// ```
 	///
 	/// ## Behavior
-	/// - `myapp://public-content` → No authentication required (no host)
+	/// - `myapp://public-content` → No authentication required
 	/// - `https://public.myapp.com/help` → No authentication required
 	/// - `https://secure.myapp.com/profile` → Authentication required
-	/// - `https://admin.myapp.com/dashboard` → Authentication required
+	/// - `https://Admin.MyApp.com./dashboard` → Authentication required
 	static let standard = AuthenticationStrategy { url, protectedHosts, provider in
-		guard let host = url.host else {
-			return url
-		}
-
-		guard protectedHosts.contains(host) else {
+		let normalizedHosts = Set(protectedHosts.map(DeepLinkMatcher.normalizedHost))
+		guard DeepLinkMatcher.matchesHost(of: url, in: normalizedHosts) else {
 			return url
 		}
 

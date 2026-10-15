@@ -247,6 +247,18 @@ checked once you list any host.
 (including the emoji zero-width joiner), `..` segments in any encoding and
 malformed encodings.
 
+**Hosts are compared in every spelling.** `.hardened` decodes the host and
+drops a trailing dot, and rejects `myapp:///path` (empty host). The default
+authentication strategy protects `myapp://Account./x`, `myapp://account%2e/x`,
+`myapp:///account/x`, `myapp:/account/x` and `myapp:account/x` when
+`"account"` is protected. Protect sensitive screens at the route level too:
+
+```swift
+.handler(AppHandler().requiringAuthentication(for: .routes { $0.isPrivate }, provider: auth))
+// or any URL rule, e.g. a path under a public host
+.authentication(provider: auth, requiredFor: .paths(["/admin"]))
+```
+
 **Input limits are on.** `.security(...)` and `SecurityMiddleware` default to
 `limits: .recommended` (8192-character URLs, 50 query parameters, 1024
 characters per decoded value).
@@ -451,7 +463,8 @@ come first and side effects (prompts, analytics) last:
       (`.signedLinks`) with an expiry and a nonce; keys live in the Keychain or
       server config, rotate through `kid`, and are at least 256 bits.
 - [ ] Sensitive routes are protected at the route level
-      (`handler.requiringSignature(for:)`, `handler.confirming(_:)`), which holds
+      (`handler.requiringSignature(for:)`, `handler.requiringAuthentication(for:provider:)`,
+      `handler.confirming(_:)`), which holds
       for every URL spelling; URL rules (`.signedLinks`, `.confirmation`) only filter early.
 - [ ] Destructive or financial routes ask the user first (`.confirmation` or `.confirming`).
 - [ ] A rate limiter runs before signature checks and prompts. The default

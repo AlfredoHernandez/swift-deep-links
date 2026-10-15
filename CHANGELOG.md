@@ -62,6 +62,19 @@ middleware order and a hardening checklist.
     `securityViolation("Unauthorized scheme")` / `("Unauthorized host")`.
     Migration: tests matching the old `"Unauthorized host: <host>"` text
     compare the fixed reason instead.
+  - Host spellings are canonical. `URLCanonicalizer` (and `.hardened`)
+    percent-decodes the host and drops a trailing dot (`myapp://Account%2E/x`
+    continues as `myapp://account/x`), rejecting a host that decodes to a
+    delimiter with `securityViolation("Malformed host")`; `.hardened` rejects
+    an empty authority host (`myapp:///account`) with
+    `securityViolation("Missing host")`. `AuthenticationStrategy.standard` and
+    `DeepLinkMatcher.hosts(_:)` match hosts case-insensitively, decoded,
+    without a trailing dot, and read the first path segment of a hostless
+    custom-scheme link (`myapp:///account/x`, `myapp:/account`,
+    `myapp:account/x`) as its host, so `protectedHosts` can no longer be
+    bypassed by a parser that ignores the host. `URLFuzzCorpus` replaces its
+    "trailing dot host" case with "empty authority host". Migration: links
+    that relied on `myapp:///path` must name a host, or use `.standard`.
   - `DeepLinkReadinessQueue()` keeps at most
     `DeepLinkReadinessQueue.defaultMaxQueueSize` (50) links, dropping the
     oldest. Pass `maxQueueSize: nil` for the old unbounded queue, and
@@ -378,6 +391,13 @@ middleware order and a hardening checklist.
   middleware before `.signedLinks(...)`; the middleware now also verifies any link
   that carries a signature, not only those its URL rule selects (an invalid
   signature is rejected either way).
+- **Route- and matcher-level authentication.** `AuthenticatedHandler` /
+  `handler.requiringAuthentication(for:provider:)` rejects protected parsed
+  routes for a signed-out user (`unauthorizedAccess` with the routed URL),
+  whatever URL spelling produced them; it is the strongest authentication
+  rule. `AuthenticationMiddleware(authProvider:requiredFor:pendingLinks:)` /
+  `.authentication(provider:requiredFor:pendingLinks:)` protects any
+  `DeepLinkMatcher` selection, such as a path under a public host.
 - **Multi-scene routing (F9).** `SceneRoutingHandler<Route>` is a handler that
   forwards each route to the handler registered for its
   `DeepLinkContext.sceneID` (`register(_:forScene:)`, `unregister(scene:)`),

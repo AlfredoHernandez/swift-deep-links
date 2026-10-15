@@ -96,7 +96,7 @@ private extension URLFuzzCorpus {
 			[
 				"userinfo credentials": "\(scheme)://user:pass@\(host)/a",
 				"trusted host as userinfo": "\(scheme)://\(host)@evil.example/a",
-				"trailing dot host": "\(scheme)://\(host)./a",
+				"empty authority host": "\(scheme):///\(host)/a",
 			]
 
 		case .internationalizedHost:
