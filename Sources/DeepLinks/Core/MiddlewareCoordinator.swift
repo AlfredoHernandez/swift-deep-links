@@ -204,15 +204,12 @@ public actor DeepLinkMiddlewareCoordinator {
 	}
 
 	func trackedProcess(_ request: DeepLinkRequest) async -> MiddlewareRun {
-		await runTracked(request, through: middleware[...])
+		await execute(request, through: middleware[...], defersAtGates: true)
 	}
 
 	func trackedProcess(_ request: DeepLinkRequest, resumingAfterReadinessOf queue: any ReadinessQueue) async -> MiddlewareRun {
-		let remaining = middleware(after: { candidate in
-			guard let readiness = candidate as? ReadinessMiddleware else { return false }
-			return readiness.isGating(queue)
-		})
-		return await runTracked(request, through: remaining)
+		let remaining = middleware(after: { ($0 as? any ChainGate)?.isGating(queue) == true })
+		return await execute(request, through: remaining, defersAtGates: true)
 	}
 }
 
@@ -227,37 +224,37 @@ private extension DeepLinkMiddlewareCoordinator {
 	}
 
 	func run(_ request: DeepLinkRequest, through chain: ArraySlice<any DeepLinkMiddleware>) async throws -> DeepLinkRequest? {
-		var current = request
-
-		for middleware in chain {
-			guard let next = try await intercept(current, with: middleware) else {
-				return nil
-			}
-
-			current = next
-		}
-
-		return current
+		try await execute(request, through: chain, defersAtGates: false).result.get()
 	}
 
-	func runTracked(_ request: DeepLinkRequest, through chain: ArraySlice<any DeepLinkMiddleware>) async -> MiddlewareRun {
+	/// Runs `request` through `chain`, recording each middleware that ran.
+	///
+	/// With `defersAtGates`, a ``ChainGate`` receives the request carrying a
+	/// ``DeepLinkDeferral`` so a queued link settles the middleware before it
+	/// later; standalone calls pass `false` so nothing outside a coordinator
+	/// pass is ever settled.
+	func execute(
+		_ request: DeepLinkRequest,
+		through chain: ArraySlice<any DeepLinkMiddleware>,
+		defersAtGates: Bool,
+	) async -> MiddlewareRun {
 		var run = MiddlewareRun(result: .success(request))
 		var current = request
 
 		for middleware in chain {
 			run.visited.append((middleware, current))
-			let isReadinessGate = middleware is ReadinessMiddleware
+			let isGate = defersAtGates && middleware is any ChainGate
 			var input = current
-			if isReadinessGate {
+			if isGate {
 				input.deferral = DeepLinkDeferral(runID: DeepLinkRun.id, arrival: DeepLinkRun.arrival, visited: run.visited)
 			}
 			do {
 				guard var next = try await intercept(input, with: middleware) else {
 					run.result = .success(nil)
-					run.wasDeferred = isReadinessGate
+					run.wasDeferred = isGate
 					return run
 				}
-				if isReadinessGate {
+				if isGate {
 					next.deferral = current.deferral
 				}
 				current = next

@@ -37,7 +37,7 @@ import OSLog
 /// ``DeepLinkMiddlewareCoordinator/process(_:startingAfter:)`` with this
 /// middleware as the anchor. Re-feeding them through
 /// ``DeepLinkCoordinator/handle(url:)`` re-runs the whole chain.
-public final class ReadinessMiddleware: DeepLinkMiddleware {
+public final class ReadinessMiddleware: DeepLinkMiddleware, ChainGate {
 	private let queue: any ReadinessQueue
 	private let log: LoggingProvider
 	private let privacy: DeepLinkLogPrivacy
