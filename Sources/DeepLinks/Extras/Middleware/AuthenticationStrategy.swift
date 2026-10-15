@@ -105,7 +105,7 @@ public extension AuthenticationStrategy {
 	/// - `https://secure.myapp.com/profile` → Authentication required
 	/// - `https://Admin.MyApp.com./dashboard` → Authentication required
 	static let standard = AuthenticationStrategy { url, protectedHosts, provider in
-		let normalizedHosts = Set(protectedHosts.map(DeepLinkMatcher.normalizedHost))
+		let normalizedHosts = Set(protectedHosts.map(URLText.normalizedHost))
 		guard DeepLinkMatcher.matchesHost(of: url, in: normalizedHosts) else {
 			return url
 		}

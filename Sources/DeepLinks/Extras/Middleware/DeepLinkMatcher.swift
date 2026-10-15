@@ -55,7 +55,7 @@ public extension DeepLinkMatcher {
 	/// - Parameter hosts: The hosts to match.
 	/// - Returns: A host matcher.
 	static func hosts(_ hosts: Set<String>) -> DeepLinkMatcher {
-		let normalizedHosts = Set(hosts.map(normalizedHost))
+		let normalizedHosts = Set(hosts.map(URLText.normalizedHost))
 		return DeepLinkMatcher { request in
 			matchesHost(of: request.url, in: normalizedHosts)
 		}
@@ -115,39 +115,42 @@ public extension DeepLinkMatcher {
 
 extension DeepLinkMatcher {
 	/// Whether any spelling of `url`'s host is in `normalizedHosts` (built
-	/// with ``normalizedHost(_:)``); `true` when the host cannot be decoded.
+	/// with ``URLText/normalizedHost(_:)``); `true` when the host cannot be decoded.
 	static func matchesHost(of url: URL, in normalizedHosts: Set<String>) -> Bool {
 		guard let candidates = hostCandidates(of: url) else { return true }
 		return candidates.contains(where: normalizedHosts.contains)
-	}
-
-	/// Lower-cased, without trailing dots.
-	static func normalizedHost(_ host: String) -> String {
-		var normalized = host.lowercased()
-		while normalized.hasSuffix(".") {
-			normalized.removeLast()
-		}
-		return normalized
 	}
 
 	/// Every decoded, normalized form of the host, or of the first path
 	/// segment of a hostless custom-scheme link; `nil` when a form cannot be decoded.
 	private static func hostCandidates(of url: URL) -> [String]? {
 		if let host = url.host(percentEncoded: true), !host.isEmpty {
-			return decodedForms(of: host)?.map(normalizedHost)
+			return URLText.strictDecodedForms(of: host)?.map(URLText.normalizedHost)
 		}
 		guard !["http", "https"].contains(url.scheme?.lowercased()) else { return [] }
 		let pathForms = [url.path(percentEncoded: true)] + opaquePathForms(of: url)
 		var candidates: [String] = []
 		for encodedPath in pathForms {
-			guard let decoded = decodedForms(of: encodedPath) else { return nil }
-			candidates += decoded.compactMap(firstSegment).map(normalizedHost)
+			guard let decoded = URLText.strictDecodedForms(of: encodedPath) else { return nil }
+			candidates += decoded.compactMap(firstSegment).map(URLText.normalizedHost)
 		}
 		return candidates
 	}
 
+	/// Collapses empty segments, treats `\\` as a separator, drops `;`
+	/// parameters and invisible or control characters, resolves `.`/`..`,
+	/// forces a leading `/` and lower-cases, so every spelling a lenient parser
+	/// might accept reduces to the same path.
+	static func normalizedPath(_ path: String) -> String {
+		let visible = String(String.UnicodeScalarView(path.unicodeScalars.filter { !URLText.isInvisible($0) }))
+		let segments = visible.split(whereSeparator: URLText.isPathSeparator)
+			.map { $0.prefix { $0 != ";" } }
+			.filter { !$0.isEmpty }
+		return ("/" + URLText.resolvingDotSegments(segments).joined(separator: "/")).lowercased()
+	}
+
 	private static func firstSegment(of path: String) -> String? {
-		path.split(whereSeparator: { $0 == "/" || $0 == "\\" }).first.map(String.init)
+		path.split(whereSeparator: URLText.isPathSeparator).first.map(String.init)
 	}
 }
 
@@ -173,7 +176,7 @@ private extension DeepLinkMatcher {
 			+ opaquePathForms(of: url)
 		var paths: [String] = []
 		for encodedPath in pathForms + customSchemeHostForms(of: url, paths: pathForms) {
-			guard let decodedForms = decodedForms(of: encodedPath) else { return nil }
+			guard let decodedForms = URLText.strictDecodedForms(of: encodedPath) else { return nil }
 			paths += decodedForms.map(normalizedPath)
 		}
 		return paths
@@ -193,50 +196,8 @@ private extension DeepLinkMatcher {
 	/// match it as `/reset/abc` so one rule covers web and custom-scheme links.
 	static func customSchemeHostForms(of url: URL, paths: [String]) -> [String] {
 		guard !["http", "https"].contains(url.scheme?.lowercased()),
-		      let host = url.host(percentEncoded: true).map(normalizedHost), !host.isEmpty
+		      let host = url.host(percentEncoded: true).map(URLText.normalizedHost), !host.isEmpty
 		else { return [] }
 		return paths.map { "/\(host)/\($0)" }
-	}
-
-	static func decodedForms(of encodedPath: String) -> [String]? {
-		var encoded = encodedPath
-		var forms = [encoded]
-		for _ in 0 ..< URLCanonicalizer.maximumDecodingPasses {
-			guard let decoded = encoded.removingPercentEncoding else { return nil }
-			guard decoded != encoded else { return forms }
-			forms.append(decoded)
-			encoded = decoded
-		}
-		return encoded.removingPercentEncoding == encoded ? forms : nil
-	}
-
-	/// Collapses empty segments, treats `\\` as a separator, drops `;`
-	/// parameters and invisible or control characters, resolves `.`/`..`,
-	/// forces a leading `/` and lower-cases, so every spelling a lenient parser
-	/// might accept reduces to the same path.
-	static func normalizedPath(_ path: String) -> String {
-		let visible = String(String.UnicodeScalarView(path.unicodeScalars.filter { !isInvisible($0) }))
-		var segments: [Substring] = []
-		for rawSegment in visible.split(whereSeparator: { $0 == "/" || $0 == "\\" }) {
-			let segment = rawSegment.prefix { $0 != ";" }
-			switch segment {
-			case "", ".":
-				continue
-
-			case "..":
-				_ = segments.popLast()
-
-			default:
-				segments.append(segment)
-			}
-		}
-		return ("/" + segments.joined(separator: "/")).lowercased()
-	}
-
-	static func isInvisible(_ scalar: Unicode.Scalar) -> Bool {
-		switch scalar.properties.generalCategory {
-		case .control, .format, .lineSeparator, .paragraphSeparator: true
-		default: false
-		}
 	}
 }

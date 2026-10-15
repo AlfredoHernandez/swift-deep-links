@@ -88,7 +88,7 @@ public final class URLNormalizationTransformer: URLTransformer {
 			throw DeepLinkError.invalidURL(url)
 		}
 
-		components.path = resolvingDotSegments(in: components.path)
+		components.path = Self.resolvingDotSegments(in: components.path)
 			.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
 		if !components.path.isEmpty, !components.path.hasPrefix("/") {
 			components.path = "/" + components.path
@@ -103,21 +103,9 @@ public final class URLNormalizationTransformer: URLTransformer {
 		return normalizedURL
 	}
 
-	private func resolvingDotSegments(in path: String) -> String {
+	static func resolvingDotSegments(in path: String) -> String {
 		let isAbsolute = path.hasPrefix("/")
-		var resolved: [Substring] = []
-		for segment in path.split(separator: "/", omittingEmptySubsequences: false).dropFirst(isAbsolute ? 1 : 0) {
-			switch segment {
-			case ".":
-				continue
-
-			case "..":
-				_ = resolved.popLast()
-
-			default:
-				resolved.append(segment)
-			}
-		}
-		return (isAbsolute ? "/" : "") + resolved.joined(separator: "/")
+		let segments = path.split(separator: "/", omittingEmptySubsequences: false).dropFirst(isAbsolute ? 1 : 0)
+		return (isAbsolute ? "/" : "") + URLText.resolvingDotSegments(segments).joined(separator: "/")
 	}
 }

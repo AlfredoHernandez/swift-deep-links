@@ -165,7 +165,7 @@ private extension ReplayProtectionMiddleware {
 		}
 
 		let kept = items.filter { item in
-			!ignoredQueryKeys.contains(item.name.removingPercentEncoding ?? item.name)
+			!ignoredQueryKeys.contains(URLText.decodedOnce(item.name))
 		}
 		components.percentEncodedQueryItems = kept.isEmpty ? nil : kept
 		return components.url ?? url

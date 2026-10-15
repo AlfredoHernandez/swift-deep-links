@@ -203,8 +203,8 @@ private extension URLRedactor {
 		guard let equals = pair.firstIndex(of: "=") else { return String(pair) }
 		let encodedName = pair[..<equals]
 		let encodedValue = pair[pair.index(after: equals)...]
-		let name = encodedName.removingPercentEncoding ?? String(encodedName)
-		let value = encodedValue.removingPercentEncoding ?? String(encodedValue)
+		let name = URLText.decodedOnce(encodedName)
+		let value = URLText.decodedOnce(encodedValue)
 
 		if isSensitive(parameterName: name) || JSONWebTokenShape.matches(value) {
 			return "\(encodedName)=\(encodedPlaceholder())"

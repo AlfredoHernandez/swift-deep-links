@@ -99,7 +99,7 @@ extension URLRedactor {
 
 	private static func segmentName(of encodedSegment: String) -> String {
 		let name = encodedSegment.prefix { $0 != ";" }
-		return name.removingPercentEncoding ?? String(name)
+		return URLText.decodedOnce(name)
 	}
 }
 

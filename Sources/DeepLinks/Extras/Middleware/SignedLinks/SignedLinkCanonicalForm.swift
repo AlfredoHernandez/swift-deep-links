@@ -49,7 +49,7 @@ enum SignedLinkCanonicalForm {
 	}
 
 	static func decodedName(of item: URLQueryItem) -> String {
-		item.name.removingPercentEncoding ?? item.name
+		URLText.decodedOnce(item.name)
 	}
 
 	private static func rendered(_ item: URLQueryItem) -> String {

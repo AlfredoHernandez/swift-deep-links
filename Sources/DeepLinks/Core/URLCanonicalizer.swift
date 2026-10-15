@@ -40,7 +40,7 @@ import Foundation
 public struct URLCanonicalizer: Sendable {
 	/// The number of percent-decoding passes inspected before a URL is
 	/// considered maliciously nested.
-	public static let maximumDecodingPasses = 4
+	public static let maximumDecodingPasses = URLText.maximumDecodingPasses
 
 	/// The size limits enforced before any other check.
 	public let limits: DeepLinkInputLimits
@@ -88,7 +88,7 @@ public struct URLCanonicalizer: Sendable {
 	/// - Parameter url: The URL whose forms to produce.
 	/// - Returns: At least one string; the first is always `url.absoluteString`.
 	public func matchableForms(of url: URL) -> [String] {
-		DecodingPasses(of: url.absoluteString, limit: Self.maximumDecodingPasses).forms
+		URLText.DecodingPasses(of: url.absoluteString).forms
 	}
 }
 
@@ -96,7 +96,7 @@ public struct URLCanonicalizer: Sendable {
 
 private extension URLCanonicalizer {
 	func strictlyDecodedForms(of encoded: String) throws(DeepLinkError) -> [String] {
-		let passes = DecodingPasses(of: encoded, limit: Self.maximumDecodingPasses)
+		let passes = URLText.DecodingPasses(of: encoded)
 		guard passes.isValidUTF8, !passes.decodesFurther else {
 			throw .securityViolation("Malformed percent-encoding")
 		}
@@ -104,20 +104,15 @@ private extension URLCanonicalizer {
 	}
 
 	func containsControlCharacter(_ text: String) -> Bool {
-		text.unicodeScalars.contains { $0.properties.generalCategory == .control }
+		text.unicodeScalars.contains(where: URLText.isControl)
 	}
 
 	func containsInvisibleFormatting(_ text: String) -> Bool {
-		text.unicodeScalars.contains { scalar in
-			switch scalar.properties.generalCategory {
-			case .format, .lineSeparator, .paragraphSeparator: true
-			default: false
-			}
-		}
+		text.unicodeScalars.contains(where: URLText.isInvisibleFormatting)
 	}
 
 	func containsDotDotSegment(_ path: String) -> Bool {
-		path.split(omittingEmptySubsequences: false) { $0 == "/" || $0 == "\\" }
+		path.split(omittingEmptySubsequences: false, whereSeparator: URLText.isPathSeparator)
 			.contains("..")
 	}
 
@@ -142,7 +137,7 @@ private extension URLCanonicalizer {
 	func canonicalHost(_ encodedHost: String) throws(DeepLinkError) -> String {
 		var host = encodedHost
 		if encodedHost.contains("%") {
-			let decoded = DecodingPasses(of: encodedHost, limit: Self.maximumDecodingPasses).forms.last ?? encodedHost
+			let decoded = URLText.DecodingPasses(of: encodedHost).forms.last ?? encodedHost
 			guard decoded.unicodeScalars.allSatisfy({ !$0.isASCII || Self.plainHostCharacters.contains($0) }) else {
 				throw .securityViolation("Malformed host")
 			}
@@ -150,71 +145,8 @@ private extension URLCanonicalizer {
 				host = decoded
 			}
 		}
-		return DeepLinkMatcher.normalizedHost(host)
+		return URLText.normalizedHost(host)
 	}
 
 	static let plainHostCharacters = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-._~!$&'()*+,;="))
-}
-
-// MARK: - Percent Decoding
-
-/// Successive percent-decoding passes. Each pass decodes every valid `%HH`
-/// escape and keeps invalid ones literally, so an invalid escape such as a
-/// decoded literal `%zz` cannot stop decoding and hide what follows it.
-private struct DecodingPasses {
-	private(set) var forms: [String]
-	private(set) var isValidUTF8 = true
-	private(set) var decodesFurther = false
-
-	init(of encoded: String, limit: Int) {
-		forms = [encoded]
-		while let next = Self.decode(forms[forms.count - 1]), next.text != forms[forms.count - 1] {
-			guard forms.count <= limit else {
-				decodesFurther = true
-				return
-			}
-			isValidUTF8 = isValidUTF8 && next.isValidUTF8
-			forms.append(next.text)
-		}
-	}
-
-	private static func decode(_ text: String) -> (text: String, isValidUTF8: Bool)? {
-		let source = Array(text.utf8)
-		var bytes: [UInt8] = []
-		bytes.reserveCapacity(source.count)
-
-		var index = 0
-		while index < source.count {
-			if source[index] == UInt8(ascii: "%"), index + 2 < source.count,
-			   let high = hexValue(of: source[index + 1]), let low = hexValue(of: source[index + 2])
-			{
-				bytes.append(high << 4 | low)
-				index += 3
-			} else {
-				bytes.append(source[index])
-				index += 1
-			}
-		}
-
-		if let valid = String(bytes: bytes, encoding: .utf8) {
-			return (valid, true)
-		}
-		return (String(decoding: bytes, as: UTF8.self), false)
-	}
-
-	private static func hexValue(of byte: UInt8) -> UInt8? {
-		switch byte {
-		case UInt8(ascii: "0") ... UInt8(ascii: "9"):
-			byte - UInt8(ascii: "0")
-
-		case UInt8(ascii: "a") ... UInt8(ascii: "f"):
-			byte - UInt8(ascii: "a") + 10
-
-		case UInt8(ascii: "A") ... UInt8(ascii: "F"):
-			byte - UInt8(ascii: "A") + 10
-
-		default:
-			nil
-		}
-	}
 }

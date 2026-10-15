@@ -10,10 +10,10 @@
 /// written as escapes: `\n`, `\r`, `\t`, or `\u{HEX}`.
 enum LogEscaping {
 	static func singleLine(_ text: String) -> String {
-		guard text.unicodeScalars.contains(where: needsEscaping) else { return text }
+		guard text.unicodeScalars.contains(where: URLText.isInvisible) else { return text }
 		var escaped = ""
 		for scalar in text.unicodeScalars {
-			guard needsEscaping(scalar) else {
+			guard URLText.isInvisible(scalar) else {
 				escaped.unicodeScalars.append(scalar)
 				continue
 			}
@@ -25,12 +25,5 @@ enum LogEscaping {
 			}
 		}
 		return escaped
-	}
-
-	private static func needsEscaping(_ scalar: Unicode.Scalar) -> Bool {
-		switch scalar.properties.generalCategory {
-		case .control, .format, .lineSeparator, .paragraphSeparator: true
-		default: false
-		}
 	}
 }

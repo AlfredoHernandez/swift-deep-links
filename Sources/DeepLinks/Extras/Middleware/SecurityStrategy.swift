@@ -119,7 +119,7 @@ struct SecurityPolicy: Sendable {
 	}
 
 	private static func normalized(_ hosts: Set<String>) -> Set<String> {
-		Set(hosts.map(DeepLinkMatcher.normalizedHost))
+		Set(hosts.map(URLText.normalizedHost))
 	}
 }
 
@@ -273,7 +273,7 @@ private func requireScheme(of url: URL, in policy: SecurityPolicy) throws(DeepLi
 /// dot, so `HOME`, `home.` and `%68ome` all match an allowed `home`.
 private func requireHost(of url: URL, in normalizedHosts: Set<String>) throws(DeepLinkError) {
 	guard let encodedHost = url.host(percentEncoded: true), !encodedHost.isEmpty,
-	      normalizedHosts.contains(DeepLinkMatcher.normalizedHost(encodedHost.removingPercentEncoding ?? encodedHost))
+	      normalizedHosts.contains(URLText.normalizedHost(URLText.decodedOnce(encodedHost)))
 	else { throw .securityViolation("Unauthorized host") }
 }
 

@@ -144,7 +144,7 @@ private extension PathPatternParser {
 		guard let decoded = segment.removingPercentEncoding else {
 			throw DeepLinkError.invalidURL(url)
 		}
-		guard decoded != ".", decoded != ".." else {
+		guard !URLText.isDotSegment(decoded) else {
 			throw DeepLinkError.securityViolation("Path traversal is not allowed")
 		}
 		return decoded
