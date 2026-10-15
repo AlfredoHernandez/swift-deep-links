@@ -437,8 +437,9 @@ hardening checklist.
   `resumePendingLinks` hand the handler the original source, source
   application and scene (a drained signed link stays verified for
   `SignedRouteGuard`). `UserDefaultsPendingLinkStore` persists the context as
-  versioned JSON without the signature-verified flag; links stored by 1.x, or
-  with a source this version does not know, load as `.unknown`.
+  versioned JSON without the signature-verified flag; links stored in an
+  older format, or with a source this version does not know, load as
+  `.unknown`.
 - **`UserDefaultsNonceStore`.** A bounded, persistent `NonceStore` (injectable
   `UserDefaults`, key and clock): spent nonces survive relaunch as versioned
   JSON and are pruned by expiry; open reservations stay in memory and are
