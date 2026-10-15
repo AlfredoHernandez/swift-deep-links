@@ -21,7 +21,7 @@ final class ProductParser: DeepLinkParser {
 			return try parseProductData(from: deepLinkURL)
 
 		default:
-			throw DeepLinkError.unsupportedHost(deepLinkURL.host)
+			throw DeepLinkError.routeNotFound(url)
 		}
 	}
 

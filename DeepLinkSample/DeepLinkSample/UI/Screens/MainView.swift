@@ -37,6 +37,7 @@ struct MainView: View {
 				VStack(spacing: 24) {
 					HeaderView()
 					DemoButtonsView()
+					SecureShowcaseView()
 					ReadinessShowcaseView()
 					DeepLinkExamplesView()
 					CustomDeepLinkTesterView()
@@ -90,6 +91,9 @@ struct MainView: View {
 }
 
 #Preview {
+	let viewModel = DeepLinkViewModel()
 	MainView()
-		.environment(NavigationRouter())
+		.environment(viewModel.navigationRouter)
+		.environment(viewModel)
+		.environment(viewModel.secureShowcase)
 }

@@ -21,7 +21,7 @@ final class InformationParser: DeepLinkParser {
 			return try parseInfoData(from: deepLinkURL)
 
 		default:
-			throw DeepLinkError.unsupportedHost(deepLinkURL.host)
+			throw DeepLinkError.routeNotFound(url)
 		}
 	}
 

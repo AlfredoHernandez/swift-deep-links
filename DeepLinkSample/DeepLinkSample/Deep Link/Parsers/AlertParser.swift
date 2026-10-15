@@ -24,7 +24,7 @@ import Foundation
 /// - `type`: The alert type - info, warning, error, or success (optional, defaults to info)
 ///
 /// ## Error Handling:
-/// - Throws `DeepLinkError.unsupportedHost` for non-alert URLs
+/// - Throws `DeepLinkError.routeNotFound` for non-alert URLs, so the next parser runs
 /// - Uses default alert type (.info) if the provided type is invalid
 final class AlertParser: DeepLinkParser {
 	typealias Route = AppRoute
@@ -41,7 +41,7 @@ final class AlertParser: DeepLinkParser {
 	///
 	/// - Parameter url: The deep link URL to parse
 	/// - Returns: An array containing the parsed alert route
-	/// - Throws: `DeepLinkError.unsupportedHost` if the URL host is not "alert"
+	/// - Throws: `DeepLinkError.routeNotFound` if the URL host is not "alert"
 	func parse(from url: URL) throws -> [AppRoute] {
 		let deepLinkURL = try DeepLinkURL(url: url)
 
@@ -50,7 +50,7 @@ final class AlertParser: DeepLinkParser {
 			return try parseAlertData(from: deepLinkURL)
 
 		default:
-			throw DeepLinkError.unsupportedHost(deepLinkURL.host)
+			throw DeepLinkError.routeNotFound(url)
 		}
 	}
 

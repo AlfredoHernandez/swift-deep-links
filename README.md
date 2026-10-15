@@ -245,13 +245,13 @@ await coordinator.handle(url: URL(string: "myapp://profile?userID=42")!)
 
 ## Sample App
 
-The [Sample App](./DeepLinkSample/) (iOS 17+) shows the recommended setup: the `secureDefaults` preset, `.onDeepLink`, redacted logging, readiness gating drained with `markReadyAndDrain`, and a Secure screen with a signed link, a confirmation prompt, resume after sign-in and a debug-only `DeepLinkDiagnostics` check. It does not cover every API (for example Handoff, Spotlight, notifications and multi-scene routing). Built with MVVM and the Observation framework.
+The [Sample App](./DeepLinkSample/) (iOS 26+) shows the recommended setup: the `secureDefaults` preset, `.onDeepLink`, redacted logging, readiness gating drained with `markReadyAndDrain`, and a Secure screen with a signed link, a confirmation prompt, resume after sign-in and a debug-only `DeepLinkDiagnostics` check. It does not cover every API (for example Handoff, Spotlight, notifications and multi-scene routing). Built with MVVM and the Observation framework.
 
 ## Requirements
 
 iOS 16+ · macOS 13+ · tvOS 16+ · watchOS 9+ · visionOS 1+ · Swift 6.2+ · Xcode 26+
 
-Snippets that use `@Observable` (such as the SwiftUI one above) and the Sample App need iOS 17 / macOS 14 or later.
+Snippets that use `@Observable` (such as the SwiftUI one above) need iOS 17 / macOS 14 or later; the Sample App targets iOS 26.
 
 The package targets Apple platforms only: it uses `os` (`Logger`, `OSAllocatedUnfairLock`, signposts) unconditionally and does not build on Linux or Windows.
 
