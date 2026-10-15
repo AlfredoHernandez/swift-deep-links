@@ -150,7 +150,7 @@ public final class SecurityMiddleware: DeepLinkMiddleware {
 
 	public func intercept(_ request: DeepLinkRequest) async throws -> DeepLinkRequest? {
 		if let allowedSources, !allowedSources.contains(request.context.source) {
-			throw DeepLinkError.securityViolation("Source not allowed")
+			throw DeepLinkError.securityViolation(SecurityViolationMessage.unauthorizedSource)
 		}
 		try limits.validate(request.url)
 		let validated = try await strategy.validate(url: request.url, policy: policy)

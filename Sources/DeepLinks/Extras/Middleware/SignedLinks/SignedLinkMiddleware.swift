@@ -122,25 +122,25 @@ public final class SignedLinkMiddleware: DeepLinkMiddleware {
 	}
 
 	/// The link has no signature.
-	public static let missingSignatureReason = "Missing link signature"
+	public static let missingSignatureReason = SecurityViolationMessage.missingSignature
 	/// The signature is malformed, repeated, made with another key or does not match the link.
-	public static let invalidSignatureReason = "Invalid link signature"
+	public static let invalidSignatureReason = SecurityViolationMessage.invalidSignature
 	/// The link has no expiry but one is required.
-	public static let missingExpiryReason = "Missing link expiry"
+	public static let missingExpiryReason = SecurityViolationMessage.missingExpiry
 	/// The expiry is not a whole number of seconds.
-	public static let invalidExpiryReason = "Invalid link expiry"
+	public static let invalidExpiryReason = SecurityViolationMessage.invalidExpiry
 	/// The link has expired.
-	public static let expiredReason = "Expired signed link"
+	public static let expiredReason = SecurityViolationMessage.expired
 	/// The link has no nonce but a nonce store is configured.
-	public static let missingNonceReason = "Missing link nonce"
+	public static let missingNonceReason = SecurityViolationMessage.missingNonce
 	/// The link's nonce was already consumed.
-	public static let reusedNonceReason = "Signed link already used"
+	public static let reusedNonceReason = SecurityViolationMessage.reusedNonce
 	/// The link expires further ahead than `maximumLifetime` allows.
-	public static let lifetimeTooLongReason = "Signed link lifetime too long"
+	public static let lifetimeTooLongReason = SecurityViolationMessage.lifetimeTooLong
 	/// An HMAC key is shorter than ``minimumKeyByteCount`` bytes.
-	public static let weakKeyReason = "Signing key too short"
+	public static let weakKeyReason = SecurityViolationMessage.weakKey
 	/// The signer could not produce a signature.
-	public static let signingFailedReason = "Could not sign link"
+	public static let signingFailedReason = SecurityViolationMessage.signingFailed
 	/// The shortest HMAC-SHA256 key accepted, in bytes (256 bits).
 	public static let minimumKeyByteCount = 32
 

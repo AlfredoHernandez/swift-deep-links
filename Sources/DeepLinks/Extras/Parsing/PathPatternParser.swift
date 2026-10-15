@@ -145,7 +145,7 @@ private extension PathPatternParser {
 			throw DeepLinkError.invalidURL(url)
 		}
 		guard !URLText.isDotSegment(decoded) else {
-			throw DeepLinkError.securityViolation("Path traversal is not allowed")
+			throw DeepLinkError.securityViolation(SecurityViolationMessage.pathTraversal)
 		}
 		return decoded
 	}

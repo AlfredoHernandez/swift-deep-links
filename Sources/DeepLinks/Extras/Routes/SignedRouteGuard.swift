@@ -27,7 +27,7 @@ import Foundation
 public struct SignedRouteGuard<Route: DeepLinkRoute>: DeepLinkHandler {
 	/// The reason of the ``DeepLinkError/securityViolation(_:)`` thrown for an unsigned protected route.
 	public static var unsignedRouteReason: String {
-		"Route requires a signed link"
+		SecurityViolationMessage.unsignedRoute
 	}
 
 	private let wrapped: any DeepLinkHandler<Route>

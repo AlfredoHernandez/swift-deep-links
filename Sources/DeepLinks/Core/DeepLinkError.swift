@@ -257,51 +257,104 @@ extension DeepLinkError: Equatable {
 	/// `handlerError`. Callers who need deeper comparison must unwrap
 	/// the payloads and compare them themselves.
 	public static func == (lhs: DeepLinkError, rhs: DeepLinkError) -> Bool {
-		switch (lhs, rhs) {
-		case let (.invalidURL(l), .invalidURL(r)):
-			l == r
+		switch lhs {
+		case let .invalidURL(l):
+			if case let .invalidURL(r) = rhs {
+				l == r
+			} else {
+				false
+			}
 
-		case let (.unsupportedScheme(l), .unsupportedScheme(r)):
-			l == r
+		case let .unsupportedScheme(l):
+			if case let .unsupportedScheme(r) = rhs {
+				l == r
+			} else {
+				false
+			}
 
-		case let (.unsupportedHost(l), .unsupportedHost(r)):
-			l == r
+		case let .unsupportedHost(l):
+			if case let .unsupportedHost(r) = rhs {
+				l == r
+			} else {
+				false
+			}
 
-		case let (.missingRequiredParameter(l), .missingRequiredParameter(r)):
-			l == r
+		case let .missingRequiredParameter(l):
+			if case let .missingRequiredParameter(r) = rhs {
+				l == r
+			} else {
+				false
+			}
 
-		case let (.invalidParameterValue(lName, lValue), .invalidParameterValue(rName, rValue)):
-			lName == rName && lValue == rValue
+		case let .invalidParameterValue(lName, lValue):
+			if case let .invalidParameterValue(rName, rValue) = rhs {
+				lName == rName && lValue == rValue
+			} else {
+				false
+			}
 
-		case let (.routeNotFound(l), .routeNotFound(r)):
-			l == r
+		case let .routeNotFound(l):
+			if case let .routeNotFound(r) = rhs {
+				l == r
+			} else {
+				false
+			}
 
-		case let (.parsingFailed(lURL, lErrors), .parsingFailed(rURL, rErrors)):
-			lURL == rURL && lErrors.count == rErrors.count
+		case let .parsingFailed(lURL, lErrors):
+			if case let .parsingFailed(rURL, rErrors) = rhs {
+				lURL == rURL && lErrors.count == rErrors.count
+			} else {
+				false
+			}
 
-		case let (.handlerError(lMessage, lUnderlying), .handlerError(rMessage, rUnderlying)):
-			lMessage == rMessage && (lUnderlying == nil) == (rUnderlying == nil)
+		case let .handlerError(lMessage, lUnderlying):
+			if case let .handlerError(rMessage, rUnderlying) = rhs {
+				lMessage == rMessage && (lUnderlying == nil) == (rUnderlying == nil)
+			} else {
+				false
+			}
 
-		case let (.missingRequiredConfiguration(l), .missingRequiredConfiguration(r)):
-			l == r
+		case let .missingRequiredConfiguration(l):
+			if case let .missingRequiredConfiguration(r) = rhs {
+				l == r
+			} else {
+				false
+			}
 
-		case let (.rateLimitExceeded(lMax, lWindow), .rateLimitExceeded(rMax, rWindow)):
-			lMax == rMax && lWindow == rWindow
+		case let .rateLimitExceeded(lMax, lWindow):
+			if case let .rateLimitExceeded(rMax, rWindow) = rhs {
+				lMax == rMax && lWindow == rWindow
+			} else {
+				false
+			}
 
-		case let (.securityViolation(l), .securityViolation(r)):
-			l == r
+		case let .securityViolation(l):
+			if case let .securityViolation(r) = rhs {
+				l == r
+			} else {
+				false
+			}
 
-		case let (.unauthorizedAccess(l), .unauthorizedAccess(r)):
-			l == r
+		case let .unauthorizedAccess(l):
+			if case let .unauthorizedAccess(r) = rhs {
+				l == r
+			} else {
+				false
+			}
 
-		case let (.blockedURL(l), .blockedURL(r)):
-			l == r
+		case let .blockedURL(l):
+			if case let .blockedURL(r) = rhs {
+				l == r
+			} else {
+				false
+			}
 
-		case let (.confirmationDenied(l), .confirmationDenied(r)):
-			l == r
-
-		default:
-			false
+		case let .confirmationDenied(l):
+			if case let .confirmationDenied(r) = rhs {
+				l == r
+			} else {
+				false
+			}
 		}
 	}
 }

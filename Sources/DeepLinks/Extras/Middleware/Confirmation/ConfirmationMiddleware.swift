@@ -49,7 +49,7 @@ public final class ConfirmationMiddleware: DeepLinkMiddleware {
 
 	/// The reason of the ``DeepLinkError/securityViolation(_:)`` thrown for a link beyond `maxPendingPrompts`.
 	public static var tooManyPendingPromptsReason: String {
-		"Too many pending confirmations"
+		SecurityViolationMessage.tooManyPendingPrompts
 	}
 
 	let maxPendingPrompts: Int

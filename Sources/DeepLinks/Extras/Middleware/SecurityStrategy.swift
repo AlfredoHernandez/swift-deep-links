@@ -176,20 +176,20 @@ public extension SecurityStrategy {
 		let canonicalURL = try canonicalizer.canonicalize(url)
 
 		guard let scheme = canonicalURL.scheme, policy.normalizedSchemes.contains(scheme) else {
-			throw DeepLinkError.securityViolation("Unauthorized scheme")
+			throw DeepLinkError.securityViolation(SecurityViolationMessage.unauthorizedScheme)
 		}
 
 		if hasEmptyAuthority(canonicalURL) {
-			throw DeepLinkError.securityViolation("Missing host")
+			throw DeepLinkError.securityViolation(SecurityViolationMessage.missingHost)
 		}
 		let listedHosts = policy.normalizedHosts(forScheme: scheme)
 		if webSchemes.contains(scheme) || listedHosts != nil || !policy.normalizedHosts.isEmpty {
 			guard let host = canonicalURL.host(), !host.isEmpty else {
-				throw DeepLinkError.securityViolation("Missing host")
+				throw DeepLinkError.securityViolation(SecurityViolationMessage.missingHost)
 			}
 
 			guard (listedHosts ?? policy.normalizedHosts).contains(host) else {
-				throw DeepLinkError.securityViolation("Unauthorized host")
+				throw DeepLinkError.securityViolation(SecurityViolationMessage.unauthorizedHost)
 			}
 		}
 
@@ -253,7 +253,7 @@ public extension SecurityStrategy {
 		}
 
 		guard url.path.hasPrefix("/") || url.path.isEmpty else {
-			throw DeepLinkError.securityViolation("Invalid URL path format")
+			throw DeepLinkError.securityViolation(SecurityViolationMessage.invalidPath)
 		}
 
 		return url
@@ -265,7 +265,7 @@ public extension SecurityStrategy {
 /// Schemes compare case-insensitively.
 private func requireScheme(of url: URL, in policy: SecurityPolicy) throws(DeepLinkError) {
 	guard let scheme = url.scheme?.lowercased(), policy.normalizedSchemes.contains(scheme) else {
-		throw .securityViolation("Unauthorized scheme")
+		throw .securityViolation(SecurityViolationMessage.unauthorizedScheme)
 	}
 }
 
@@ -274,7 +274,7 @@ private func requireScheme(of url: URL, in policy: SecurityPolicy) throws(DeepLi
 private func requireHost(of url: URL, in normalizedHosts: Set<String>) throws(DeepLinkError) {
 	guard let encodedHost = url.host(percentEncoded: true), !encodedHost.isEmpty,
 	      normalizedHosts.contains(URLText.normalizedHost(URLText.decodedOnce(encodedHost)))
-	else { throw .securityViolation("Unauthorized host") }
+	else { throw .securityViolation(SecurityViolationMessage.unauthorizedHost) }
 }
 
 /// Patterns match case-insensitively against the raw URL and every percent-decoded form.
@@ -304,7 +304,7 @@ func caseInsensitiveRegex(
 	do {
 		return try NSRegularExpression(pattern: pattern, options: options.union(.caseInsensitive))
 	} catch {
-		throw .securityViolation("Invalid blocked pattern")
+		throw .securityViolation(SecurityViolationMessage.invalidBlockedPattern)
 	}
 }
 

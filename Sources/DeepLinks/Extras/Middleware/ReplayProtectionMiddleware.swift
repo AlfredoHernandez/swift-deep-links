@@ -117,7 +117,7 @@ public final class ReplayProtectionMiddleware: DeepLinkMiddleware {
 			return nil
 
 		case .reject:
-			throw DeepLinkError.securityViolation("Replayed deep link")
+			throw DeepLinkError.securityViolation(SecurityViolationMessage.replayed)
 		}
 	}
 

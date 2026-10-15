@@ -62,20 +62,20 @@ public struct URLCanonicalizer: Sendable {
 		try limits.validate(url)
 
 		guard url.user == nil, url.password == nil else {
-			throw .securityViolation("Userinfo is not allowed")
+			throw .securityViolation(SecurityViolationMessage.userinfo)
 		}
 
 		let decodedForms = try strictlyDecodedForms(of: url.absoluteString)
 		guard !decodedForms.contains(where: containsControlCharacter) else {
-			throw .securityViolation("Control characters are not allowed")
+			throw .securityViolation(SecurityViolationMessage.controlCharacters)
 		}
 		guard !decodedForms.contains(where: containsInvisibleFormatting) else {
-			throw .securityViolation("Invisible formatting characters are not allowed")
+			throw .securityViolation(SecurityViolationMessage.invisibleCharacters)
 		}
 
 		let decodedPaths = try strictlyDecodedForms(of: url.path(percentEncoded: true))
 		guard !decodedPaths.contains(where: containsDotDotSegment) else {
-			throw .securityViolation("Path traversal is not allowed")
+			throw .securityViolation(SecurityViolationMessage.pathTraversal)
 		}
 
 		return try canonicalSchemeAndHost(of: url)
@@ -98,7 +98,7 @@ private extension URLCanonicalizer {
 	func strictlyDecodedForms(of encoded: String) throws(DeepLinkError) -> [String] {
 		let passes = URLText.DecodingPasses(of: encoded)
 		guard passes.isValidUTF8, !passes.decodesFurther else {
-			throw .securityViolation("Malformed percent-encoding")
+			throw .securityViolation(SecurityViolationMessage.malformedEncoding)
 		}
 		return passes.forms
 	}
@@ -139,7 +139,7 @@ private extension URLCanonicalizer {
 		if encodedHost.contains("%") {
 			let decoded = URLText.DecodingPasses(of: encodedHost).forms.last ?? encodedHost
 			guard decoded.unicodeScalars.allSatisfy({ !$0.isASCII || Self.plainHostCharacters.contains($0) }) else {
-				throw .securityViolation("Malformed host")
+				throw .securityViolation(SecurityViolationMessage.malformedHost)
 			}
 			if decoded.unicodeScalars.allSatisfy(\.isASCII) {
 				host = decoded

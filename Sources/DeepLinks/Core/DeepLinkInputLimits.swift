@@ -78,24 +78,24 @@ public struct DeepLinkInputLimits: Sendable, Equatable {
 	/// - Throws: ``DeepLinkError/securityViolation(_:)`` describing the first limit exceeded.
 	public func validate(_ url: URL) throws(DeepLinkError) {
 		if let maxURLLength, url.absoluteString.count > maxURLLength {
-			throw .securityViolation("URL exceeds maximum length")
+			throw .securityViolation(SecurityViolationMessage.urlTooLong)
 		}
 
 		guard maxQueryParameterCount != nil || maxParameterValueLength != nil || rejectDuplicateParameters else { return }
 		let queryItems = Self.queryItems(of: url)
 
 		if let maxQueryParameterCount, queryItems.count > maxQueryParameterCount {
-			throw .securityViolation("Too many query parameters")
+			throw .securityViolation(SecurityViolationMessage.tooManyQueryParameters)
 		}
 
 		if let maxParameterValueLength,
 		   queryItems.contains(where: { ($0.value?.count ?? 0) > maxParameterValueLength })
 		{
-			throw .securityViolation("Query parameter value exceeds maximum length")
+			throw .securityViolation(SecurityViolationMessage.parameterValueTooLong)
 		}
 
 		if rejectDuplicateParameters, DeepLinkURL.containsDuplicateKey(queryItems) {
-			throw .securityViolation("Duplicate query parameter")
+			throw .securityViolation(SecurityViolationMessage.duplicateParameter)
 		}
 	}
 
