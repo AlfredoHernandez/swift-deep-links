@@ -22,6 +22,15 @@ public extension View {
 	/// SwiftUI does not expose the source application or scene identifier here;
 	/// use `onDeepLink(_:sceneID:)` in multi-window apps.
 	///
+	/// ## Double Delivery
+	///
+	/// SwiftUI can hand one Universal Link tap to both handlers. A web link
+	/// arriving through one handler and then the other within a second is
+	/// routed once; the `onOpenURL` copy waits one main-actor turn so the
+	/// browsing-web activity (tagged ``DeepLinkContext/Source/universalLink``)
+	/// normally wins. Repeats through the same handler are not suppressed;
+	/// add ``ReplayProtectionMiddleware`` for double taps.
+	///
 	/// ## Ordering
 	///
 	/// Route-execution order is **best-effort**. Each URL the view receives is dispatched
@@ -152,13 +161,22 @@ enum DeepLinkSceneIdentifier {
 private struct OnDeepLinkModifier<Route: DeepLinkRoute>: ViewModifier {
 	let coordinator: DeepLinkCoordinator<Route>
 	let sceneID: String?
+	@State private var deduplicator = LinkDeliveryDeduplicator()
 
 	func body(content: Content) -> some View {
 		content
 			.onOpenURL { url in
-				Task { await coordinator.handle(url: url, context: DeepLinkSceneIdentifier.openedURLContext(for: url, sceneID: sceneID)) }
+				Task { @MainActor in
+					// Let a browsing-web activity for the same tap claim the link first, as a verified Universal Link.
+					await Task.yield()
+					guard deduplicator.shouldDeliver(url, via: .openURL) else { return }
+					await coordinator.handle(url: url, context: DeepLinkSceneIdentifier.openedURLContext(for: url, sceneID: sceneID))
+				}
 			}
 			.onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
+				if let url = activity.webpageURL, !deduplicator.shouldDeliver(url, via: .userActivity) {
+					return
+				}
 				Task { await coordinator.handle(activity: activity, sceneID: sceneID) }
 			}
 	}

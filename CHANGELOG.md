@@ -650,6 +650,11 @@ middleware order and a hardening checklist.
   now found by a single-pass scanner, and free-form text over 2048 characters
   is cut (a URL split by the cut is replaced whole) and marked
   `… [truncated]`.
+- **SwiftUI double delivery.** `onDeepLink(_:)` routes a web link once when
+  SwiftUI hands the same tap to both `onOpenURL` and
+  `onContinueUserActivity` within a second, preferring the browsing-web
+  activity (`.universalLink`) by letting the `onOpenURL` copy wait one
+  main-actor turn, so a single-use signed link is not reported as reused.
 - **Log injection.** Decoded control, invisible-format and line/paragraph
   separator characters are escaped (`\n`, `\u{1B}`) in the host, path and
   query parameters the logging formats print, in `redactedDescription`, and in

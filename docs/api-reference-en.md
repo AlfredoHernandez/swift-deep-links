@@ -780,6 +780,8 @@ ContentView()
     .onDeepLink(coordinator)
 ```
 
+SwiftUI can deliver one Universal Link tap to both `onOpenURL` and `onContinueUserActivity`. A web link arriving through one handler and then the other within a second is routed once; the `onOpenURL` copy waits one main-actor turn so the browsing-web activity (`.universalLink`) normally wins. Repeats through the same handler are left to `ReplayProtectionMiddleware`.
+
 SwiftUI exposes no scene identifier, so the `sceneID:` overloads take one from the app (a UUID in `@SceneStorage` works) and put it in `DeepLinkContext.sceneID` for both `onOpenURL` and Universal Link activities. An empty string counts as no scene.
 
 ## Multiple Scenes
