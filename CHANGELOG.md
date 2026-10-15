@@ -402,6 +402,16 @@ middleware order and a hardening checklist.
   middleware before `.signedLinks(...)`; the middleware now also verifies any link
   that carries a signature, not only those its URL rule selects (an invalid
   signature is rejected either way).
+- **Signed-link keys.** `SignedLinkMiddleware(verifier:)` /
+  `.signedLinks(verifier:)` accept any `SignedLinkVerifier`; the new
+  `Ed25519PublicKeyring` verifies Ed25519 (RFC 8032) signatures, so the app
+  embeds only public keys, and `SignedLinkBuilder(signer:)` with
+  `Ed25519LinkSigner` mints them. HMAC keys shorter than 32 bytes
+  (`SignedLinkMiddleware.minimumKeyByteCount`) are refused when signing and
+  verifying (`securityViolation(weakKeyReason)`). `maximumLifetime:` rejects
+  links whose expiry is too far ahead (`lifetimeTooLongReason`). The
+  `keys:` initializer is now a `convenience` init. Documented that HMAC keys
+  on a device are extractable and nonce stores are per install.
 - **Hosts per scheme.** `SecurityMiddleware(allowedHostsByScheme:)` /
   `.security(allowedHostsByScheme:)` (checked by `.hardened`) lists allowed
   hosts per scheme, so a Universal Link domain is not accepted as a

@@ -124,11 +124,19 @@ let link = try SignedLinkBuilder(key: currentKey, keyID: "2026-10").sign(
 > `.anyOf(.paths(...), .hosts(...), .custom { … })`, and test the unsigned forms
 > are rejected.
 
-- Keys: at least 256 random bits, stored in the Keychain or delivered by your
-  configuration service, never in the binary in plain sight. Rotate by adding
+- Keys: an HMAC key on the device can be extracted and then forges links
+  for every install. Prefer Ed25519: ship only public keys
+  (`.signedLinks(verifier: Ed25519PublicKeyring(keys: ["2026-10": publicKey]))`)
+  and sign on the server (`SignedLinkBuilder(signer: Ed25519LinkSigner(privateKey:))`).
+  HMAC keys must be at least 256 random bits (shorter keys are refused),
+  stored in the Keychain or delivered by your configuration service, never
+  in the binary in plain sight. Rotate by adding
   the new key id, signing with it, and removing the old key once its links
   have expired.
-- Expiry: keep lifetimes short (minutes for resets, days for invitations).
+- Expiry: keep lifetimes short (minutes for resets, days for invitations),
+  and pass `maximumLifetime:` so a link minted with a far-future `exp` is
+  rejected. Nonce stores are per install: a link is single-use on each
+  device, not globally, until it expires.
 - Nonces are two-phase: `SignedLinkMiddleware` reserves the nonce once the
   signature verifies, and the coordinator spends it once a handler runs (even
   one that throws: it, or an earlier route, may already have acted; keep

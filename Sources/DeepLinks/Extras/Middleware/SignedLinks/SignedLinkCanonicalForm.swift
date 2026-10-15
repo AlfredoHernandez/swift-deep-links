@@ -44,13 +44,8 @@ enum SignedLinkCanonicalForm {
 		].joined(separator: "\n")
 	}
 
-	static func signature(of url: URL, parameters: SignedLinkParameters, using key: SymmetricKey) -> String {
-		let code = HMAC<SHA256>.authenticationCode(for: Data(string(of: url, parameters: parameters).utf8), using: key)
-		return Base64URL.encoded(Data(code))
-	}
-
-	static func isValidSignature(_ signature: Data, of url: URL, parameters: SignedLinkParameters, using key: SymmetricKey) -> Bool {
-		HMAC<SHA256>.isValidAuthenticationCode(signature, authenticating: Data(string(of: url, parameters: parameters).utf8), using: key)
+	static func message(of url: URL, parameters: SignedLinkParameters) -> Data {
+		Data(string(of: url, parameters: parameters).utf8)
 	}
 
 	static func decodedName(of item: URLQueryItem) -> String {

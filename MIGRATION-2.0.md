@@ -466,8 +466,10 @@ come first and side effects (prompts, analytics) last:
       `.security(allowedSources: [.universalLink])` or a `DeepLinkMatcher.sources` rule.
       Custom schemes can be opened by any app.
 - [ ] Password resets, invitations and payment links are signed
-      (`.signedLinks`) with an expiry and a nonce; keys live in the Keychain or
-      server config, rotate through `kid`, and are at least 256 bits.
+      (`.signedLinks`) with an expiry, a `maximumLifetime` and a nonce; prefer
+      Ed25519 (`Ed25519PublicKeyring`, public keys only in the app); HMAC keys
+      live in the Keychain or server config, rotate through `kid`, and are at
+      least 256 bits (shorter keys are refused).
 - [ ] Sensitive routes are protected at the route level
       (`handler.requiringSignature(for:)`, `handler.requiringAuthentication(for:provider:)`,
       `handler.confirming(_:)`), which holds

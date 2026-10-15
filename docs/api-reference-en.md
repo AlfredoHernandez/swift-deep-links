@@ -407,14 +407,32 @@ Available where `CryptoKit` can be imported.
 
 ```swift
 public final class SignedLinkMiddleware: DeepLinkMiddleware {
-    public init(keys: any SigningKeyProvider, requiredFor matcher: DeepLinkMatcher = .all,
+    public convenience init(keys: any SigningKeyProvider, requiredFor matcher: DeepLinkMatcher = .all,
                 parameters: SignedLinkParameters = .default, requiresExpiry: Bool = true,
-                leeway: TimeInterval = 0, nonceStore: (any NonceStore)? = nil,
+                leeway: TimeInterval = 0, maximumLifetime: TimeInterval? = nil,
+                nonceStore: (any NonceStore)? = nil,
                 reusedNonce: ReusedNonceResponse = .reject,   // or .drop: stop silently
                 stripsSignatureParameters: Bool = true,
                 dateProvider: @Sendable @escaping () -> Date = Date.init)
+    public init(verifier: any SignedLinkVerifier, /* same parameters as above */)
     public static let missingSignatureReason, invalidSignatureReason, missingExpiryReason,
-                      invalidExpiryReason, expiredReason, missingNonceReason, reusedNonceReason: String
+                      invalidExpiryReason, expiredReason, missingNonceReason, reusedNonceReason,
+                      lifetimeTooLongReason, weakKeyReason, signingFailedReason: String
+    public static let minimumKeyByteCount: Int  // 32
+}
+
+public protocol SignedLinkVerifier: Sendable {
+    func isValidSignature(_ signature: Data, of message: Data, keyID: String?) async throws -> Bool
+}
+public protocol SignedLinkSigner: Sendable {
+    func signature(of message: Data) throws -> Data
+}
+public struct Ed25519PublicKeyring: SignedLinkVerifier {
+    public init(keys: [String: Curve25519.Signing.PublicKey], defaultKeyID: String? = nil)
+    public init(key: Curve25519.Signing.PublicKey)
+}
+public struct Ed25519LinkSigner: SignedLinkSigner {
+    public init(privateKey: Curve25519.Signing.PrivateKey)
 }
 
 public protocol SigningKeyProvider: Sendable {
@@ -447,7 +465,8 @@ public actor UserDefaultsNonceStore: NonceStore {
 }
 
 public struct SignedLinkBuilder: Sendable {
-    public init(key: SymmetricKey, keyID: String? = nil, parameters: SignedLinkParameters = .default)
+    public init(key: SymmetricKey, keyID: String? = nil, parameters: SignedLinkParameters = .default)  // HMAC-SHA256
+    public init(signer: any SignedLinkSigner, keyID: String? = nil, parameters: SignedLinkParameters = .default)
     public func sign(_ url: URL, expiresAt: Date? = nil, nonce: String? = nil) throws(DeepLinkError) -> URL
 }
 
@@ -468,7 +487,9 @@ DLSIG1
 <percent-encoded fragment, or empty>
 ```
 
-Path, query items and fragment first decode escapes of RFC 3986 unreserved characters (`A-Z a-z 0-9 - . _ ~`) and upper-case the remaining escapes. The signature is `base64url(HMAC-SHA256(key, canonical))` without padding, appended as the last `sig` parameter. `kid`, `exp` and `nonce` are ordinary query items and therefore signed. Userinfo (`user:pass@`) is not part of the canonical form: keep `.security(...)` with `.hardened` (which rejects userinfo) in front. Links from notifications, Spotlight and quick actions are checked like any other, so payloads pointing at a signed path must carry the signed URL.
+Path, query items and fragment first decode escapes of RFC 3986 unreserved characters (`A-Z a-z 0-9 - . _ ~`) and upper-case the remaining escapes. The signature is `base64url(HMAC-SHA256(key, canonical))`, or `base64url(Ed25519-sign(privateKey, canonical))` (RFC 8032) with `Ed25519PublicKeyring`, without padding, appended as the last `sig` parameter.
+
+**Keys.** An HMAC key both verifies and mints links, and anything in an app binary or on a device can be extracted, so a leaked key forges links for every install. Prefer Ed25519: the app embeds only public keys (`Ed25519PublicKeyring`) and the server keeps the private key (`Ed25519LinkSigner`). HMAC keys shorter than `minimumKeyByteCount` (32) bytes throw `securityViolation(weakKeyReason)` from both `SignedLinkBuilder.sign` and verification. Nonce stores are per install, so a link stays usable once on each device until it expires: keep lifetimes short and set `maximumLifetime` to reject links whose `exp` is further ahead (`lifetimeTooLongReason`; it requires an expiry). `kid`, `exp` and `nonce` are ordinary query items and therefore signed. Userinfo (`user:pass@`) is not part of the canonical form: keep `.security(...)` with `.hardened` (which rejects userinfo) in front. Links from notifications, Spotlight and quick actions are checked like any other, so payloads pointing at a signed path must carry the signed URL.
 
 Checks run in order: one `sig` and at most one `kid`/`exp`/`nonce`; constant-time HMAC verification with the key returned for `kid` (an unknown key id fails like a bad signature); `exp` (whole seconds since 1970, valid while `now < exp + leeway`; `leeway` only extends validity after expiry and counts as `0` when negative, infinite or NaN), required when `requiresExpiry` is `true` or a nonce store is set; finally the nonce is consumed (only after the signature is verified, so forged links cannot burn nonces). Failures throw `DeepLinkError.securityViolation` with one of the fixed reasons. Links the matcher does not select pass unchanged. `InMemoryNonceStore` keeps nonces until their link expires and rejects new nonces when `maxEntries` live ones are stored, rather than evicting one that could then be replayed; it does not survive relaunch. `UserDefaultsNonceStore` persists spent nonces (versioned JSON, pruned by expiry on load and when full) so links stay single-use across launches; open reservations live in memory and are dropped on relaunch, so a link interrupted by termination can be retried (a link whose handler finished just before the app was killed, before the commit was written, could run once more within its expiry). It writes only when the spent set changes. Unreadable stored data is logged and starts an empty store; data from a newer format version is kept and the store fails closed (refuses every nonce) until it is cleared; a nonce whose spending cannot be written is refused. Checks are atomic within one process only: an app extension sharing the suite through an app group keeps its own copy, so use distinct keys per process or a server-side store. Inside `DeepLinkCoordinator` the nonce is reserved when the link passes and settled through `didFinish(_:outcome:)`: committed once a handler ran (even one that threw, outcome `.handlerFailed`), kept while a readiness queue holds the link (settled when it drains, released if the queue evicts or resets it), released when a later middleware or the router stopped or failed it before any handler ran, so the link can be retried or resumed after sign-in. Called directly, the middleware consumes at once. Place `.replayProtection(...)` before `.signedLinks(...)` so a duplicate delivery is dropped quietly, or pass `reusedNonce: .drop`.
 

@@ -8,12 +8,13 @@ import CryptoKit
 import Foundation
 import os
 
-/// Middleware that requires an HMAC-SHA256 signature, and optionally an
+/// Middleware that requires a signature (HMAC-SHA256 or Ed25519), and optionally an
 /// expiry and a single-use nonce, on sensitive deep links such as password
 /// resets, invitations and payment confirmations.
 ///
 /// A link the ``DeepLinkMatcher`` selects must carry a signature made with a
-/// key the ``SigningKeyProvider`` knows. Any other link that carries the
+/// key the ``SigningKeyProvider`` (HMAC) or ``SignedLinkVerifier`` (for example
+/// ``Ed25519PublicKeyring``) knows. Any other link that carries the
 /// signature parameter is verified too (and rejected if the signature is
 /// invalid), so route-level rules (``SignedRouteGuard``) can rely on it; links
 /// without one pass through. Every link leaves with
@@ -40,13 +41,26 @@ import os
 /// Spotlight item or quick action whose URL matches the rule must carry a
 /// signed URL in its payload, or it is rejected like any unsigned link.
 ///
+/// ## Keys
+///
+/// An HMAC key verifies **and** mints links, and anything shipped in an app
+/// can be extracted from a device, so a leaked HMAC key lets an attacker
+/// forge links for every install. Prefer ``Ed25519PublicKeyring``: the app
+/// holds only public keys and your server keeps the private ones
+/// (``Ed25519LinkSigner``). HMAC keys must be at least
+/// ``minimumKeyByteCount`` bytes; a shorter one throws ``weakKeyReason``.
+/// Nonce stores are per install: a nonce spent on one device is unknown to
+/// another, so a signed link stays usable once on **every** device until it
+/// expires. Keep lifetimes short, and cap them with `maximumLifetime`.
+///
 /// ## Checks, in order
 ///
 /// 1. Exactly one signature, and at most one key id, expiry and nonce.
 /// 2. The signature verifies (compared in constant time) with the key the
 ///    provider returns for the link's key id.
 /// 3. The expiry (whole seconds since 1970) has not passed, extended by
-///    `leeway` seconds after it; required when `requiresExpiry` is `true` or a nonce store is set.
+///    `leeway` seconds after it, and is at most `maximumLifetime` seconds
+///    ahead; required when `requiresExpiry` is `true`, a nonce store or a maximum lifetime is set.
 /// 4. With a ``NonceStore``, the nonce is present and consumed for the first time.
 ///
 /// Every failure throws ``DeepLinkError/securityViolation(_:)`` with one of
@@ -119,49 +133,95 @@ public final class SignedLinkMiddleware: DeepLinkMiddleware {
 	public static let missingNonceReason = "Missing link nonce"
 	/// The link's nonce was already consumed.
 	public static let reusedNonceReason = "Signed link already used"
+	/// The link expires further ahead than `maximumLifetime` allows.
+	public static let lifetimeTooLongReason = "Signed link lifetime too long"
+	/// An HMAC key is shorter than ``minimumKeyByteCount`` bytes.
+	public static let weakKeyReason = "Signing key too short"
+	/// The signer could not produce a signature.
+	public static let signingFailedReason = "Could not sign link"
+	/// The shortest HMAC-SHA256 key accepted, in bytes (256 bits).
+	public static let minimumKeyByteCount = 32
 
-	private let keys: any SigningKeyProvider
+	private let verifier: any SignedLinkVerifier
 	private let matcher: DeepLinkMatcher
 	private let parameters: SignedLinkParameters
 	private let requiresExpiry: Bool
 	private let leeway: TimeInterval
+	private let maximumLifetime: TimeInterval?
 	private let nonceStore: (any NonceStore)?
 	private let reusedNonce: ReusedNonceResponse
 	private let stripsSignatureParameters: Bool
 	private let dateProvider: @Sendable () -> Date
 	private let settlements = OSAllocatedUnfairLock(initialState: NonceSettlements())
 
-	/// Creates a signed-link middleware.
+	/// Creates a middleware verifying HMAC-SHA256 signatures.
 	///
 	/// - Parameters:
-	///   - keys: The verification keys.
+	///   - keys: The verification keys, each at least ``minimumKeyByteCount`` bytes.
 	///   - matcher: The links that must be signed. Defaults to ``DeepLinkMatcher/all``.
 	///   - parameters: The query parameter names. Defaults to ``SignedLinkParameters/default``.
 	///   - requiresExpiry: Whether a signed link must carry an expiry. Defaults to `true`.
 	///   - leeway: Extra seconds a link stays valid **after** its expiry, to absorb
 	///     clock skew; it never makes a link valid earlier. Defaults to `0`;
 	///     negative, infinite and NaN values count as `0`.
+	///   - maximumLifetime: The furthest ahead, in seconds, a link's expiry may be;
+	///     a later expiry is rejected with ``lifetimeTooLongReason``, so a leaked
+	///     key or a long-lived link cannot be used indefinitely. Requires an expiry.
+	///     Defaults to `nil` (no cap).
 	///   - nonceStore: Makes each link single-use and requires a nonce and an expiry. Defaults to `nil`.
 	///   - reusedNonce: Whether a reused nonce is rejected (default) or dropped quietly.
 	///   - stripsSignatureParameters: Whether verified links continue without the
 	///     signature, key id, expiry and nonce parameters. Defaults to `true`.
 	///   - dateProvider: Supplies the current time; inject a manual clock in tests.
-	public init(
+	public convenience init(
 		keys: any SigningKeyProvider,
 		requiredFor matcher: DeepLinkMatcher = .all,
 		parameters: SignedLinkParameters = .default,
 		requiresExpiry: Bool = true,
 		leeway: TimeInterval = 0,
+		maximumLifetime: TimeInterval? = nil,
 		nonceStore: (any NonceStore)? = nil,
 		reusedNonce: ReusedNonceResponse = .reject,
 		stripsSignatureParameters: Bool = true,
 		dateProvider: @Sendable @escaping () -> Date = Date.init,
 	) {
-		self.keys = keys
+		self.init(
+			verifier: HMACSignedLinkVerifier(keys: keys),
+			requiredFor: matcher,
+			parameters: parameters,
+			requiresExpiry: requiresExpiry,
+			leeway: leeway,
+			maximumLifetime: maximumLifetime,
+			nonceStore: nonceStore,
+			reusedNonce: reusedNonce,
+			stripsSignatureParameters: stripsSignatureParameters,
+			dateProvider: dateProvider,
+		)
+	}
+
+	/// Creates a middleware verifying signatures with any ``SignedLinkVerifier``,
+	/// such as an ``Ed25519PublicKeyring``.
+	///
+	/// The other parameters are those of
+	/// ``init(keys:requiredFor:parameters:requiresExpiry:leeway:maximumLifetime:nonceStore:reusedNonce:stripsSignatureParameters:dateProvider:)``.
+	public init(
+		verifier: any SignedLinkVerifier,
+		requiredFor matcher: DeepLinkMatcher = .all,
+		parameters: SignedLinkParameters = .default,
+		requiresExpiry: Bool = true,
+		leeway: TimeInterval = 0,
+		maximumLifetime: TimeInterval? = nil,
+		nonceStore: (any NonceStore)? = nil,
+		reusedNonce: ReusedNonceResponse = .reject,
+		stripsSignatureParameters: Bool = true,
+		dateProvider: @Sendable @escaping () -> Date = Date.init,
+	) {
+		self.verifier = verifier
 		self.matcher = matcher
 		self.parameters = parameters
 		self.requiresExpiry = requiresExpiry
 		self.leeway = leeway.isFinite && leeway > 0 ? leeway : 0
+		self.maximumLifetime = maximumLifetime.map { $0.isNaN ? 0 : max($0, 0) }
 		self.nonceStore = nonceStore
 		self.reusedNonce = reusedNonce
 		self.stripsSignatureParameters = stripsSignatureParameters
@@ -207,14 +267,15 @@ public final class SignedLinkMiddleware: DeepLinkMiddleware {
 
 private extension SignedLinkMiddleware {
 	func verifySignature(of fields: SignedLinkFields, in url: URL) async throws {
-		guard let key = await keys.verificationKey(forKeyID: fields.keyID),
-		      SignedLinkCanonicalForm.isValidSignature(fields.signature, of: url, parameters: parameters, using: key)
-		else { throw DeepLinkError.securityViolation(Self.invalidSignatureReason) }
+		let message = SignedLinkCanonicalForm.message(of: url, parameters: parameters)
+		guard try await verifier.isValidSignature(fields.signature, of: message, keyID: fields.keyID) else {
+			throw DeepLinkError.securityViolation(Self.invalidSignatureReason)
+		}
 	}
 
 	func validatedExpiry(_ expiry: String?) throws -> Date? {
 		guard let expiry else {
-			if requiresExpiry || nonceStore != nil {
+			if requiresExpiry || nonceStore != nil || maximumLifetime != nil {
 				throw DeepLinkError.securityViolation(Self.missingExpiryReason)
 			}
 			return nil
@@ -222,9 +283,13 @@ private extension SignedLinkMiddleware {
 		guard expiry.allSatisfy(\.isASCII), expiry.allSatisfy(\.isNumber), let seconds = Int64(expiry) else {
 			throw DeepLinkError.securityViolation(Self.invalidExpiryReason)
 		}
+		let now = dateProvider()
 		let validUntil = Date(timeIntervalSince1970: TimeInterval(seconds) + leeway)
-		guard dateProvider() < validUntil else {
+		guard now < validUntil else {
 			throw DeepLinkError.securityViolation(Self.expiredReason)
+		}
+		if let maximumLifetime, TimeInterval(seconds) - now.timeIntervalSince1970 > maximumLifetime {
+			throw DeepLinkError.securityViolation(Self.lifetimeTooLongReason)
 		}
 		return validUntil
 	}

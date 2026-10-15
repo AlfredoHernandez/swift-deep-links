@@ -273,7 +273,7 @@ struct SignedLinkMiddlewareTests {
 	func `malformed expiry is rejected even when signed`() async throws {
 		let (sut, _) = makeSUT()
 		let unsigned = try #require(URLComponents(string: "https://example.com/reset")).with(query: [("exp", "soon")])
-		let signature = SignedLinkCanonicalForm.signature(of: unsigned, parameters: .default, using: key)
+		let signature = try Base64URL.encoded(HMACSignedLinkSigner(key: key).signature(of: SignedLinkCanonicalForm.message(of: unsigned, parameters: .default)))
 		let link = try #require(URLComponents(url: unsigned, resolvingAgainstBaseURL: false)).with(query: [("exp", "soon"), ("sig", signature)])
 
 		await #expect(throws: DeepLinkError.securityViolation(SignedLinkMiddleware.invalidExpiryReason)) {

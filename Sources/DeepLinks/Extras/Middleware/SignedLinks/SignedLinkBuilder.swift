@@ -11,7 +11,8 @@ import Foundation
 ///
 /// Use it on a server written in Swift, in tests, or as the reference for a
 /// server in another language: the signature is the unpadded base64url
-/// HMAC-SHA256, with the shared key, of the canonical form documented on
+/// HMAC-SHA256 (with the shared key) or Ed25519 signature (with an
+/// ``Ed25519LinkSigner``) of the canonical form documented on
 /// ``SignedLinkMiddleware``.
 ///
 /// ```swift
@@ -24,19 +25,31 @@ import Foundation
 /// // https://example.com/reset?user=42&kid=2026-10&exp=…&nonce=…&sig=…
 /// ```
 public struct SignedLinkBuilder: Sendable {
-	private let key: SymmetricKey
+	private let signer: any SignedLinkSigner
 	private let keyID: String?
 	private let parameters: SignedLinkParameters
 
 	/// Creates a builder.
 	///
 	/// - Parameters:
-	///   - key: The signing key; use at least 256 random bits.
+	///   - key: The HMAC-SHA256 signing key, at least
+	///     ``SignedLinkMiddleware/minimumKeyByteCount`` random bytes; ``sign(_:expiresAt:nonce:)``
+	///     throws for a shorter key.
 	///   - keyID: The key's id, added as the key-id parameter so the verifier
 	///     can pick the key during rotation. `nil` (default) adds none.
 	///   - parameters: The query parameter names. Defaults to ``SignedLinkParameters/default``.
 	public init(key: SymmetricKey, keyID: String? = nil, parameters: SignedLinkParameters = .default) {
-		self.key = key
+		self.init(signer: HMACSignedLinkSigner(key: key), keyID: keyID, parameters: parameters)
+	}
+
+	/// Creates a builder signing with any ``SignedLinkSigner``, such as an ``Ed25519LinkSigner``.
+	///
+	/// - Parameters:
+	///   - signer: Produces the signature of the canonical form.
+	///   - keyID: The key's id, added as the key-id parameter. `nil` (default) adds none.
+	///   - parameters: The query parameter names. Defaults to ``SignedLinkParameters/default``.
+	public init(signer: any SignedLinkSigner, keyID: String? = nil, parameters: SignedLinkParameters = .default) {
+		self.signer = signer
 		self.keyID = keyID
 		self.parameters = parameters
 	}
@@ -50,7 +63,8 @@ public struct SignedLinkBuilder: Sendable {
 	///     the verifier has a ``NonceStore``.
 	/// - Returns: The signed link.
 	/// - Throws: ``DeepLinkError/invalidURL(_:)`` when `url` cannot be decomposed
-	///   or already carries one of the signed-link parameters.
+	///   or already carries one of the signed-link parameters;
+	///   ``DeepLinkError/securityViolation(_:)`` when the signer cannot sign (an HMAC key that is too short).
 	public func sign(_ url: URL, expiresAt: Date? = nil, nonce: String? = nil) throws(DeepLinkError) -> URL {
 		guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false),
 		      !(components.percentEncodedQueryItems ?? []).contains(where: { parameters.all.contains(SignedLinkCanonicalForm.decodedName(of: $0)) })
@@ -65,11 +79,21 @@ public struct SignedLinkBuilder: Sendable {
 			+ added.map { URLQueryItem(name: Self.encoded($0.0), value: Self.encoded($0.1)) }
 
 		guard let unsigned = components.url else { throw DeepLinkError.invalidURL(url) }
-		let signature = SignedLinkCanonicalForm.signature(of: unsigned, parameters: parameters, using: key)
+		let signature = try signature(of: unsigned)
 		components.percentEncodedQueryItems?.append(URLQueryItem(name: Self.encoded(parameters.signature), value: signature))
 
 		guard let signed = components.url else { throw DeepLinkError.invalidURL(url) }
 		return signed
+	}
+
+	private func signature(of url: URL) throws(DeepLinkError) -> String {
+		do {
+			return try Base64URL.encoded(signer.signature(of: SignedLinkCanonicalForm.message(of: url, parameters: parameters)))
+		} catch let error as DeepLinkError {
+			throw error
+		} catch {
+			throw .securityViolation(SignedLinkMiddleware.signingFailedReason)
+		}
 	}
 
 	private static func encoded(_ text: String) -> String {
