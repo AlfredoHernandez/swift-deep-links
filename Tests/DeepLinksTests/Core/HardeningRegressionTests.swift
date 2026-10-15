@@ -70,7 +70,7 @@ struct HardeningRegressionTests {
 		let declineThenFail = FallbackAfterDecline(guarded: CollectingHandler<TestRoute>().confirming(.all) { _, _ in false })
 		let routeDecline = RouteDecline()
 
-		let thrown = try await #require(DeepLinkRun.$routeDecline.withValue(routeDecline) {
+		let thrown = try await #require(DeepLinkRun.updating({ $0.routeDecline = routeDecline }) {
 			await #expect(throws: FallbackAfterDecline<TestRoute>.FallbackError.self) {
 				try await declineThenFail.handle(.route1, context: .unknown)
 			}

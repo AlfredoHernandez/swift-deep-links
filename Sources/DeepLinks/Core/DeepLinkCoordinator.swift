@@ -256,10 +256,11 @@ private extension DeepLinkCoordinator {
 		_ request: DeepLinkRequest,
 		middlewareStage: (DeepLinkRequest) async -> MiddlewareRun,
 	) async -> DeepLinkResult<Route> {
-		await DeepLinkRun.$id.withValue(UUID()) {
-			await DeepLinkRun.$arrival.withValue(request.deferral?.arrival ?? request) {
-				await handleInRun(request, middlewareStage: middlewareStage)
-			}
+		await DeepLinkRun.updating({
+			$0.id = UUID()
+			$0.arrival = request.deferral?.arrival ?? request
+		}) {
+			await handleInRun(request, middlewareStage: middlewareStage)
 		}
 	}
 
@@ -302,7 +303,7 @@ private extension DeepLinkCoordinator {
 
 		do {
 			let routes = try await routeURL(processed.url)
-			let executionResult = await DeepLinkRun.$routedURL.withValue(processed.url) {
+			let executionResult = await DeepLinkRun.updating({ $0.routedURL = processed.url }) {
 				await executeRoutes(routes, context: processed.context)
 			}
 			let result = await createSuccessResult(
@@ -341,7 +342,7 @@ private extension DeepLinkCoordinator {
 		for (index, route) in routes.enumerated() {
 			let decline = RouteDecline()
 			do {
-				try await DeepLinkRun.$routeDecline.withValue(decline) {
+				try await DeepLinkRun.updating({ $0.routeDecline = decline }) {
 					try await handler.handle(route, context: context)
 				}
 				successfulRoutes += 1
