@@ -51,10 +51,14 @@ enum ProtocolBridgeGuard {
 		_ body: () async throws -> Output,
 	) async throws -> Output {
 		let conformerID = ObjectIdentifier(conformer)
-		guard !marks.contains(Mark(requirement: requirement, hop: hop.opposite, conformer: conformerID)) else {
+		var updated = marks
+		guard !updated.contains(Mark(requirement: requirement, hop: hop.opposite, conformer: conformerID)) else {
 			throw DeepLinkError.missingRequiredConfiguration("\(conformer) implements neither \(requirement.name) form")
 		}
-		return try await $marks.withValue(marks.union([Mark(requirement: requirement, hop: hop, conformer: conformerID)])) {
+		guard updated.insert(Mark(requirement: requirement, hop: hop, conformer: conformerID)).inserted else {
+			return try await body()
+		}
+		return try await $marks.withValue(updated) {
 			try await body()
 		}
 	}

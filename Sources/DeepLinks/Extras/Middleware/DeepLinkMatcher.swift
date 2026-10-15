@@ -69,12 +69,14 @@ public extension DeepLinkMatcher {
 	/// - Returns: A path-prefix matcher.
 	static func paths(_ prefixes: Set<String>) -> DeepLinkMatcher {
 		let normalizedPrefixes = prefixes.map(normalizedPrefix)
+		guard !normalizedPrefixes.contains("/") else {
+			return DeepLinkMatcher { _ in true }
+		}
+		let directoryPrefixes = normalizedPrefixes.map { $0 + "/" }
 		return DeepLinkMatcher { request in
 			guard let paths = matchablePaths(of: request.url) else { return true }
 			return paths.contains { path in
-				normalizedPrefixes.contains { prefix in
-					prefix == "/" || path == prefix || path.hasPrefix(prefix + "/")
-				}
+				normalizedPrefixes.contains(path) || directoryPrefixes.contains(where: path.hasPrefix)
 			}
 		}
 	}
