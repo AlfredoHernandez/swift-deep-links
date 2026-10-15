@@ -124,7 +124,7 @@ struct ConfirmationMiddlewareTests {
 	@Test
 	func `no timeout never starts a timer`() async throws {
 		let sleeps = SleepRecorder()
-		let sut = ConfirmationMiddleware(provider: CollectingConfirmation(approves: true), sleep: sleeps.returnImmediately)
+		let sut = ConfirmationMiddleware(provider: CollectingConfirmation(approves: true), timeout: nil, sleep: sleeps.returnImmediately)
 
 		_ = try await sut.intercept(DeepLinkRequest(url: url("myapp://pay")))
 
@@ -148,6 +148,63 @@ struct ConfirmationMiddlewareTests {
 		#expect(try await first.value != nil)
 		await #expect(throws: CancellationError.self) { try await second.value }
 		#expect(provider.askedCount == 1)
+	}
+
+	@Test(.timeLimit(.minutes(1)))
+	func `prompts time out after sixty seconds by default`() async throws {
+		let sleeps = SleepRecorder()
+		let sut = ConfirmationMiddleware(provider: GatedConfirmation(), sleep: sleeps.returnImmediately)
+		let factoryMade: ConfirmationMiddleware = .confirmation(provider: GatedConfirmation(), sleep: sleeps.returnImmediately)
+
+		await #expect(throws: DeepLinkError.confirmationDenied(url("myapp://pay"))) {
+			try await sut.intercept(DeepLinkRequest(url: url("myapp://pay")))
+		}
+		await #expect(throws: DeepLinkError.confirmationDenied(url("myapp://pay"))) {
+			try await factoryMade.intercept(DeepLinkRequest(url: url("myapp://pay")))
+		}
+		#expect(sleeps.durations == [.seconds(60), .seconds(60)])
+	}
+
+	@Test(.timeLimit(.minutes(1)))
+	func `the timeout covers the wait for an earlier prompt`() async throws {
+		let provider = GatedConfirmation()
+		let sut = ConfirmationMiddleware(provider: provider, timeout: .seconds(30), sleep: FirstSleepSuspends().sleep)
+		var prompts = provider.prompts.makeAsyncIterator()
+
+		let first = Task { try await sut.intercept(DeepLinkRequest(url: url("myapp://pay/1"))) }
+		_ = await prompts.next()
+		await #expect(throws: DeepLinkError.confirmationDenied(url("myapp://pay/2"))) {
+			try await sut.intercept(DeepLinkRequest(url: url("myapp://pay/2")))
+		}
+		provider.answerAll(true)
+
+		#expect(try await first.value != nil)
+		#expect(provider.askedCount == 1)
+	}
+
+	@Test
+	func `links beyond the pending limit are rejected without a prompt`() async throws {
+		let provider = GatedConfirmation()
+		let sut = ConfirmationMiddleware(provider: provider, timeout: nil, maxPendingPrompts: 1)
+		var prompts = provider.prompts.makeAsyncIterator()
+
+		let first = Task { try await sut.intercept(DeepLinkRequest(url: url("myapp://pay/1"))) }
+		_ = await prompts.next()
+		await #expect(throws: DeepLinkError.securityViolation(ConfirmationMiddleware.tooManyPendingPromptsReason)) {
+			try await sut.intercept(DeepLinkRequest(url: url("myapp://pay/2")))
+		}
+		provider.answerAll(true)
+
+		#expect(try await first.value != nil)
+		#expect(provider.askedCount == 1)
+	}
+
+	@Test(arguments: [(nil as Int?, 2), (0, 1), (-3, 1), (5, 5)])
+	func `the pending limit defaults to two and is at least one`(requested: Int?, effective: Int) {
+		let sut = requested.map { ConfirmationMiddleware(provider: GatedConfirmation(), maxPendingPrompts: $0) }
+			?? ConfirmationMiddleware(provider: GatedConfirmation())
+
+		#expect(sut.maxPendingPrompts == effective)
 	}
 
 	// MARK: - Coordinator
@@ -267,6 +324,22 @@ private final class StubbornConfirmation: DeepLinkConfirmationProvider {
 			return state.waiting
 		}
 		continuations.forEach { $0.resume(returning: decision) }
+	}
+}
+
+/// The first sleep suspends until cancelled; later sleeps return at once.
+private final class FirstSleepSuspends: Sendable {
+	private let recorder = SleepRecorder()
+	private let calls = OSAllocatedUnfairLock(initialState: 0)
+
+	var sleep: @Sendable (Duration) async throws -> Void {
+		{ [recorder, calls] duration in
+			let isFirst = calls.withLock { count in
+				defer { count += 1 }
+				return count == 0
+			}
+			try await (isFirst ? recorder.suspendUntilCancelled : recorder.returnImmediately)(duration)
+		}
 	}
 }
 

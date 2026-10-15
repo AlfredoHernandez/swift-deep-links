@@ -321,11 +321,15 @@ middleware order and a hardening checklist.
   `DeepLinkConfirmationProvider` (`confirm(_:) async -> Bool`) with a
   `DeepLinkConfirmationRequest` carrying the `URLRedactor`-redacted URL and the
   `DeepLinkContext`. Approval continues unchanged; denial throws
-  `DeepLinkError.confirmationDenied`. An optional `timeout` (with an injectable
-  `sleep`) denies an unanswered prompt and cancels the provider's task so it
+  `DeepLinkError.confirmationDenied`. A `timeout` (default
+  `ConfirmationMiddleware.defaultTimeout`, 60 s; `nil` waits forever; injectable
+  `sleep`) counts from the link's arrival, including the wait for earlier
+  prompts, denies an unanswered link and cancels the provider's task so it
   can dismiss its UI; the timeout (and cancelling the link) denies at once even
   when the provider ignores cancellation, releasing the next prompt. Prompts are serialized in arrival order; a link
-  cancelled while waiting is never shown. `DeepLinksTesting.CollectingConfirmation`
+  cancelled while waiting is never shown. At most `maxPendingPrompts`
+  (default 2) links wait or prompt at once; more are rejected without a
+  prompt with `securityViolation(ConfirmationMiddleware.tooManyPendingPromptsReason)`. `DeepLinksTesting.CollectingConfirmation`
   answers with a configurable decision and records every prompt.
 - **Notification, Spotlight and quick-action entry points (F8).**
   `handle(notificationResponse:urlKey:sceneID:)` and

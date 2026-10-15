@@ -353,15 +353,23 @@ public extension DeepLinkMiddleware where Self == SignedLinkMiddleware {
 public extension DeepLinkMiddleware where Self == ConfirmationMiddleware {
 	/// Creates a middleware asking the user to confirm the links `matcher` selects.
 	///
-	/// See ``ConfirmationMiddleware/init(provider:requiredFor:redactor:timeout:sleep:)``
+	/// See ``ConfirmationMiddleware/init(provider:requiredFor:redactor:timeout:maxPendingPrompts:sleep:)``
 	/// for the parameters.
 	static func confirmation(
 		provider: any DeepLinkConfirmationProvider,
 		requiredFor matcher: DeepLinkMatcher = .all,
 		redactor: URLRedactor = URLRedactor(),
-		timeout: Duration? = nil,
+		timeout: Duration? = ConfirmationMiddleware.defaultTimeout,
+		maxPendingPrompts: Int = ConfirmationMiddleware.defaultMaxPendingPrompts,
 		sleep: @Sendable @escaping (Duration) async throws -> Void = { try await Task.sleep(for: $0) },
 	) -> ConfirmationMiddleware {
-		ConfirmationMiddleware(provider: provider, requiredFor: matcher, redactor: redactor, timeout: timeout, sleep: sleep)
+		ConfirmationMiddleware(
+			provider: provider,
+			requiredFor: matcher,
+			redactor: redactor,
+			timeout: timeout,
+			maxPendingPrompts: maxPendingPrompts,
+			sleep: sleep,
+		)
 	}
 }

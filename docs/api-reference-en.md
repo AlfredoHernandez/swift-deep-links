@@ -344,7 +344,7 @@ All middleware can be created using static factory methods on `DeepLinkMiddlewar
 .readiness(queue:)
 .replayProtection(window:maxEntries:key:ignoredQueryKeys:response:dateProvider:)
 .signedLinks(keys:requiredFor:parameters:requiresExpiry:leeway:nonceStore:reusedNonce:stripsSignatureParameters:dateProvider:)
-.confirmation(provider:requiredFor:redactor:timeout:sleep:)
+.confirmation(provider:requiredFor:redactor:timeout:maxPendingPrompts:sleep:)
 ```
 
 ### Strategies
@@ -475,8 +475,12 @@ Checks run in order: one `sig` and at most one `kid`/`exp`/`nonce`; constant-tim
 ```swift
 public final class ConfirmationMiddleware: DeepLinkMiddleware {
     public init(provider: any DeepLinkConfirmationProvider, requiredFor matcher: DeepLinkMatcher = .all,
-                redactor: URLRedactor = URLRedactor(), timeout: Duration? = nil,
+                redactor: URLRedactor = URLRedactor(), timeout: Duration? = ConfirmationMiddleware.defaultTimeout,
+                maxPendingPrompts: Int = ConfirmationMiddleware.defaultMaxPendingPrompts,
                 sleep: @Sendable @escaping (Duration) async throws -> Void = { try await Task.sleep(for: $0) })
+    public static let defaultTimeout: Duration          // 60 seconds
+    public static let defaultMaxPendingPrompts: Int     // 2
+    public static var tooManyPendingPromptsReason: String { get }  // "Too many pending confirmations"
 }
 
 public protocol DeepLinkConfirmationProvider: Sendable {
@@ -489,7 +493,7 @@ public struct DeepLinkConfirmationRequest: Sendable, Hashable {
 }
 ```
 
-Asks the user before a sensitive link continues. Approval passes the request on unchanged; denial or no answer within `timeout` throws `DeepLinkError.confirmationDenied(url)`. On timeout, or when the link's task is cancelled, the link is denied immediately, even if the provider ignores cancellation, and the task running `confirm` is cancelled: dismiss the prompt and resume with `false` in a cancellation handler. Prompts are serialized; a link cancelled while waiting for its turn throws `CancellationError` without being shown. Place it after `.readiness(...)` and every rejecting middleware, so the user is never asked about a link that would be rejected anyway.
+Asks the user before a sensitive link continues. Approval passes the request on unchanged; denial or no answer within `timeout` throws `DeepLinkError.confirmationDenied(url)`. On timeout, or when the link's task is cancelled, the link is denied immediately, even if the provider ignores cancellation, and the task running `confirm` is cancelled: dismiss the prompt and resume with `false` in a cancellation handler. Prompts are serialized, and `timeout` (60 s by default, `nil` for none) counts from the link's arrival, so it includes the wait for earlier prompts. At most `maxPendingPrompts` links (default 2, at least 1) wait or prompt at once; another is rejected immediately with `securityViolation(tooManyPendingPromptsReason)` and no prompt. A link cancelled while waiting for its turn throws `CancellationError` without being shown. Place it after `.readiness(...)` and every rejecting middleware, so the user is never asked about a link that would be rejected anyway.
 
 ### Route-Level Rules
 

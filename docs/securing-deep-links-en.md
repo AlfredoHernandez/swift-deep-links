@@ -164,7 +164,11 @@ Even a valid, signed link should not delete an account or send money without
 the user seeing it. `ConfirmationMiddleware` hands your
 `DeepLinkConfirmationProvider` the redacted URL and the context, and stops the
 link with `DeepLinkError.confirmationDenied` when the user declines or does not
-answer within `timeout`. Treat that error as a user choice, not an attack. On
+answer within `timeout` (60 seconds by default, counted from the link's
+arrival, so time spent behind another prompt counts). Treat that error as a
+user choice, not an attack. A burst of links cannot stack dialogs: at most
+`maxPendingPrompts` (default 2) links wait or prompt at once, and the rest are
+rejected with `securityViolation` without a prompt. On
 timeout the link is denied at once, even if your provider ignores
 cancellation, but dismiss the prompt in the cancellation handler so it does
 not linger.
