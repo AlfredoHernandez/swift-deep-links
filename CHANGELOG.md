@@ -644,6 +644,11 @@ middleware order and a hardening checklist.
   now found by a single-pass scanner, and free-form text over 2048 characters
   is cut (a URL split by the cut is replaced whole) and marked
   `… [truncated]`.
+- **Log injection.** Decoded control, invisible-format and line/paragraph
+  separator characters are escaped (`\n`, `\u{1B}`) in the host, path and
+  query parameters the logging formats print, in `redactedDescription`, and in
+  `DeepLinkLogPrivacy.redactingURLs(in:)`, so a link carrying `%0A` cannot
+  forge log lines.
 - **Invisible Unicode characters rejected (`.hardened`).** `URLCanonicalizer`
   (and so `SecurityStrategy.hardened`) also rejects Unicode format (Cf) and
   line/paragraph separator (Zl, Zp) characters in any decoded form, such as

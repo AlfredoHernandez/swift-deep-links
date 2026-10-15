@@ -69,8 +69,8 @@ struct DeepLinkComponents {
 	init(from url: URL) {
 		let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
 		scheme = components?.scheme
-		host = components?.host
-		path = components?.path ?? ""
+		host = components?.host.map(LogEscaping.singleLine)
+		path = LogEscaping.singleLine(components?.path ?? "")
 		queryItems = components?.queryItems
 	}
 
@@ -91,7 +91,8 @@ struct DeepLinkComponents {
 	/// and display. For example: "id=123&color=red&size=large"
 	///
 	/// Parameters with `nil` values are represented as "nil" in the string.
-	/// If no query parameters exist, returns an empty string.
+	/// Decoded control characters are escaped (`\n`), so a value cannot add
+	/// log lines. If no query parameters exist, returns an empty string.
 	///
 	/// ## Examples
 	///
@@ -106,7 +107,7 @@ struct DeepLinkComponents {
 	/// - Returns: A string representation of query parameters, or empty string if none exist
 	var queryParametersString: String {
 		guard let queryItems, !queryItems.isEmpty else { return "" }
-		return queryItems.map { "\($0.name)=\($0.value ?? "nil")" }.joined(separator: "&")
+		return queryItems.map { LogEscaping.singleLine("\($0.name)=\($0.value ?? "nil")") }.joined(separator: "&")
 	}
 
 	/// Returns query parameters as a dictionary.

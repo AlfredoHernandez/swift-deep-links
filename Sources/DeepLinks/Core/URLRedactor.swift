@@ -120,7 +120,8 @@ public struct URLRedactor: Sendable {
 	///
 	/// Text longer than ``maximumRedactedTextLength`` is cut first, and a URL
 	/// the cut splits is replaced whole by ``placeholder``, so no fragment of a
-	/// secret survives. The scan is linear in the length of the text.
+	/// secret survives. The scan is linear in the length of the text. Control
+	/// characters are escaped (`\n`) so the result stays on one log line.
 	func redactingURLs(in text: String) -> String {
 		let scalars = text.unicodeScalars
 		let cut = scalars.index(scalars.startIndex, offsetBy: Self.maximumRedactedTextLength, limitedBy: scalars.endIndex) ?? scalars.endIndex
@@ -141,7 +142,7 @@ public struct URLRedactor: Sendable {
 		if isTruncated {
 			result.append(contentsOf: Self.truncationMarker.unicodeScalars)
 		}
-		return String(result)
+		return LogEscaping.singleLine(String(result))
 	}
 
 	private func redactedURLText(_ text: String) -> String {

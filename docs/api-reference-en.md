@@ -272,7 +272,7 @@ LoggingProvider.console(privacy: .unredacted)
 .notification(errorDetail: .full)
 ```
 
-`errorDescription` embeds full URLs. Use `redactedDescription` for logs, analytics and user-facing text: carried URLs and every `scheme://` URL embedded in a message, host or reason go through `URLRedactor`, the value in `invalidParameterValue` is always replaced, and underlying errors that are not `DeepLinkError` are described only by their type name.
+`errorDescription` embeds full URLs. `redactedDescription` escapes control and line-separator characters (`\n`), so it is always one log line. Use `redactedDescription` for logs, analytics and user-facing text: carried URLs and every `scheme://` URL embedded in a message, host or reason go through `URLRedactor`, the value in `invalidParameterValue` is always replaced, and underlying errors that are not `DeepLinkError` are described only by their type name.
 
 ### URLRedactor
 

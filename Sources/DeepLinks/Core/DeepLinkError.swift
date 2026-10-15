@@ -178,6 +178,7 @@ public extension DeepLinkError {
 	/// through a default ``URLRedactor``; the value in
 	/// ``invalidParameterValue(name:value:)`` always replaced; and underlying
 	/// errors that are not ``DeepLinkError`` described only by their type name.
+	/// Control characters are escaped (`\n`), so the description is one log line.
 	var redactedDescription: String {
 		redactedDescription(using: URLRedactor())
 	}
@@ -187,6 +188,12 @@ public extension DeepLinkError {
 	/// - Parameter redactor: The redactor applied to URLs and parameter values.
 	/// - Returns: The redacted description. See ``redactedDescription``.
 	func redactedDescription(using redactor: URLRedactor) -> String {
+		LogEscaping.singleLine(redactedText(using: redactor))
+	}
+}
+
+private extension DeepLinkError {
+	func redactedText(using redactor: URLRedactor) -> String {
 		switch self {
 		case let .invalidURL(url):
 			Self.invalidURL(redactor.redact(url)).plainDescription
