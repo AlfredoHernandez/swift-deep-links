@@ -9,6 +9,8 @@ import os
 import Testing
 
 struct AuthenticationResumeTests {
+	/// These tests resume links handled as `.unknown`, which the default pending sources skip.
+	private static let everySource = Set(DeepLinkContext.Source.allCases)
 	private let protectedURL = URL(string: "myapp://account/settings")!
 	private let publicURL = URL(string: "myapp://home")!
 
@@ -52,6 +54,7 @@ struct AuthenticationResumeTests {
 			provider: SwitchableAuthenticationProvider(isAuthenticated: false),
 			protectedHosts: ["account"],
 			pendingLinks: store,
+			pendingSources: Self.everySource,
 		)
 
 		_ = try? await sut.intercept(url: protectedURL)
@@ -110,7 +113,7 @@ struct AuthenticationResumeTests {
 			routing: routing,
 			handler: DeepLinkHandlerSpy<TestRoute>(),
 			middlewareCoordinator: DeepLinkMiddlewareCoordinator(middleware: [
-				AuthenticationMiddleware(authProvider: auth, protectedHosts: ["account"], pendingLinks: store),
+				AuthenticationMiddleware(authProvider: auth, protectedHosts: ["account"], pendingLinks: store, pendingSources: Self.everySource),
 				ReplayProtectionMiddleware(window: 2, dateProvider: clock.dateProvider),
 			]),
 		)
@@ -136,6 +139,7 @@ struct AuthenticationResumeTests {
 			authProvider: SwitchableAuthenticationProvider(isAuthenticated: isAuthenticated),
 			protectedHosts: ["account"],
 			pendingLinks: store,
+			pendingSources: Self.everySource,
 		)
 	}
 
@@ -148,7 +152,7 @@ struct AuthenticationResumeTests {
 		routing.routesToReturn = [.route1]
 		let handler = DeepLinkHandlerSpy<TestRoute>()
 		let middleware = leading + [
-			AuthenticationMiddleware(authProvider: auth, protectedHosts: ["account"], pendingLinks: store),
+			AuthenticationMiddleware(authProvider: auth, protectedHosts: ["account"], pendingLinks: store, pendingSources: Self.everySource),
 		]
 		let coordinator = DeepLinkCoordinator(
 			routing: routing,

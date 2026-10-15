@@ -71,7 +71,9 @@ struct QueuedLinkContextTests {
 		auth.isSignedIn = true
 		_ = await coordinator.resumePendingLinks(from: store)
 
-		#expect(handler.handledContexts == [context])
+		var resumed = context
+		resumed.isResumedPendingLink = true
+		#expect(handler.handledContexts == [resumed])
 	}
 
 	@Test

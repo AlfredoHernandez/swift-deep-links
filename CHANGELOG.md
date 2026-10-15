@@ -75,6 +75,16 @@ middleware order and a hardening checklist.
     bypassed by a parser that ignores the host. `URLFuzzCorpus` replaces its
     "trailing dot host" case with "empty authority host". Migration: links
     that relied on `myapp:///path` must name a host, or use `.standard`.
+  - `AuthenticationMiddleware` saves rejected links to its pending store
+    only from `pendingSources` (default
+    `AuthenticationMiddleware.defaultPendingSources`: every source except
+    `.customScheme` and `.unknown`), so another app cannot plant a link that
+    runs after sign-in. Resumed links carry
+    `DeepLinkContext.isResumedPendingLink`, and
+    `DeepLinkMatcher.resumedPendingLinks` lets `.confirmation(...)` ask before
+    they act. Migration: pass `pendingSources:` (for example adding
+    `.customScheme`) to keep saving links from `onOpenURL` or `handle(url:)`,
+    preferably together with a confirmation on resume.
   - `DeepLinkReadinessQueue()` keeps at most
     `DeepLinkReadinessQueue.defaultMaxQueueSize` (50) links, dropping the
     oldest. Pass `maxQueueSize: nil` for the old unbounded queue, and
@@ -429,8 +439,8 @@ middleware order and a hardening checklist.
   `handler.requiringAuthentication(for:provider:)` rejects protected parsed
   routes for a signed-out user (`unauthorizedAccess` with the routed URL),
   whatever URL spelling produced them; it is the strongest authentication
-  rule. `AuthenticationMiddleware(authProvider:requiredFor:pendingLinks:)` /
-  `.authentication(provider:requiredFor:pendingLinks:)` protects any
+  rule. `AuthenticationMiddleware(authProvider:requiredFor:pendingLinks:pendingSources:)` /
+  `.authentication(provider:requiredFor:pendingLinks:pendingSources:)` protects any
   `DeepLinkMatcher` selection, such as a path under a public host.
 - **Multi-scene routing (F9).** `SceneRoutingHandler<Route>` is a handler that
   forwards each route to the handler registered for its

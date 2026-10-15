@@ -84,6 +84,8 @@ Why this order:
 4. **Signed links** prove a link was minted by your server and is unmodified.
 5. **Authentication** gates protected routes and can save the link to resume
    after sign-in. It runs again on resume, so the check happens at execution time.
+   Only links from verified or app-owned sources are saved by default (not
+   custom schemes); confirm resumed links with `requiredFor: .resumedPendingLinks`.
 6. **Readiness** holds links until the app can navigate; drained links resume
    the chain after it, so later stages evaluate them at drain time.
 7. **Confirmation** asks the user only about links every earlier stage accepted.

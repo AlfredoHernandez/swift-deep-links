@@ -13,7 +13,9 @@ public extension DeepLinkCoordinator {
 	/// that is still unauthorized fails with
 	/// ``DeepLinkError/unauthorizedAccess(_:)`` and, when the authentication
 	/// middleware is configured with the same store, is saved again. Delegate
-	/// notifications fire for each link as for ``handle(url:)``.
+	/// notifications fire for each link as for ``handle(url:)``. Each resumed
+	/// link has ``DeepLinkContext/isResumedPendingLink`` set, so
+	/// ``DeepLinkMatcher/resumedPendingLinks`` can require a confirmation.
 	///
 	/// ## Example
 	///
@@ -36,7 +38,9 @@ public extension DeepLinkCoordinator {
 	func resumePendingLinks(from store: any PendingLinkStore) async -> [DeepLinkResult<Route>] {
 		var results: [DeepLinkResult<Route>] = []
 		for request in await store.takeAllRequests() {
-			await results.append(handle(url: request.url, context: request.context))
+			var context = request.context
+			context.isResumedPendingLink = true
+			await results.append(handle(url: request.url, context: context))
 		}
 		return results
 	}

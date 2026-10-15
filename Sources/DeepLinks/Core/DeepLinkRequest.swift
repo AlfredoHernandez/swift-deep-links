@@ -67,6 +67,15 @@ public struct DeepLinkContext: Sendable, Hashable {
 	/// The URL ``SignedLinkMiddleware`` verified, if any.
 	var signatureVerifiedURL: URL?
 
+	/// Whether ``DeepLinkCoordinator/resumePendingLinks(from:)`` replayed this
+	/// link from a pending-link store, rather than an entry point delivering it now.
+	///
+	/// Only the coordinator sets it. A resumed link runs without a fresh user
+	/// action, possibly long after another app or page triggered it, so
+	/// consider confirming it first: `.confirmation(provider:requiredFor: .resumedPendingLinks)`,
+	/// or a ``RouteMatcher`` checking this flag.
+	public internal(set) var isResumedPendingLink = false
+
 	/// Creates a context.
 	///
 	/// - Parameters:

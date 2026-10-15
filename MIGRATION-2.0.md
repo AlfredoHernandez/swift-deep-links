@@ -259,6 +259,17 @@ authentication strategy protects `myapp://Account./x`, `myapp://account%2e/x`,
 .authentication(provider: auth, requiredFor: .paths(["/admin"]))
 ```
 
+**Pending links come only from trusted sources.** `AuthenticationMiddleware`
+saves a rejected link only when its source is in `pendingSources` (by default
+every source except `.customScheme` and `.unknown`). To resume custom-scheme
+links, opt in and confirm them on resume:
+
+```swift
+.authentication(provider: auth, protectedHosts: ["account"], pendingLinks: pending,
+                pendingSources: AuthenticationMiddleware.defaultPendingSources.union([.customScheme])),
+.confirmation(provider: alerts, requiredFor: .resumedPendingLinks)
+```
+
 **Input limits are on.** `.security(...)` and `SecurityMiddleware` default to
 `limits: .recommended` (8192-character URLs, 50 query parameters, 1024
 characters per decoded value).

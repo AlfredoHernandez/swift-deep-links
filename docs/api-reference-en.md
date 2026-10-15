@@ -347,8 +347,8 @@ All middleware can be created using static factory methods on `DeepLinkMiddlewar
 ```swift
 .security(allowedSchemes:allowedHosts:allowedHostsByScheme:blockedPatterns:allowedSources:strategy:limits:)
 .rateLimit(maxRequests:timeWindow:persistence:strategy:)
-.authentication(provider:protectedHosts:strategy:pendingLinks:)
-.authentication(provider:requiredFor:pendingLinks:)
+.authentication(provider:protectedHosts:strategy:pendingLinks:pendingSources:)
+.authentication(provider:requiredFor:pendingLinks:pendingSources:)
 .urlTransformation(transformer:strategy:)
 .analytics(provider:strategy:)
 .logging(provider:logLevel:format:)
@@ -641,9 +641,11 @@ public extension DeepLinkCoordinator {
 
 `AuthenticationMiddleware` saves the link as it entered the chain, with its context, and `resumePendingLinks(from:)` replays it with that context through the whole chain. `UserDefaultsPendingLinkStore` persists the context as versioned JSON (`source`, `sourceApplication`, `sceneID`; plain text in `UserDefaults`, like the URL) but never the signature-verified flag, so a resumed link is verified again; links saved by 1.x or with an unknown source load as `.unknown`.
 
-`AuthenticationStrategy.standard` matches `protectedHosts` like `DeepLinkMatcher.hosts(_:)`: case-insensitively, after percent-decoding, ignoring a trailing dot, and reading the first path segment of a hostless custom-scheme link (`myapp:///account/x`, `myapp:/account`, `myapp:account/x`) as its host. `AuthenticationMiddleware(authProvider:requiredFor:pendingLinks:)` / `.authentication(provider:requiredFor:pendingLinks:)` takes any `DeepLinkMatcher` instead (for example `.paths(["/admin"])`). Route rules (`requiringAuthentication(for:provider:)`) are the strongest.
+`AuthenticationStrategy.standard` matches `protectedHosts` like `DeepLinkMatcher.hosts(_:)`: case-insensitively, after percent-decoding, ignoring a trailing dot, and reading the first path segment of a hostless custom-scheme link (`myapp:///account/x`, `myapp:/account`, `myapp:account/x`) as its host. `AuthenticationMiddleware(authProvider:requiredFor:pendingLinks:pendingSources:)` / `.authentication(provider:requiredFor:pendingLinks:pendingSources:)` takes any `DeepLinkMatcher` instead (for example `.paths(["/admin"])`). Route rules (`requiringAuthentication(for:provider:)`) are the strongest.
 
-Pass a store to `AuthenticationMiddleware(authProvider:protectedHosts:strategy:pendingLinks:)` (or `.authentication(..., pendingLinks:)`) and a link rejected with `unauthorizedAccess` is saved before the error propagates. After sign-in, `resumePendingLinks(from:)` runs each saved link through the **whole** chain again, so authentication, security and rate limiting are evaluated at resume time; a link that is still unauthorized is saved again. Stores keep at most `maxCount` links (oldest dropped, clamped to at least 1) and discard links older than `expiry` seconds. Only the URL and its save time are stored; the `UserDefaults` store writes them unencrypted, so prefer the in-memory store when protected links carry secrets. Call `removeAll()` on sign-out so one account's pending link never runs for another. Any app or page can trigger a protected link, so only protect routes that are safe to run after sign-in without a fresh user action, or confirm before acting.
+Only links whose source is in `pendingSources` are saved (default `AuthenticationMiddleware.defaultPendingSources`: every source except `.customScheme` and `.unknown`, which any app can produce). `resumePendingLinks(from:)` sets `DeepLinkContext.isResumedPendingLink` on each replayed link; `DeepLinkMatcher.resumedPendingLinks` selects them, for example to confirm them before they act.
+
+Pass a store to `AuthenticationMiddleware(authProvider:protectedHosts:strategy:pendingLinks:pendingSources:)` (or `.authentication(..., pendingLinks:)`) and a link rejected with `unauthorizedAccess` is saved before the error propagates. After sign-in, `resumePendingLinks(from:)` runs each saved link through the **whole** chain again, so authentication, security and rate limiting are evaluated at resume time; a link that is still unauthorized is saved again. Stores keep at most `maxCount` links (oldest dropped, clamped to at least 1) and discard links older than `expiry` seconds. Only the URL and its save time are stored; the `UserDefaults` store writes them unencrypted, so prefer the in-memory store when protected links carry secrets. Call `removeAll()` on sign-out so one account's pending link never runs for another. Any app or page can trigger a protected link, so only protect routes that are safe to run after sign-in without a fresh user action, or confirm before acting.
 
 ## Readiness
 

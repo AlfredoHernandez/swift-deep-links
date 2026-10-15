@@ -73,6 +73,7 @@ struct AuthenticationSpellingTests {
 			provider: AuthenticationProviderStub(isAuthenticated: false),
 			requiredFor: .paths(["/admin"]),
 			pendingLinks: pendingLinks,
+			pendingSources: Set(DeepLinkContext.Source.allCases),
 		)
 		let admitting = AuthenticationMiddleware(authProvider: AuthenticationProviderStub(isAuthenticated: true), requiredFor: .paths(["/admin"]))
 

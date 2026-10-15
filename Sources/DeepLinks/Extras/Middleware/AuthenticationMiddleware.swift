@@ -67,6 +67,10 @@ import Foundation
 /// - `.schemeBased`: Validates authentication based on URL scheme rather than host
 ///
 /// ### Resuming After Sign-In
+/// Only links from ``defaultPendingSources`` are saved by default (not custom
+/// schemes or unknown sources, which any app can trigger). Resumed links run
+/// without a fresh user action; confirm them with
+/// `.confirmation(provider:requiredFor: .resumedPendingLinks)`.
 /// ```swift
 /// let pendingLinks = InMemoryPendingLinkStore()
 /// let middleware = AuthenticationMiddleware(
@@ -96,8 +100,15 @@ import Foundation
 /// ## Thread Safety
 /// This middleware is thread-safe and can be used concurrently.
 public final class AuthenticationMiddleware: DeepLinkMiddleware {
+	/// The sources whose rejected links are saved unless you pass other
+	/// `pendingSources`: every source except ``DeepLinkContext/Source/customScheme``
+	/// and ``DeepLinkContext/Source/unknown``, which any app can produce.
+	public static let defaultPendingSources: Set<DeepLinkContext.Source> = Set(DeepLinkContext.Source.allCases)
+		.subtracting([.customScheme, .unknown])
+
 	private let authorize: @Sendable (DeepLinkRequest) throws -> URL?
 	private let pendingLinks: (any PendingLinkStore)?
+	private let pendingSources: Set<DeepLinkContext.Source>
 
 	/// Creates a new authentication middleware.
 	///
@@ -113,16 +124,23 @@ public final class AuthenticationMiddleware: DeepLinkMiddleware {
 	///     link drained from a readiness queue, because a resume runs the whole
 	///     chain again; called directly, it is the URL
 	///     this middleware received. Defaults to `nil`, which saves nothing.
+	///   - pendingSources: The sources whose rejected links are saved. Defaults
+	///     to ``defaultPendingSources``, so a link another app opened through
+	///     your custom scheme cannot plant a link that runs after sign-in; add
+	///     ``DeepLinkContext/Source/customScheme`` only if you confirm resumed
+	///     links (``DeepLinkMatcher/resumedPendingLinks``).
 	public init(
 		authProvider: AuthenticationProvider,
 		protectedHosts: Set<String>,
 		strategy: AuthenticationStrategy = .standard,
 		pendingLinks: (any PendingLinkStore)? = nil,
+		pendingSources: Set<DeepLinkContext.Source> = AuthenticationMiddleware.defaultPendingSources,
 	) {
 		authorize = { request in
 			try strategy.validate(url: request.url, protectedHosts: protectedHosts, provider: authProvider)
 		}
 		self.pendingLinks = pendingLinks
+		self.pendingSources = pendingSources
 	}
 
 	/// Creates a middleware requiring authentication for the links `matcher` selects.
@@ -136,24 +154,29 @@ public final class AuthenticationMiddleware: DeepLinkMiddleware {
 	///   - authProvider: The authentication provider to use.
 	///   - matcher: The links that require a signed-in user.
 	///   - pendingLinks: Where to save rejected links; see
-	///     ``init(authProvider:protectedHosts:strategy:pendingLinks:)``.
+	///     ``init(authProvider:protectedHosts:strategy:pendingLinks:pendingSources:)``.
+	///   - pendingSources: The sources whose rejected links are saved. Defaults to ``defaultPendingSources``.
 	public init(
 		authProvider: AuthenticationProvider,
 		requiredFor matcher: DeepLinkMatcher,
 		pendingLinks: (any PendingLinkStore)? = nil,
+		pendingSources: Set<DeepLinkContext.Source> = AuthenticationMiddleware.defaultPendingSources,
 	) {
 		authorize = { request in
 			guard matcher.matches(request), !authProvider.isAuthenticated() else { return request.url }
 			throw DeepLinkError.unauthorizedAccess(request.url)
 		}
 		self.pendingLinks = pendingLinks
+		self.pendingSources = pendingSources
 	}
 
 	public func intercept(_ request: DeepLinkRequest) async throws -> DeepLinkRequest? {
 		do {
 			return try authorize(request).map(request.replacingURL)
 		} catch let DeepLinkError.unauthorizedAccess(rejectedURL) {
-			await pendingLinks?.save(DeepLinkRun.arrival ?? request.replacingURL(rejectedURL))
+			if pendingSources.contains(request.context.source) {
+				await pendingLinks?.save(DeepLinkRun.arrival ?? request.replacingURL(rejectedURL))
+			}
 			throw DeepLinkError.unauthorizedAccess(rejectedURL)
 		}
 	}

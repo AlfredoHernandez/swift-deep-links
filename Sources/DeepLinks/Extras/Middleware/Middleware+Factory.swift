@@ -200,18 +200,21 @@ public extension DeepLinkMiddleware where Self == AuthenticationMiddleware {
 	///   - protectedHosts: Set of hosts that require authentication
 	///   - strategy: The authentication validation strategy (default: .standard)
 	///   - pendingLinks: Where to save rejected links for ``DeepLinkCoordinator/resumePendingLinks(from:)`` (default: `nil`)
+	///   - pendingSources: The sources whose rejected links are saved (default: ``AuthenticationMiddleware/defaultPendingSources``)
 	/// - Returns: A configured authentication middleware instance
 	static func authentication(
 		provider: AuthenticationProvider,
 		protectedHosts: Set<String>,
 		strategy: AuthenticationStrategy = .standard,
 		pendingLinks: (any PendingLinkStore)? = nil,
+		pendingSources: Set<DeepLinkContext.Source> = AuthenticationMiddleware.defaultPendingSources,
 	) -> AuthenticationMiddleware {
 		AuthenticationMiddleware(
 			authProvider: provider,
 			protectedHosts: protectedHosts,
 			strategy: strategy,
 			pendingLinks: pendingLinks,
+			pendingSources: pendingSources,
 		)
 	}
 }
@@ -219,13 +222,14 @@ public extension DeepLinkMiddleware where Self == AuthenticationMiddleware {
 public extension DeepLinkMiddleware where Self == AuthenticationMiddleware {
 	/// Creates authentication middleware for the links `matcher` selects.
 	///
-	/// See ``AuthenticationMiddleware/init(authProvider:requiredFor:pendingLinks:)``.
+	/// See ``AuthenticationMiddleware/init(authProvider:requiredFor:pendingLinks:pendingSources:)``.
 	static func authentication(
 		provider: AuthenticationProvider,
 		requiredFor matcher: DeepLinkMatcher,
 		pendingLinks: (any PendingLinkStore)? = nil,
+		pendingSources: Set<DeepLinkContext.Source> = AuthenticationMiddleware.defaultPendingSources,
 	) -> AuthenticationMiddleware {
-		AuthenticationMiddleware(authProvider: provider, requiredFor: matcher, pendingLinks: pendingLinks)
+		AuthenticationMiddleware(authProvider: provider, requiredFor: matcher, pendingLinks: pendingLinks, pendingSources: pendingSources)
 	}
 }
 

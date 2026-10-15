@@ -87,6 +87,11 @@ public extension DeepLinkMatcher {
 		DeepLinkMatcher { sources.contains($0.context.source) }
 	}
 
+	/// Matches links replayed by ``DeepLinkCoordinator/resumePendingLinks(from:)``
+	/// (``DeepLinkContext/isResumedPendingLink``), for example to confirm them
+	/// with ``ConfirmationMiddleware`` before they act.
+	static let resumedPendingLinks = DeepLinkMatcher { $0.context.isResumedPendingLink }
+
 	/// A matcher backed by a closure.
 	///
 	/// - Parameter predicate: Returns `true` for requests the policy applies to.
