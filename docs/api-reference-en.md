@@ -371,10 +371,12 @@ public protocol RateLimitPersistence: Sendable {
     func clearRequests() async
     /// Read-modify-write with no suspension in between (2.0).
     func mutateRequests<Output: Sendable>(_ mutation: @Sendable (inout [TimeInterval]) -> Output) async -> Output
+    func mutateRequests<Output: Sendable>(retaining window: TimeInterval,
+                                          _ mutation: @Sendable (inout [TimeInterval]) -> Output) async -> Output  // default: forwards
 }
 ```
 
-Custom persistences must implement `mutateRequests(_:)`; in an actor, call `mutation(&state)` synchronously and persist before returning. There is no default built on `loadRequests`/`saveRequests`, because it could not be atomic.
+Custom persistences must implement `mutateRequests(_:)`; in an actor, call `mutation(&state)` synchronously and persist before returning. There is no default built on `loadRequests`/`saveRequests`, because it could not be atomic. The window strategies call `mutateRequests(retaining:_:)` with their `timeWindow`; a persistence that prunes must keep at least that many seconds (`UserDefaultsRateLimitPersistence` retains `max(maxAge, timeWindow)`). `UserDefaultsRateLimitPersistence` keeps one budget per install for every source, editable by the user; use separate keys for separate budgets.
 
 `.tokenBucket(capacity:refillRate:)` admits a burst of up to `capacity` links and then `refillRate` links per second; it ignores the middleware's `maxRequests` and `timeWindow`. When the bucket is empty it throws `rateLimitExceeded(maxRequests: capacity, timeWindow: capacity / refillRate)`. A non-positive or NaN rate never refills, and its error reports the seconds since the first admitted request as `timeWindow`; an infinite rate never limits.
 

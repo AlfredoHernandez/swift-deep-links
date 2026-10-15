@@ -104,7 +104,7 @@ public extension RateLimitStrategy {
 	static let slidingWindow = RateLimitStrategy { url, maxRequests, timeWindow, persistence, dateProvider in
 		let now = dateProvider().timeIntervalSince1970
 
-		let isAdmitted = await persistence.mutateRequests { timestamps in
+		let isAdmitted = await persistence.mutateRequests(retaining: timeWindow) { timestamps in
 			let validRequests = timestamps.filter { now - $0 <= timeWindow }
 			guard validRequests.count < maxRequests else { return false }
 			timestamps = validRequests + [now]
@@ -149,7 +149,7 @@ public extension RateLimitStrategy {
 		let windowStart = fixedWindowStart(containing: now, timeWindow: timeWindow).timeIntervalSince1970
 		let instant = now.timeIntervalSince1970
 
-		let isAdmitted = await persistence.mutateRequests { timestamps in
+		let isAdmitted = await persistence.mutateRequests(retaining: timeWindow) { timestamps in
 			let windowRequests = timestamps.filter { $0 >= windowStart }
 			guard windowRequests.count < maxRequests else { return false }
 			timestamps = windowRequests + [instant]

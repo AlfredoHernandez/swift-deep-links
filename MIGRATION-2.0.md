@@ -318,6 +318,12 @@ actor KeychainRateLimitPersistence: RateLimitPersistence {
 }
 ```
 
+Persistences that prune old timestamps should also implement
+`mutateRequests(retaining:_:)` and keep at least `window` seconds, as
+`UserDefaultsRateLimitPersistence` does; otherwise a long `timeWindow` loses
+requests. The built-in persistence keeps one budget per install for every
+source; give each middleware its own `key` for separate budgets.
+
 ## 8. `handle(activity:)` checks the activity type
 
 Only `NSUserActivityTypeBrowsingWeb` (as `.universalLink`) and the Handoff

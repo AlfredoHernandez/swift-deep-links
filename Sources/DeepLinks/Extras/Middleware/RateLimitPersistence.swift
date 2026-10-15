@@ -55,4 +55,30 @@ public protocol RateLimitPersistence: Sendable {
 	///   unchanged to record nothing.
 	/// - Returns: The value `mutation` returned.
 	func mutateRequests<Output: Sendable>(_ mutation: @Sendable (inout [TimeInterval]) -> Output) async -> Output
+
+	/// Like ``mutateRequests(_:)``, and keeps every timestamp from the last
+	/// `window` seconds: a persistence that prunes old timestamps must not
+	/// prune these, or a long rate-limit window would forget requests.
+	///
+	/// ``RateLimitMiddleware``'s window strategies call this with their
+	/// `timeWindow`. The default calls ``mutateRequests(_:)``, which suits
+	/// persistences that never prune.
+	///
+	/// - Parameters:
+	///   - window: The age, in seconds, below which timestamps must be kept.
+	///   - mutation: Reads and changes the timestamps.
+	/// - Returns: The value `mutation` returned.
+	func mutateRequests<Output: Sendable>(
+		retaining window: TimeInterval,
+		_ mutation: @Sendable (inout [TimeInterval]) -> Output,
+	) async -> Output
+}
+
+public extension RateLimitPersistence {
+	func mutateRequests<Output: Sendable>(
+		retaining _: TimeInterval,
+		_ mutation: @Sendable (inout [TimeInterval]) -> Output,
+	) async -> Output {
+		await mutateRequests(mutation)
+	}
 }

@@ -104,8 +104,15 @@ middleware order and a hardening checklist.
   Every built-in strategy now records only through it, so separate
   `RateLimitMiddleware` instances sharing one persistence admit exactly their
   limit (before, only a single instance was atomic).
-  `UserDefaultsRateLimitPersistence` (applying its `maxAge` pruning first) and
-  `DeepLinksTesting.InMemoryRateLimitPersistence` implement it. Migration:
+  `UserDefaultsRateLimitPersistence` (applying its pruning first) and
+  `DeepLinksTesting.InMemoryRateLimitPersistence` implement it. The window
+  strategies call the additive `mutateRequests(retaining:_:)` with their
+  `timeWindow` (the default forwards to `mutateRequests(_:)`);
+  `UserDefaultsRateLimitPersistence` raises its retention to
+  `max(maxAge, timeWindow)`, so a window longer than `maxAge` (one hour by
+  default) no longer forgets requests and admits more than its limit. The
+  stored count is global per install (every source shares one budget, and it
+  is user-editable); use separate keys for separate budgets. Migration:
   custom persistences must implement it; in an actor, call
   `mutation(&timestamps)` synchronously and persist before returning. There
   is intentionally no default built on `loadRequests`/`saveRequests`, since it
