@@ -3,6 +3,7 @@
 //
 
 import Foundation
+import os
 
 /// A builder for creating and configuring `DeepLinkCoordinator` instances.
 ///
@@ -51,6 +52,8 @@ public struct DeepLinkCoordinatorBuilder<Route: DeepLinkRoute>: Sendable {
 	private var _routeExecutionDelay: Duration = .zero
 	private var _sleep: (@Sendable (Duration) async -> Void)?
 	private var _logPrivacy = DeepLinkLogPrivacy.redacted
+	private var _diagnosticLog = LoggingProvider.systemLogger(Logger(subsystem: "swift-deep-links", category: "DeepLinkCoordinatorBuilder"))
+	var presetMiddleware: [any DeepLinkMiddleware] = []
 
 	/// Creates a new builder instance.
 	public init() {}
@@ -267,6 +270,13 @@ public struct DeepLinkCoordinatorBuilder<Route: DeepLinkRoute>: Sendable {
 		return copy
 	}
 
+	/// Replaces where debug-build configuration warnings go; a test seam.
+	func diagnosticLog(_ log: LoggingProvider) -> Self {
+		var copy = self
+		copy._diagnosticLog = log
+		return copy
+	}
+
 	/// Builds and returns the configured `DeepLinkCoordinator`.
 	///
 	/// This method assembles all configured components into a functional coordinator
@@ -280,6 +290,11 @@ public struct DeepLinkCoordinatorBuilder<Route: DeepLinkRoute>: Sendable {
 	/// - Handler implementation is configured (required)
 	/// - Middleware is added in the correct order
 	/// - Multiple delegates are automatically composed
+	///
+	/// In debug builds, a chain without a ``SecurityMiddleware`` (added
+	/// directly or by `secureDefaults(allowedSchemes:)`) logs a warning;
+	/// behavior is unchanged. A custom
+	/// ``middlewareCoordinator(_:)`` is not inspected.
 	///
 	/// ## Examples
 	///
@@ -312,16 +327,20 @@ public struct DeepLinkCoordinatorBuilder<Route: DeepLinkRoute>: Sendable {
 			throw DeepLinkError.missingRequiredConfiguration("handler")
 		}
 
+		let chain = presetMiddleware + middlewareEntries
 		let coordinator: DeepLinkMiddlewareCoordinator
 		if let custom = _middlewareCoordinator {
-			guard middlewareEntries.isEmpty else {
+			guard chain.isEmpty else {
 				throw DeepLinkError.missingRequiredConfiguration(
 					"Cannot combine a custom middlewareCoordinator with additional middleware entries; register middleware on the coordinator before passing it to the builder.",
 				)
 			}
 			coordinator = custom
 		} else {
-			coordinator = DeepLinkMiddlewareCoordinator(middleware: middlewareEntries)
+			#if DEBUG
+			warnIfUnprotected(chain)
+			#endif
+			coordinator = DeepLinkMiddlewareCoordinator(middleware: chain)
 		}
 
 		let capturedDelegates = _delegates
@@ -342,6 +361,18 @@ public struct DeepLinkCoordinatorBuilder<Route: DeepLinkRoute>: Sendable {
 			delegate: finalDelegate,
 			sleep: _sleep ?? defaultSleep,
 			logPrivacy: _logPrivacy,
+		)
+	}
+}
+
+// MARK: - Diagnostics
+
+private extension DeepLinkCoordinatorBuilder {
+	func warnIfUnprotected(_ chain: [any DeepLinkMiddleware]) {
+		guard !chain.contains(where: { $0 is SecurityMiddleware }) else { return }
+		_diagnosticLog.log(
+			level: .error,
+			"No SecurityMiddleware is registered: every scheme, host and source reaches your parsers. Add .secureDefaults(allowedSchemes:) or .middleware(.security(allowedSchemes:)) first in the chain.",
 		)
 	}
 }

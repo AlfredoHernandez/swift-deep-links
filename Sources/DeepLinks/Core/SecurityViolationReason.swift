@@ -21,7 +21,7 @@ import Foundation
 ///     showLinkExpiredBanner()
 /// }
 /// ```
-public enum SecurityViolationReason: Sendable, Hashable, CaseIterable {
+public enum SecurityViolationReason: Sendable, Hashable {
 	/// The URL carries userinfo (`https://trusted.com@evil.com`).
 	case userinfo
 

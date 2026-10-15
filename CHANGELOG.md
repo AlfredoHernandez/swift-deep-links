@@ -23,6 +23,12 @@ behavior change. User-visible additions:
   custom strategy or wrap a built-in one. `.whitelist` is documented as the
   allow-list it is.
 - `handle(shortcutItem:)` is also available on visionOS.
+- `DeepLinkCoordinatorBuilder.secureDefaults(allowedSchemes:...)` puts
+  `.security` (`.hardened`, `limits: .recommended`), `.rateLimit` (30 links
+  per minute) and `.replayProtection` (2 s) in front of the chain, whatever
+  the order of the builder calls.
+- In debug builds, `build()` logs a warning when the chain has no
+  `SecurityMiddleware`. Behavior is unchanged.
 
 ## [2.0.0] - 2026-10-14
 
