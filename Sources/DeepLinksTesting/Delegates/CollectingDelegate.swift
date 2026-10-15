@@ -94,14 +94,18 @@ public final class CollectingDelegate<Route: DeepLinkRoute>: DeepLinkCoordinator
 	/// Initializes a new collecting delegate with no recorded events.
 	public init() {}
 
+	/// Appends `url` to ``willProcessURLs``.
 	public func coordinator(_: DeepLinkCoordinator<Route>, willProcess url: URL) {
 		willProcessURLs.append(url)
 	}
 
+	/// Appends the URL and result to ``processedEvents``, including links
+	/// middleware stopped and links whose handler failed.
 	public func coordinator(_: DeepLinkCoordinator<Route>, didProcess url: URL, result: DeepLinkResult<Route>) {
 		processedEvents.append(ProcessedEvent(url: url, result: result))
 	}
 
+	/// Appends the URL and error to ``failedEvents``: links that middleware or routing rejected.
 	public func coordinator(_: DeepLinkCoordinator<Route>, didFailProcessing url: URL, error: Error) {
 		failedEvents.append(FailedEvent(url: url, error: error))
 	}

@@ -99,7 +99,7 @@ public final class LoggingMiddleware: DeepLinkMiddleware {
 	/// configured `LoggingFormat` strategy. The original URL is always returned
 	/// unchanged, allowing the middleware chain to continue processing.
 	///
-	/// - Parameter url: The deep link URL to log
+	/// - Parameter request: The deep link and its context to log
 	/// - Returns: The original URL unchanged, allowing middleware chain continuation
 	/// - Throws: Never throws - logging failures are handled gracefully
 	public func intercept(_ request: DeepLinkRequest) async throws -> DeepLinkRequest? {

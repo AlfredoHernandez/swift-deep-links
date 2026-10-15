@@ -64,6 +64,11 @@ public final class SceneRoutingHandler<Route: DeepLinkRoute>: DeepLinkHandler {
 		handlers.withLock { $0[sceneID] = nil }
 	}
 
+	/// Runs `route` on the handler registered for `context.sceneID`, or on the
+	/// fallback when the link has no scene or its scene has no handler.
+	///
+	/// - Throws: ``DeepLinkError/handlerError(message:underlyingError:)`` with
+	///   ``noSceneHandlerMessage`` when there is neither, or whatever the chosen handler throws.
 	public func handle(_ route: Route, context: DeepLinkContext) async throws {
 		let sceneHandler = context.sceneID.flatMap { sceneID in handlers.withLock { $0[sceneID] } }
 		guard let handler = sceneHandler ?? fallback else {

@@ -64,6 +64,8 @@ public actor CollectingNotificationPresenter: DeepLinkNotificationPresenter {
 		invocations
 	}
 
+	/// Records the invocation and resumes a waiting
+	/// ``waitFor(count:)`` once enough have arrived; never throws.
 	public func present(kind: DeepLinkNotificationKind, title: String, body: String, identifier: String) async throws {
 		invocations.append(Invocation(kind: kind, title: title, body: body, identifier: identifier))
 		if let awaiter = pendingAwaiter, invocations.count >= awaiter.count {

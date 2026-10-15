@@ -237,6 +237,18 @@ public final class SignedLinkMiddleware: DeepLinkMiddleware {
 		nonceStore != nil
 	}
 
+	/// Verifies the links the matcher selects, and any link that carries a
+	/// signature; other links pass through marked unverified.
+	///
+	/// A verified link has its expiry checked and its nonce reserved, then
+	/// continues with ``DeepLinkContext/isSignatureVerified`` set and, by
+	/// default, the signature parameters removed. The nonce is committed or
+	/// released in ``didFinish(_:outcome:)``.
+	///
+	/// - Returns: `nil` for a reused nonce with ``ReusedNonceResponse/drop``.
+	/// - Throws: ``DeepLinkError/securityViolation(_:)`` for a missing or
+	///   invalid signature, a missing, expired or too distant expiry, a missing
+	///   nonce, or a reused one with ``ReusedNonceResponse/reject``.
 	public func intercept(_ request: DeepLinkRequest) async throws -> DeepLinkRequest? {
 		guard matcher.matches(request) || carriesSignature(request.url) else {
 			return request.markingSignature(verified: false)

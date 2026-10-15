@@ -32,10 +32,22 @@ import Foundation
 /// match; decoding happens once, so `%252e%252e` stays the literal text
 /// `%2e%2e` and fails the character-set check.
 ///
-/// These checks are defence in depth, not a gate: ``DefaultDeepLinkRouting``
-/// treats any parser error as "not mine" and tries the next parser, so a
-/// laxer parser later in the list can still accept the URL. Reject traversal
-/// before routing with `.security(..., strategy: .hardened)`.
+/// The traversal check throws a security error, which stops
+/// ``DefaultDeepLinkRouting`` before any later parser sees the URL. Still
+/// reject traversal before routing with ``SecurityMiddleware`` and
+/// ``SecurityStrategy/hardened``, so logging and other middleware never
+/// read such a link.
+///
+/// ## Protecting the routes a template produces
+///
+/// Several URL spellings can produce the same route (a custom-scheme host
+/// with ``Scope/hostAndPath``, a second template for an old path). Guard
+/// sensitive routes with a ``RouteMatcher`` rule
+/// (``DeepLinkHandler/requiringSignature(for:)``,
+/// ``DeepLinkHandler/requiringAuthentication(for:provider:)``,
+/// ``ConfirmingHandler``), which sees the parsed route. A
+/// ``DeepLinkMatcher`` rule such as ``DeepLinkMatcher/paths(_:)`` matches
+/// URL path *prefixes*, not templates, and only rejects early.
 ///
 /// ## Errors
 ///

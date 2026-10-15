@@ -69,6 +69,8 @@ public final class CollectingAnalyticsProvider: AnalyticsProvider {
 		state.withLock { $0 }
 	}
 
+	/// Records `event` with every parameter value converted to a string with
+	/// string interpolation, so tests compare `"true"`, `"42"` and so on.
 	public func track(_ event: String, parameters: [String: Any]) {
 		let sendableParams = parameters.compactMapValues { "\($0)" }
 		let tracked = TrackedEvent(name: event, parameters: sendableParams)

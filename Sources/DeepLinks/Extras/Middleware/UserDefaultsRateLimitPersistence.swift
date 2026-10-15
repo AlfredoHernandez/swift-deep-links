@@ -69,6 +69,10 @@ public actor UserDefaultsRateLimitPersistence: RateLimitPersistence {
 		}
 	}
 
+	/// The stored timestamps newer than the retention (`maxAge`, raised by
+	/// long windows), writing back the pruned list when anything was dropped.
+	///
+	/// - Returns: An empty array when nothing is stored or the data is unreadable.
 	public func loadRequests() -> [TimeInterval] {
 		guard let data = userDefaults.data(forKey: key),
 		      let timestamps = try? JSONDecoder().decode([TimeInterval].self, from: data)
@@ -83,10 +87,13 @@ public actor UserDefaultsRateLimitPersistence: RateLimitPersistence {
 		return pruned
 	}
 
+	/// Replaces the stored timestamps. Not atomic with ``loadRequests()``;
+	/// ``RateLimitMiddleware`` records through ``mutateRequests(_:)`` instead.
 	public func saveRequests(_ timestamps: [TimeInterval]) {
 		persistTimestamps(timestamps)
 	}
 
+	/// Removes the stored entry, resetting every limiter that shares this key.
 	public func clearRequests() {
 		userDefaults.removeObject(forKey: key)
 	}

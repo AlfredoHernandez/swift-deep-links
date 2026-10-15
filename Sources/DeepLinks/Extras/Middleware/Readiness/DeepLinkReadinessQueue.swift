@@ -73,6 +73,8 @@ public final class DeepLinkReadinessQueue: ReadinessQueue, Sendable {
 		state = OSAllocatedUnfairLock(initialState: State())
 	}
 
+	/// Whether links pass through instead of being queued: `false` until
+	/// ``markReady()`` or ``markReadyReturningRequests()``, and again after ``reset()``.
 	public var isReady: Bool {
 		state.withLock { $0.isReady }
 	}
@@ -88,6 +90,13 @@ public final class DeepLinkReadinessQueue: ReadinessQueue, Sendable {
 		enqueue(DeepLinkRequest(url: url))?.url
 	}
 
+	/// Queues `request`, with its context, while not ready; returns it unchanged once ready.
+	///
+	/// When the queue is full the oldest link is dropped: a signed link it
+	/// reserved is released, and `onEvict` receives its URL after the lock is
+	/// released.
+	///
+	/// - Returns: `request` when ready, `nil` when it was queued.
 	public func enqueue(_ request: DeepLinkRequest) -> DeepLinkRequest? {
 		let outcome = state.withLock { state -> (passThrough: DeepLinkRequest?, evicted: DeepLinkRequest?) in
 			if state.isReady {
@@ -107,10 +116,16 @@ public final class DeepLinkReadinessQueue: ReadinessQueue, Sendable {
 		return outcome.passThrough
 	}
 
+	/// Marks the queue ready and returns the queued URLs, oldest first,
+	/// emptying the queue. Calling it again returns an empty array. Prefer
+	/// ``DeepLinkCoordinator/markReadyAndDrain(queue:)``, which also routes them.
 	public func markReady() -> [URL] {
 		markReadyReturningRequests().map(\.url)
 	}
 
+	/// Marks the queue ready and returns the queued requests with their
+	/// contexts, oldest first, emptying the queue atomically: a link enqueued
+	/// concurrently is either returned here or passed through, never lost.
 	public func markReadyReturningRequests() -> [DeepLinkRequest] {
 		state.withLock { state in
 			state.isReady = true
@@ -136,6 +151,8 @@ public final class DeepLinkReadinessQueue: ReadinessQueue, Sendable {
 		pendingRequests.map(\.url)
 	}
 
+	/// A snapshot of the queued requests with their contexts, oldest first;
+	/// reading it does not drain the queue.
 	public var pendingRequests: [DeepLinkRequest] {
 		state.withLock { $0.pending }
 	}

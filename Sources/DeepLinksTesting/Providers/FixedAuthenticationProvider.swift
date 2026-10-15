@@ -50,6 +50,7 @@ public struct FixedAuthenticationProvider: AuthenticationProvider, Sendable {
 		authenticated = isAuthenticated
 	}
 
+	/// The value passed to ``init(isAuthenticated:)``.
 	public func isAuthenticated() -> Bool {
 		authenticated
 	}

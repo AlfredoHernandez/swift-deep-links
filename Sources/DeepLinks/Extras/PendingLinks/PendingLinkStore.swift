@@ -46,10 +46,13 @@ public protocol PendingLinkStore: Sendable {
 }
 
 public extension PendingLinkStore {
+	/// Saves only `request.url`, dropping the context: the link resumes with
+	/// ``DeepLinkContext/unknown``, so source-based rules treat it as unknown.
 	func save(_ request: DeepLinkRequest) async {
 		await save(request.url)
 	}
 
+	/// Wraps ``takeAll()``; every request carries ``DeepLinkContext/unknown``.
 	func takeAllRequests() async -> [DeepLinkRequest] {
 		await takeAll().map { DeepLinkRequest(url: $0) }
 	}

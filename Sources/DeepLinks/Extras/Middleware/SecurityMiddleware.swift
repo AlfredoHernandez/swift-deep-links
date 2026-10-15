@@ -148,6 +148,13 @@ public final class SecurityMiddleware: DeepLinkMiddleware {
 		self.allowedSources = allowedSources
 	}
 
+	/// Checks, in order, the source against `allowedSources`, the input
+	/// limits, then the strategy, before any later middleware reads the URL.
+	///
+	/// - Returns: The request with the URL the strategy returned (canonical
+	///   for ``SecurityStrategy/hardened``), or `nil` when the strategy stops it.
+	/// - Throws: ``DeepLinkError/securityViolation(_:)`` or
+	///   ``DeepLinkError/blockedURL(_:)``; the reason never echoes the rejected value.
 	public func intercept(_ request: DeepLinkRequest) async throws -> DeepLinkRequest? {
 		if let allowedSources, !allowedSources.contains(request.context.source) {
 			throw DeepLinkError.securityViolation(SecurityViolationMessage.unauthorizedSource)

@@ -84,6 +84,13 @@ public final class URLTransformationMiddleware: DeepLinkMiddleware {
 		self.strategy = strategy
 	}
 
+	/// Replaces the URL with the transformer's result according to the strategy.
+	///
+	/// Changing the URL clears ``DeepLinkContext/isSignatureVerified``, so
+	/// place this before ``SignedLinkMiddleware`` when routes need a verified link.
+	///
+	/// - Returns: The transformed request, or `nil` when the strategy stops it.
+	/// - Throws: What the transformer throws, unless the strategy recovers.
 	public func intercept(_ request: DeepLinkRequest) async throws -> DeepLinkRequest? {
 		try strategy.transform(url: request.url, transformer: transformer).map(request.replacingURL)
 	}

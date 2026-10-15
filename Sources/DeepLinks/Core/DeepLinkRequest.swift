@@ -155,10 +155,14 @@ public struct DeepLinkRequest: Sendable, Hashable {
 // MARK: - Equatable & Hashable
 
 public extension DeepLinkRequest {
+	/// Two requests are equal when their URLs and contexts match, including
+	/// ``DeepLinkContext/isSignatureVerified`` and
+	/// ``DeepLinkContext/isResumedPendingLink``; readiness bookkeeping is ignored.
 	static func == (lhs: DeepLinkRequest, rhs: DeepLinkRequest) -> Bool {
 		lhs.url == rhs.url && lhs.context == rhs.context
 	}
 
+	/// Hashes the URL and the context, consistent with `==`.
 	func hash(into hasher: inout Hasher) {
 		hasher.combine(url)
 		hasher.combine(context)

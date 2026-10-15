@@ -11,7 +11,9 @@ import Foundation
 /// so they hold however the URL was spelled (encodings, custom-scheme hosts,
 /// a second parser accepting another shape). Prefer them to ``DeepLinkMatcher``
 /// URL rules for anything sensitive; use URL rules to reject early, before
-/// parsing or other middleware runs.
+/// parsing or other middleware runs. When parsers such as
+/// ``PathPatternParser`` map several templates or a custom-scheme host to the
+/// same route, one route rule covers all of them.
 public struct RouteMatcher<Route: DeepLinkRoute>: Sendable {
 	private let predicate: @Sendable (Route, DeepLinkContext) -> Bool
 

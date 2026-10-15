@@ -43,6 +43,7 @@ public struct URLFuzzCase: Sendable, Hashable, CustomStringConvertible {
 	/// The hostile URL.
 	public let url: URL
 
+	/// `category: name`, for readable parameterized test names; the URL is left out.
 	public var description: String {
 		"\(category.rawValue): \(name)"
 	}

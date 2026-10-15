@@ -54,6 +54,13 @@ public struct ConfirmingHandler<Route: DeepLinkRoute>: DeepLinkHandler {
 		self.confirm = confirm
 	}
 
+	/// Asks `confirm` about routes the matcher selects, then runs approved ones.
+	///
+	/// An unanswered prompt is denied when `timeout` elapses. A declined route
+	/// releases a signed link's nonce.
+	///
+	/// - Throws: ``DeepLinkError/confirmationDenied(_:)`` with the routed URL,
+	///   or whatever the wrapped handler throws.
 	public func handle(_ route: Route, context: DeepLinkContext) async throws {
 		if matcher.matches(route, context: context) {
 			let approved = await ConfirmationRace.decide(timeout: timeout, sleep: sleep) { [confirm] in

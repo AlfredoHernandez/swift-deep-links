@@ -61,14 +61,18 @@ public protocol ReadinessQueue: ReadinessCondition {
 }
 
 public extension ReadinessQueue {
+	/// Enqueues only `request.url`; a queued link drains with
+	/// ``DeepLinkContext/unknown``. A link passed through while ready keeps its context.
 	func enqueue(_ request: DeepLinkRequest) -> DeepLinkRequest? {
 		enqueue(request.url).map(request.replacingURL)
 	}
 
+	/// Wraps ``markReady()``; every request carries ``DeepLinkContext/unknown``.
 	func markReadyReturningRequests() -> [DeepLinkRequest] {
 		markReady().map { DeepLinkRequest(url: $0) }
 	}
 
+	/// Wraps ``pendingURLs``; every request carries ``DeepLinkContext/unknown``.
 	var pendingRequests: [DeepLinkRequest] {
 		pendingURLs.map { DeepLinkRequest(url: $0) }
 	}

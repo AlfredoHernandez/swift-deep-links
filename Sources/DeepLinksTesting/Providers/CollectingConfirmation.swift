@@ -42,6 +42,8 @@ public final class CollectingConfirmation: DeepLinkConfirmationProvider {
 		state.withLock { $0.requests }
 	}
 
+	/// Records `request` and answers with ``approves`` immediately, without
+	/// suspending, so it never triggers a confirmation timeout.
 	public func confirm(_ request: DeepLinkConfirmationRequest) async -> Bool {
 		state.withLock { state in
 			state.requests.append(request)

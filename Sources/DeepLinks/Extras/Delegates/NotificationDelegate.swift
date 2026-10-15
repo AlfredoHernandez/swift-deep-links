@@ -106,8 +106,16 @@ public protocol DeepLinkNotificationPresenter: Sendable {
 /// observe or suppress the notification traffic without hitting the system
 /// notification center.
 public struct DefaultDeepLinkNotificationPresenter: DeepLinkNotificationPresenter {
+	/// Creates a presenter that posts to `UNUserNotificationCenter.current()`.
+	/// The app must have notification authorization, or every presentation
+	/// fails and is logged by the delegate.
 	public init() {}
 
+	/// Posts an immediate local notification with the default sound; a
+	/// pending notification with the same `identifier` is replaced. `kind` is
+	/// ignored.
+	///
+	/// - Throws: The error `UNUserNotificationCenter` reports, such as missing authorization.
 	public func present(
 		kind _: DeepLinkNotificationKind,
 		title: String,
@@ -205,6 +213,8 @@ public final class DeepLinkNotificationDelegate<Route: DeepLinkRoute>: DeepLinkC
 		}
 	}
 
+	/// Shows an info notification naming the link's host, only when
+	/// `showInfoNotifications` is on.
 	public func coordinator(
 		_: DeepLinkCoordinator<Route>,
 		willProcess url: URL,
@@ -221,6 +231,10 @@ public final class DeepLinkNotificationDelegate<Route: DeepLinkRoute>: DeepLinkC
 		}
 	}
 
+	/// Shows a success notification for a successful link when
+	/// `showSuccessNotifications` is on, or a failure notification (detail per
+	/// `errorDetail`) for an unsuccessful one when `showErrorNotifications` is
+	/// on. A link stopped by middleware counts as unsuccessful.
 	public func coordinator(
 		_: DeepLinkCoordinator<Route>,
 		didProcess url: URL,
@@ -248,6 +262,8 @@ public final class DeepLinkNotificationDelegate<Route: DeepLinkRoute>: DeepLinkC
 		}
 	}
 
+	/// Shows a failure notification (detail per `errorDetail`) for a link
+	/// middleware or routing rejected, when `showErrorNotifications` is on.
 	public func coordinator(
 		_: DeepLinkCoordinator<Route>,
 		didFailProcessing url: URL,

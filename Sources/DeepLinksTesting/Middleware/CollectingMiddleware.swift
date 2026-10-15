@@ -63,6 +63,7 @@ public final class CollectingMiddleware: DeepLinkMiddleware {
 		state.withLock { $0 }
 	}
 
+	/// Records `request`, with its context, and passes it through unchanged.
 	public func intercept(_ request: DeepLinkRequest) async throws -> DeepLinkRequest? {
 		state.withLock { $0.append(request) }
 		return request

@@ -142,7 +142,7 @@ public final class RateLimitMiddleware: DeepLinkMiddleware {
 	/// If the limit is exceeded, it throws a `DeepLinkError.rateLimitExceeded` error.
 	/// Otherwise, it returns the original URL to allow processing to continue.
 	///
-	/// - Parameter url: The deep link URL to process
+	/// - Parameter request: The deep link and its context to check
 	/// - Returns: The original URL if within rate limits
 	/// - Throws: `DeepLinkError.rateLimitExceeded` if the rate limit is exceeded,
 	///   or `CancellationError` if the task is cancelled before its turn, in

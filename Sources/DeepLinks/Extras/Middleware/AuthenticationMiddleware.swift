@@ -170,6 +170,13 @@ public final class AuthenticationMiddleware: DeepLinkMiddleware {
 		self.pendingSources = pendingSources
 	}
 
+	/// Passes `request` through unless it is protected and the user is signed out.
+	///
+	/// A rejected link from one of `pendingSources` is saved to the pending
+	/// store first, as it entered the chain (so a signed link keeps its
+	/// signature), then the error is rethrown.
+	///
+	/// - Throws: ``DeepLinkError/unauthorizedAccess(_:)`` for a protected link while signed out.
 	public func intercept(_ request: DeepLinkRequest) async throws -> DeepLinkRequest? {
 		do {
 			return try authorize(request).map(request.replacingURL)

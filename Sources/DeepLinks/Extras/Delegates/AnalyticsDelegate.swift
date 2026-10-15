@@ -46,6 +46,7 @@ public final class DeepLinkAnalyticsDelegate<Route: DeepLinkRoute>: DeepLinkCoor
 		self.privacy = privacy
 	}
 
+	/// Tracks `deep_link_attempted` with the URL envelope (redacted per `privacy`).
 	public func coordinator(
 		_: DeepLinkCoordinator<Route>,
 		willProcess url: URL,
@@ -56,6 +57,10 @@ public final class DeepLinkAnalyticsDelegate<Route: DeepLinkRoute>: DeepLinkCoor
 		)
 	}
 
+	/// Tracks `deep_link_processed` with the outcome: `success`,
+	/// `execution_time`, route counts, `errors_count`,
+	/// `was_stopped_by_middleware` and, when there are errors,
+	/// `error_descriptions` described per `privacy`.
 	public func coordinator(
 		_: DeepLinkCoordinator<Route>,
 		didProcess url: URL,
@@ -76,6 +81,9 @@ public final class DeepLinkAnalyticsDelegate<Route: DeepLinkRoute>: DeepLinkCoor
 		analyticsProvider.track("deep_link_processed", parameters: parameters)
 	}
 
+	/// Tracks `deep_link_failed` for a link that middleware or routing
+	/// rejected, with `error_description` (per `privacy`), `error_domain` and
+	/// `error_code`. Handler failures arrive in `didProcess` instead.
 	public func coordinator(
 		_: DeepLinkCoordinator<Route>,
 		didFailProcessing url: URL,

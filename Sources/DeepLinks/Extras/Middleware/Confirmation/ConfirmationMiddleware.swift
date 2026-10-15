@@ -90,6 +90,17 @@ public final class ConfirmationMiddleware: DeepLinkMiddleware {
 		self.sleep = sleep
 	}
 
+	/// Asks the provider about links the matcher selects and passes the rest through.
+	///
+	/// The provider sees the redacted URL. Prompts are serialized in arrival
+	/// order, and the timeout counts from arrival, including the wait for
+	/// earlier prompts. On timeout or cancellation the link is denied at once,
+	/// even if the provider ignores cancellation.
+	///
+	/// - Returns: `request` unchanged when approved or not selected.
+	/// - Throws: ``DeepLinkError/confirmationDenied(_:)`` when denied or
+	///   unanswered, or ``DeepLinkError/securityViolation(_:)`` with
+	///   ``tooManyPendingPromptsReason`` when `maxPendingPrompts` links already wait.
 	public func intercept(_ request: DeepLinkRequest) async throws -> DeepLinkRequest? {
 		guard matcher.matches(request) else { return request }
 		guard reservePendingSlot() else {

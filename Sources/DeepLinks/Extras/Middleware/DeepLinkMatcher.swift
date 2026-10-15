@@ -22,6 +22,15 @@ import Foundation
 /// other than `http(s)` ``paths(_:)`` also matches the host as the first
 /// segment: `.paths(["/reset"])` covers both `https://example.com/reset` and
 /// `myapp://reset`.
+///
+/// ## URL rules and route rules
+///
+/// A `DeepLinkMatcher` decides from the URL, before parsing, so it can
+/// reject early, but it only covers the spellings it anticipates. A
+/// ``RouteMatcher`` decides from the route a parser produced, such as one
+/// ``PathPatternParser`` builds from several URL shapes, so its rules hold
+/// for every spelling. Use both for sensitive links: a URL rule to stop
+/// them early and a route rule as the guarantee.
 public struct DeepLinkMatcher: Sendable {
 	private let predicate: @Sendable (DeepLinkRequest) -> Bool
 

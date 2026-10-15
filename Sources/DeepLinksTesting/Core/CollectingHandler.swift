@@ -55,10 +55,12 @@ public final class CollectingHandler<Route: DeepLinkRoute>: DeepLinkHandler {
 		state.withLock { $0.map(\.context) }
 	}
 
+	/// Records `route` with `DeepLinkContext.unknown`; never throws.
 	public func handle(_ route: Route) async throws {
 		try await handle(route, context: .unknown)
 	}
 
+	/// Records `route` and `context`, in call order, thread-safely; never throws.
 	public func handle(_ route: Route, context: DeepLinkContext) async throws {
 		state.withLock { $0.append((route, context)) }
 	}

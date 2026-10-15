@@ -61,6 +61,14 @@ public final class ReadinessMiddleware: DeepLinkMiddleware, ChainGate {
 		self.log = log
 	}
 
+	/// Queues `request` until the queue is ready, stopping the chain, or
+	/// passes it through once ready.
+	///
+	/// A queued link is resumed right after this middleware by
+	/// ``DeepLinkCoordinator/markReadyAndDrain(queue:)``; middleware before it
+	/// does not run again.
+	///
+	/// - Returns: `request` when ready, `nil` when queued.
 	public func intercept(_ request: DeepLinkRequest) async throws -> DeepLinkRequest? {
 		guard let passed = queue.enqueue(request) else {
 			log.log(level: .info, "Deep link queued (app not ready): \(privacy.describe(request.url))")

@@ -20,6 +20,8 @@ public enum PathPatternError: Error, Equatable, Sendable, LocalizedError {
 	/// Carries the segment.
 	case invalidLiteral(String)
 
+	/// A description naming the offending segment or capture, taken from the
+	/// template you wrote, never from a URL.
 	public var errorDescription: String? {
 		switch self {
 		case let .invalidCaptureName(segment):

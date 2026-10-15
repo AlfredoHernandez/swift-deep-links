@@ -44,23 +44,35 @@ public actor UserDefaultsPendingLinkStore: PendingLinkStore {
 		self.dateProvider = dateProvider
 	}
 
+	/// Saves `url` with ``DeepLinkContext/unknown``; see ``save(_:)-(DeepLinkRequest)``.
 	public func save(_ url: URL) async {
 		await save(DeepLinkRequest(url: url))
 	}
 
+	/// The URLs of ``takeAllRequests()``: unexpired links, oldest first. The stored entry is removed afterwards.
 	public func takeAll() async -> [URL] {
 		await takeAllRequests().map(\.url)
 	}
 
+	/// Writes `request` as the newest link, with its context (without the
+	/// signature-verified flag) and the current time, in plain text.
+	///
+	/// A URL already pending moves to the newest position; beyond `maxCount`
+	/// the oldest link is dropped. Unreadable stored data is treated as empty
+	/// and overwritten.
 	public func save(_ request: DeepLinkRequest) async {
 		persist(policy.inserting(request, at: now, into: storedLinks()))
 	}
 
+	/// Returns the links saved less than `expiry` seconds ago, oldest first,
+	/// and removes the stored entry. Links stored in an older format, or with a source
+	/// this version does not know, come back with ``DeepLinkContext/unknown``.
 	public func takeAllRequests() async -> [DeepLinkRequest] {
 		defer { removeAll() }
 		return policy.unexpired(storedLinks(), at: now).map(\.request)
 	}
 
+	/// Removes the stored entry; call it on sign-out.
 	public func removeAll() {
 		userDefaults.removeObject(forKey: key)
 	}

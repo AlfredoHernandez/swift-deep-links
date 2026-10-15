@@ -47,6 +47,8 @@ public final class DeepLinkLoggingDelegate<Route: DeepLinkRoute>: DeepLinkCoordi
 		self.log = log
 	}
 
+	/// Logs the start at `.info` and, with debug logging, the URL's parts at
+	/// `.debug`; URLs are described per `privacy`.
 	public func coordinator(
 		_: DeepLinkCoordinator<Route>,
 		willProcess url: URL,
@@ -62,6 +64,9 @@ public final class DeepLinkLoggingDelegate<Route: DeepLinkRoute>: DeepLinkCoordi
 		}
 	}
 
+	/// Logs success at `.info` or failure at `.error` with each error, plus a
+	/// `.info` line when middleware stopped the link; timings and route counts
+	/// only with debug logging.
 	public func coordinator(
 		_: DeepLinkCoordinator<Route>,
 		didProcess url: URL,
@@ -95,6 +100,9 @@ public final class DeepLinkLoggingDelegate<Route: DeepLinkRoute>: DeepLinkCoordi
 		}
 	}
 
+	/// Logs a middleware or routing failure at `.error`. The error's
+	/// `userInfo` is logged, with debug logging, only when `privacy` is
+	/// ``DeepLinkLogPrivacy/unredacted``.
 	public func coordinator(
 		_: DeepLinkCoordinator<Route>,
 		didFailProcessing url: URL,

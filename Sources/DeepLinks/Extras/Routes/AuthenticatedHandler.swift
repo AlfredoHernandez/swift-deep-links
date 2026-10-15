@@ -41,6 +41,14 @@ public struct AuthenticatedHandler<Route: DeepLinkRoute>: DeepLinkHandler {
 		self.provider = provider
 	}
 
+	/// Runs `route` unless the matcher selects it while the user is signed out.
+	///
+	/// The check runs when the route executes, after every middleware, so it
+	/// holds for any URL spelling. A declined route releases a signed link's
+	/// nonce.
+	///
+	/// - Throws: ``DeepLinkError/unauthorizedAccess(_:)`` with the routed URL,
+	///   or whatever the wrapped handler throws.
 	public func handle(_ route: Route, context: DeepLinkContext) async throws {
 		if matcher.matches(route, context: context), !provider.isAuthenticated() {
 			throw DeepLinkRun.declineRoute(with: .unauthorizedAccess(DeepLinkRun.routedURL ?? URL(string: "about:blank")!))

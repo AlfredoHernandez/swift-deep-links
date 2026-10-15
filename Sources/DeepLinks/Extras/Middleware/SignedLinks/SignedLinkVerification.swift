@@ -96,6 +96,11 @@ public struct Ed25519PublicKeyring: SignedLinkVerifier {
 		self.init(keys: [Self.defaultKeyID: key], defaultKeyID: Self.defaultKeyID)
 	}
 
+	/// Checks `signature` with the public key for `keyID`, or for
+	/// ``defaultKeyID`` when the link has no key id.
+	///
+	/// - Returns: `false` for an unknown key id or a signature that does not
+	///   verify; it never throws.
 	public func isValidSignature(_ signature: Data, of message: Data, keyID: String?) async throws -> Bool {
 		guard let key = (keyID ?? defaultKeyID).flatMap({ keys[$0] }) else { return false }
 		return key.isValidSignature(signature, for: message)
@@ -114,6 +119,11 @@ public struct Ed25519LinkSigner: SignedLinkSigner {
 		self.privateKey = privateKey
 	}
 
+	/// Signs `message` with the private key; the result verifies with the
+	/// matching public key in an ``Ed25519PublicKeyring``.
+	///
+	/// - Throws: ``DeepLinkError/securityViolation(_:)`` with
+	///   ``SignedLinkMiddleware/signingFailedReason`` when CryptoKit cannot sign.
 	public func signature(of message: Data) throws -> Data {
 		do {
 			return try privateKey.signature(for: message)

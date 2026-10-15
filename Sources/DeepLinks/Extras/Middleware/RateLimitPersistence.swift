@@ -75,6 +75,9 @@ public protocol RateLimitPersistence: Sendable {
 }
 
 public extension RateLimitPersistence {
+	/// Ignores `window` and calls ``mutateRequests(_:)``. Correct only for a
+	/// persistence that never prunes; one that drops old timestamps must
+	/// implement this and keep at least `window` seconds.
 	func mutateRequests<Output: Sendable>(
 		retaining _: TimeInterval,
 		_ mutation: @Sendable (inout [TimeInterval]) -> Output,

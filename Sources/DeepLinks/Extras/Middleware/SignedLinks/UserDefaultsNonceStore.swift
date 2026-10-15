@@ -103,11 +103,20 @@ public actor UserDefaultsNonceStore: NonceStore {
 		self.encode = encode
 	}
 
+	/// Spends `nonce` until `expiresAt` and writes the spent set.
+	///
+	/// Returns `false`, recording nothing, when the nonce is spent or reserved,
+	/// `expiresAt` is not in the future, the store is full, the stored data has
+	/// a newer format version, or the write fails.
 	public func consume(_ nonce: String, expiresAt: Date) async -> Bool {
 		let now = dateProvider()
 		return updatingLedger(refusal: false) { $0.admit(nonce, expiresAt: expiresAt, reservation: nil, now: now, maxEntries: maxEntries) }
 	}
 
+	/// Holds `nonce` in memory for the reservation time to live; nothing is
+	/// written, so the reservation does not survive a relaunch.
+	///
+	/// - Returns: The reservation, or `nil` for the same reasons ``consume(_:expiresAt:)`` returns `false`.
 	public func reserve(_ nonce: String, expiresAt: Date) async -> NonceReservation? {
 		let now = dateProvider()
 		let reservation = NonceReservation(nonce: nonce, expiresAt: expiresAt)
@@ -118,11 +127,18 @@ public actor UserDefaultsNonceStore: NonceStore {
 		return admitted ? reservation : nil
 	}
 
+	/// Spends the reserved nonce until `reservation.expiresAt` and writes it.
+	///
+	/// If the write fails the nonce is still spent for this launch, so the link
+	/// cannot run again before a relaunch. Like ``InMemoryNonceStore``, a
+	/// lapsed or replaced reservation is spent anyway.
 	public func commit(_ reservation: NonceReservation) async {
 		let now = dateProvider()
 		updatingLedger(refusal: (), keepingUnpersisted: true) { $0.commit(reservation, now: now) }
 	}
 
+	/// Frees the nonce while this reservation still holds it; a spent nonce or
+	/// a newer reservation is left alone. Nothing is written for a reservation.
 	public func release(_ reservation: NonceReservation) async {
 		updatingLedger(refusal: ()) { $0.release(reservation) }
 	}

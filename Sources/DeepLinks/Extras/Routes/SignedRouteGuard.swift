@@ -43,6 +43,11 @@ public struct SignedRouteGuard<Route: DeepLinkRoute>: DeepLinkHandler {
 		self.matcher = matcher
 	}
 
+	/// Runs `route` unless the matcher selects it and the link was not
+	/// verified by ``SignedLinkMiddleware`` for the URL that was routed.
+	///
+	/// - Throws: ``DeepLinkError/securityViolation(_:)`` with
+	///   ``unsignedRouteReason``, or whatever the wrapped handler throws.
 	public func handle(_ route: Route, context: DeepLinkContext) async throws {
 		if matcher.matches(route, context: context), !context.isSignatureVerified {
 			throw DeepLinkRun.declineRoute(with: .securityViolation(Self.unsignedRouteReason))

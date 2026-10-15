@@ -45,12 +45,23 @@ public protocol NonceStore: Sendable {
 }
 
 public extension NonceStore {
+	/// Consumes `nonce` at once and wraps the outcome in a reservation.
+	///
+	/// The nonce is already spent when this returns, so ``commit(_:)`` and
+	/// ``release(_:)`` cannot undo it: with this default a link rejected after
+	/// its signature verified (by authentication, a confirmation or a parser)
+	/// cannot be retried or resumed after sign-in.
+	///
+	/// - Returns: A reservation when ``consume(_:expiresAt:)`` returned `true`, otherwise `nil`.
 	func reserve(_ nonce: String, expiresAt: Date) async -> NonceReservation? {
 		await consume(nonce, expiresAt: expiresAt) ? NonceReservation(nonce: nonce, expiresAt: expiresAt) : nil
 	}
 
+	/// Does nothing: the default ``reserve(_:expiresAt:)`` already spent the nonce.
 	func commit(_: NonceReservation) async {}
 
+	/// Does nothing, so with the default ``reserve(_:expiresAt:)`` a released
+	/// link stays spent.
 	func release(_: NonceReservation) async {}
 }
 
@@ -118,11 +129,25 @@ public final class InMemoryNonceStore: NonceStore {
 		self.dateProvider = dateProvider
 	}
 
+	/// Spends `nonce` until `expiresAt`, atomically.
+	///
+	/// Returns `false`, recording nothing, when `nonce` is already spent or
+	/// reserved, when `expiresAt` is not in the future, or when `maxEntries`
+	/// live nonces remain after expired ones are pruned (a full store refuses
+	/// rather than forgets).
 	public func consume(_ nonce: String, expiresAt: Date) async -> Bool {
 		let now = dateProvider()
 		return ledger.withLock { $0.admit(nonce, expiresAt: expiresAt, reservation: nil, now: now, maxEntries: maxEntries) }
 	}
 
+	/// Holds `nonce` for `reservationTTL` seconds, atomically, counting it
+	/// towards `maxEntries`.
+	///
+	/// Refused for the same reasons as ``consume(_:expiresAt:)``. A lapsed
+	/// reservation frees the nonce for a new one; committing the lapsed
+	/// reservation afterwards still spends it.
+	///
+	/// - Returns: The reservation, or `nil` when refused.
 	public func reserve(_ nonce: String, expiresAt: Date) async -> NonceReservation? {
 		let now = dateProvider()
 		let reservation = NonceReservation(nonce: nonce, expiresAt: expiresAt)
@@ -131,11 +156,18 @@ public final class InMemoryNonceStore: NonceStore {
 		return admitted ? reservation : nil
 	}
 
+	/// Spends the reserved nonce until `reservation.expiresAt`.
+	///
+	/// The nonce ends up spent even if the reservation lapsed or another
+	/// reservation now holds it: a link whose handler ran must never run again.
 	public func commit(_ reservation: NonceReservation) async {
 		let now = dateProvider()
 		ledger.withLock { $0.commit(reservation, now: now) }
 	}
 
+	/// Frees the nonce so its link can be retried, but only while this
+	/// reservation (matched by ``NonceReservation/token``) still holds it; a
+	/// spent nonce or a newer reservation is left alone.
 	public func release(_ reservation: NonceReservation) async {
 		ledger.withLock { $0.release(reservation) }
 	}

@@ -48,6 +48,10 @@ public struct SigningKeyring: SigningKeyProvider {
 		self.init(keys: [Self.defaultKeyID: key], defaultKeyID: Self.defaultKeyID)
 	}
 
+	/// The key for `keyID`, or for ``defaultKeyID`` when the link has no key id.
+	///
+	/// - Returns: `nil` for an unknown key id, or for a link without one when
+	///   there is no default key; the link then fails as an invalid signature.
 	public func verificationKey(forKeyID keyID: String?) async -> SymmetricKey? {
 		(keyID ?? defaultKeyID).flatMap { keys[$0] }
 	}
