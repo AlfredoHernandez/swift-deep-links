@@ -62,8 +62,11 @@ struct ConfirmationPrompterTests {
 	// MARK: - Helpers
 
 	private func waitForPrompt(on sut: ConfirmationPrompter) async {
-		while sut.prompt == nil {
+		for _ in 0 ..< 1000 where sut.prompt == nil {
 			await Task.yield()
+		}
+		if sut.prompt == nil {
+			Issue.record("No prompt was shown")
 		}
 	}
 }
