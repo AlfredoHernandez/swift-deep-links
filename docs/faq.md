@@ -6,7 +6,7 @@ Common questions and answers about the DeepLink library.
 
 ### What is a deep link?
 
-A deep link is a URL that opens a specific screen or section within your iOS app, rather than just launching the app. For example, `myapp://profile?userId=123` might open the user profile screen for user ID 123.
+A deep link is a URL that opens a specific screen or section within your app, rather than just launching it. For example, `myapp://profile?userID=123` might open the profile screen for user 123.
 
 ### Why should I use this library instead of handling deep links manually?
 
@@ -26,10 +26,24 @@ Most APIs work on every supported platform. Two platform notes:
 - **tvOS:** `DeepLinkNotificationDelegate` is unavailable because tvOS does not display banner notifications. Use `DeepLinkLoggingDelegate` or a custom delegate for user feedback.
 - **watchOS:** `View.onDeepLink(_:)` attaches `onContinueUserActivity(NSUserActivityTypeBrowsingWeb)`, which is available on watchOS 9+ but Universal Link continuations only originate from paired-device Safari handoffs. If your app is watchOS-only, the SwiftUI modifier's `onOpenURL` branch is the one that matters in practice.
 
+## Security Questions
+
+### Is it secure by default?
+
+Not on its own. The building blocks are hardened by default: `SecurityMiddleware` uses the `.hardened` strategy and `.recommended` input limits, and logs, analytics and error descriptions are redacted. But nothing validates a link until you register a `SecurityMiddleware`. The shortest secure setup is the builder's `secureDefaults(allowedSchemes:)`, which adds security, rate limiting and replay protection in front of the chain; debug builds log a warning from `build()` when no security middleware is registered. See [Securing your deep links](./securing-deep-links-en.md) for signed links, confirmation and the recommended order.
+
+### What happens when a link fails a security check?
+
+The middleware throws `DeepLinkError.securityViolation` (or `blockedURL`) and the link stops: no parser or handler sees it. `result.firstDeepLinkError?.securityViolationReason` tells you why (`.unauthorizedHost`, `.expiredLink`, ...). A parser that throws one of these errors also stops routing, so later parsers cannot accept the link; throw `routeNotFound(url)` for links a parser simply does not handle.
+
+### Are URLs redacted in logs and analytics?
+
+Yes, by default. The coordinator, routing, logging and analytics middleware, delegates and notification errors replace sensitive query and fragment values (tokens, codes, emails, JWTs) and userinfo with `REDACTED`. Plain path segments are kept unless you configure `URLRedactor(pathRedaction:)`. Use `.unredacted` (or `.full` for notifications) only while debugging, and `error.redactedDescription` when you log errors yourself.
+
 ## Implementation Questions
 
 ### How do I register my app's URL scheme?
-¬
+
 Add your URL scheme to your app's `Info.plist`:
 
 ```xml
@@ -48,11 +62,11 @@ Add your URL scheme to your app's `Info.plist`:
 
 ### Can I have multiple URL schemes?
 
-Yes, you can register multiple URL schemes in your `Info.plist`. The library will handle URLs from any registered scheme.
+Yes, you can register multiple URL schemes in your `Info.plist`. The system delivers links for every registered scheme, but the coordinator only accepts the schemes your `SecurityMiddleware` allows (`allowedSchemes`, or `secureDefaults(allowedSchemes:)`). Without a security middleware nothing is checked. `DeepLinkDiagnostics.checkSecurityConfiguration(allowedSchemes:allowedHosts:)` reports schemes declared in `Info.plist` but not allowed, and the reverse.
 
 ### How do I handle deep links when the app is not running?
 
-The `onOpenURL` modifier in SwiftUI handles deep links whether the app is running or not. The library works the same way in both scenarios.
+`.onDeepLink(coordinator)` (built on `onOpenURL` and `onContinueUserActivity`) receives the link whether the app was running or launched by it. If your app needs setup before it can navigate, add `.readiness(queue:)` and call `markReadyAndDrain(queue:)` once it is ready.
 
 ### Can I use this library with UIKit?
 
@@ -66,7 +80,7 @@ Use optional properties in your parameter models:
 
 ```swift
 struct ProfileParameters: Decodable {
-    let userId: String
+    let userID: String
     let name: String?  // Optional parameter
 }
 ```
@@ -77,7 +91,7 @@ Yes, you can create complex parameter models:
 
 ```swift
 struct ProductParameters: Decodable {
-    let productId: String
+    let productID: String
     let category: Category
     let filters: [String]
 }
@@ -103,6 +117,7 @@ You can implement custom parsers for any URL structure. The library is flexible 
 The library tries every registered parser in order. The outcome depends on how the chain behaves:
 
 - If **no parsers are configured**, `DefaultDeepLinkRouting` throws `DeepLinkError.routeNotFound(url)`.
+- If a parser throws `DeepLinkError.securityViolation` or `.blockedURL` (directly or nested in `parsingFailed`), routing **stops** with that error and no later parser runs.
 - If at least one parser is configured but **every parser throws**, `DefaultDeepLinkRouting` throws `DeepLinkError.parsingFailed(url:underlyingErrors:)` carrying the collected failures in order. Nested `parsingFailed` thrown by a delegating parser is flattened so callers never see `parsingFailed(parsingFailed(...))`.
 - If any parser succeeds, its routes are returned and no error is raised.
 
@@ -153,28 +168,28 @@ The library provides comprehensive test helpers. See the test suite for examples
 ```swift
 @Test("Profile deep link parses correctly")
 func profileDeepLink() async throws {
-    let url = URL(string: "myapp://profile?userId=123")!
+    let url = URL(string: "myapp://profile?userID=123")!
     let result = try await parser.parse(from: url)
 
     #expect(result.count == 1)
-    #expect(result.first == .profile(userId: "123"))
+    #expect(result.first == .profile(userID: "123"))
 }
 ```
 
 ### Can I mock the deep link components?
 
-Yes, the protocol-oriented design makes mocking easy:
+Yes. `DeepLinksTesting` ships ready-made doubles (`CollectingHandler`, `ImmediateRouting`, `CollectingMiddleware`, `FixedAuthenticationProvider`, `ManualDateProvider`, ...):
 
 ```swift
-final class HandlerSpy: DeepLinkHandler, @unchecked Sendable {
-    typealias Route = AppRoute
-    var handledRoutes: [AppRoute] = []
+import DeepLinksTesting
 
-    func handle(_ route: AppRoute) async throws {
-        handledRoutes.append(route)
-    }
-}
+let handler = CollectingHandler<AppRoute>()
+let coordinator = DeepLinkCoordinator(routing: ImmediateRouting(routes: [.profile(userID: "123")]), handler: handler)
+await coordinator.handle(url: URL(string: "myapp://profile?userID=123")!)
+#expect(handler.handledRoutes == [.profile(userID: "123")])
 ```
+
+Your own doubles must be `Sendable`; keep mutable state behind a lock or in an actor.
 
 ## Performance Questions
 

@@ -67,6 +67,11 @@ let coordinator = try DeepLinkCoordinatorBuilder<AppRoute>()
     .build()
 ```
 
+The builder's `secureDefaults(allowedSchemes:allowedHosts:allowedHostsByScheme:...)`
+adds the first three stages (`.hardened` security with `limits: .recommended`,
+30 links per minute, a 2-second replay window) in front of the chain in one
+call; register the rest with `.middleware(...)`.
+
 Why this order:
 
 1. **Security** rejects malformed, oversized and off-domain links before

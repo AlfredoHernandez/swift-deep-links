@@ -54,7 +54,7 @@ enum AppRoute: DeepLinkRoute {
 
 ## 2. Create Parsers
 
-One parser per route type. `DefaultDeepLinkRouting` tries them in order until one succeeds.
+One parser per route type. `DefaultDeepLinkRouting` tries them in order until one succeeds. A parser that does not recognize a link throws `routeNotFound` so the next one gets it; security errors stop routing.
 
 ```swift
 final class ProfileParser: DeepLinkParser {
@@ -63,7 +63,7 @@ final class ProfileParser: DeepLinkParser {
     func parse(from url: URL) async throws -> [AppRoute] {
         let deepLinkURL = try DeepLinkURL(url: url)
         guard deepLinkURL.host == "profile" else {
-            throw DeepLinkError.unsupportedHost(deepLinkURL.host)
+            throw DeepLinkError.routeNotFound(url)
         }
         guard let userID = deepLinkURL.queryParameters["userID"] else {
             throw DeepLinkError.missingRequiredParameter("userID")
@@ -102,7 +102,7 @@ final class ProductParser: DeepLinkParser {
     func parse(from url: URL) async throws -> [AppRoute] {
         let deepLinkURL = try DeepLinkURL(url: url)
         guard deepLinkURL.host == "product" else {
-            throw DeepLinkError.unsupportedHost(deepLinkURL.host)
+            throw DeepLinkError.routeNotFound(url)
         }
         let params = try parser.parse(ProductParameters.self, from: deepLinkURL.queryParameters)
         return [.product(productID: params.productID, category: params.category)]
@@ -140,7 +140,7 @@ final class AppHandler: DeepLinkHandler {
 
 ## 4. Configure the Coordinator
 
-Use the builder for a fluent setup with middleware and delegates:
+Use the builder for a fluent setup with middleware and delegates. `secureDefaults` puts security (`.hardened`, `limits: .recommended`), rate limiting and replay protection first; the delegate factories are `@MainActor`, so build on the main actor:
 
 ```swift
 let coordinator = try DeepLinkCoordinatorBuilder<AppRoute>()
@@ -150,9 +150,8 @@ let coordinator = try DeepLinkCoordinatorBuilder<AppRoute>()
         SettingsParser(),
     ]))
     .handler(AppHandler(router: navigationRouter))
+    .secureDefaults(allowedSchemes: ["myapp"], allowedHosts: ["profile", "product", "settings"])
     .middleware(
-        .security(allowedSchemes: ["myapp"]),
-        .rateLimit(maxRequests: 10, timeWindow: 60),
         .authentication(provider: authProvider, protectedHosts: ["profile"]),
         .logging()
     )
@@ -163,7 +162,7 @@ let coordinator = try DeepLinkCoordinatorBuilder<AppRoute>()
     .build()
 ```
 
-Or create one directly without the builder:
+Or create one directly without the builder (no middleware, so no validation):
 
 ```swift
 let coordinator = DeepLinkCoordinator(
@@ -177,7 +176,7 @@ let coordinator = DeepLinkCoordinator(
 The built-in `.onDeepLink(_:)` modifier handles both custom URL schemes (`onOpenURL`) and Universal Links (`NSUserActivityTypeBrowsingWeb`) in one line:
 
 ```swift
-@Observable
+@MainActor @Observable
 final class AppViewModel {
     let navigationRouter = NavigationRouter()
     var coordinator: DeepLinkCoordinator<AppRoute>?
@@ -186,6 +185,7 @@ final class AppViewModel {
         self.coordinator = try DeepLinkCoordinatorBuilder<AppRoute>()
             .routing(DefaultDeepLinkRouting(parsers: [ProfileParser()]))
             .handler(AppHandler(router: navigationRouter))
+            .secureDefaults(allowedSchemes: ["myapp"])
             .build()
     }
 }
@@ -199,18 +199,13 @@ struct MyApp: App {
             ContentView()
                 .environment(viewModel.navigationRouter)
                 .task { try? viewModel.bootstrap() }
-                .modifier(DeepLinkModifier(coordinator: viewModel.coordinator))
+                .onDeepLink(viewModel.coordinator) // no-op while the coordinator is nil
         }
     }
 }
-
-private struct DeepLinkModifier: ViewModifier {
-    let coordinator: DeepLinkCoordinator<AppRoute>?
-    func body(content: Content) -> some View {
-        if let coordinator { content.onDeepLink(coordinator) } else { content }
-    }
-}
 ```
+
+`.onDeepLink` also tags each link with its source (`.customScheme`, `.universalLink`), which `allowedSources` and source matchers rely on; a hand-written `onOpenURL` that calls `handle(url:)` reports `.unknown`.
 
 ### UIKit
 
@@ -293,13 +288,13 @@ func windowScene(_ scene: UIWindowScene, performActionFor item: UIApplicationSho
 ### AppKit
 
 ```swift
-@NSApplicationMain
+@main
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let coordinator: DeepLinkCoordinator<AppRoute> = …
 
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls {
-            Task { await coordinator.handle(url: url) }
+            Task { await coordinator.handle(url: url, context: .openedURL(url)) }
         }
     }
 
@@ -324,17 +319,26 @@ URL → Security → RateLimit → Replay → SignedLinks → Auth → Readiness
 
 ```swift
 .middleware(
-    .security(allowedSchemes: ["myapp"], allowedHosts: ["profile", "product"]),
+    .security(
+        allowedSchemes: ["myapp", "https"],
+        allowedHostsByScheme: ["myapp": ["profile", "product"], "https": ["example.com"]],
+        limits: DeepLinkInputLimits(
+            maxURLLength: 2048,
+            maxQueryParameterCount: 20,
+            maxParameterValueLength: 512,
+            rejectDuplicateParameters: true
+        )
+    ),
     .rateLimit(maxRequests: 10, timeWindow: 60, strategy: .slidingWindow),
     .authentication(provider: authProvider, protectedHosts: ["profile"]),
+    .readiness(queue: readinessQueue),
     .urlTransformation(transformer: URLNormalizationTransformer()),
     .analytics(provider: analyticsProvider),
-    .logging(format: .detailed),
-    .readiness(queue: readinessQueue)
+    .logging(format: .detailed)
 )
 ```
 
-`.security(...)` applies `limits: .recommended` by default (pass your own `DeepLinkInputLimits`, or `.unlimited`, to change it) to cap URL length, query-parameter count and parameter-value length. Limits run before any other check, so keep security first in the chain.
+`allowedHostsByScheme` keeps your Universal Link domain from being accepted as a custom-scheme host and the other way round; `allowedHosts` applies one list to every scheme. `.security(...)` applies `limits: .recommended` by default (8192-character URLs, 50 query parameters, 1024 characters per value); pass your own `DeepLinkInputLimits`, as above, or `.unlimited` to change it. Limits run before any other check, so keep security first in the chain. Nothing is validated unless a `SecurityMiddleware` is registered; debug builds log a warning from `build()` when it is missing.
 
 If you use `URLNormalizationTransformer`, run it **before** `.security(...)` or use `strategy: .hardened`. The transformer resolves `.`/`..` segments (including `%2e%2e` and `%2F`), so with `.standard` or `.strict` a link such as `/public/%2e%2e/admin` would pass validation and only turn into `/admin` afterwards. `.hardened` rejects `..` segments in any encoding.
 
@@ -494,12 +498,13 @@ func securityBlocksUnauthorized() async throws {
     let coordinator = DeepLinkMiddlewareCoordinator()
     await coordinator.add(SecurityMiddleware(allowedSchemes: ["myapp"]))
     await coordinator.add(collecting)
+    let request = DeepLinkRequest(url: URL(string: "https://evil.com")!, context: DeepLinkContext(source: .universalLink))
 
     // https:// is not in allowed schemes — middleware stops the pipeline
     await #expect(throws: DeepLinkError.self) {
-        try await coordinator.process(URL(string: "https://evil.com")!)
+        try await coordinator.process(request)
     }
-    #expect(collecting.interceptedURLs.isEmpty)
+    #expect(collecting.interceptedRequests.isEmpty)
 }
 ```
 
@@ -509,7 +514,7 @@ func securityBlocksUnauthorized() async throws {
 @MainActor
 @Test("Delegate receives lifecycle events")
 func delegateReceivesEvents() async throws {
-    let delegate = CollectingDelegate()
+    let delegate = CollectingDelegate<AppRoute>()
     let routing = ImmediateRouting<AppRoute>(routes: [.settings(section: "account")])
     let handler = CollectingHandler<AppRoute>()
     let coordinator = DeepLinkCoordinator(routing: routing, handler: handler, delegate: delegate)
@@ -528,7 +533,7 @@ func delegateReceivesEvents() async throws {
 | `ImmediateRouting<Route>` | Returns preconfigured routes without parsing |
 | `ImmediateParser<Route>` | Returns preconfigured routes for a single parser |
 | `CollectingHandler<Route>` | Accumulates handled routes for inspection |
-| `CollectingMiddleware` | Passes through and accumulates intercepted URLs |
+| `CollectingMiddleware` | Passes through and accumulates intercepted requests (`interceptedRequests`) and URLs |
 | `PassthroughMiddleware` | Always passes URLs through unchanged |
 | `CollectingDelegate` | Accumulates coordinator lifecycle events |
 | `CollectingAnalyticsProvider` | Accumulates tracked analytics events |

@@ -174,9 +174,22 @@ public struct DeepLinkCoordinatorBuilder<Route: DeepLinkRoute>: Sendable {
     public func handler(_ handler: any DeepLinkHandler<Route>) -> Self
     public func middleware(_ middleware: any DeepLinkMiddleware...) -> Self
     public func delegate(_ delegate: any DeepLinkCoordinatorDelegate<Route>...) -> Self
+    public func secureDefaults(
+        allowedSchemes: Set<String>,
+        allowedHosts: Set<String> = [],
+        allowedHostsByScheme: [String: Set<String>] = [:],
+        allowedSources: Set<DeepLinkContext.Source>? = nil,
+        maxRequests: Int = 30,
+        timeWindow: TimeInterval = 60,
+        rateLimitPersistence: (any RateLimitPersistence)? = nil,
+        replayWindow: TimeInterval = 2,
+        dateProvider: @Sendable @escaping () -> Date = Date.init
+    ) -> Self
     public func build() throws -> DeepLinkCoordinator<Route>
 }
 ```
+
+`secureDefaults` puts `SecurityMiddleware` (`.hardened`, `limits: .recommended`), `RateLimitMiddleware` and `ReplayProtectionMiddleware` in front of every other middleware, whatever the call order; calling it again replaces the preset, and combining it with `middlewareCoordinator(_:)` makes `build()` throw. It leaves out signed links, confirmation, authentication, readiness, transforms, analytics, `blockedPatterns` and duplicate-parameter rejection. In debug builds, `build()` logs a warning when no `SecurityMiddleware` is registered.
 
 ### DeepLinkResult
 
@@ -675,7 +688,8 @@ Thread-safe queue backed by `OSAllocatedUnfairLock`. Compiler-verified `Sendable
 
 ```swift
 public final class DeepLinkReadinessQueue: ReadinessQueue, Sendable {
-    public init(maxQueueSize: Int? = nil, onEvict: (@Sendable (URL) -> Void)? = nil)  // size clamped to min 1
+    public static let defaultMaxQueueSize: Int  // 50
+    public init(maxQueueSize: Int? = defaultMaxQueueSize, onEvict: (@Sendable (URL) -> Void)? = nil)  // size clamped to min 1; nil is unbounded
     public var isReady: Bool { get }
     public func enqueue(_ url: URL) -> URL?
     public func markReady() -> [URL]       // idempotent; drains the queue
@@ -686,7 +700,8 @@ public final class DeepLinkReadinessQueue: ReadinessQueue, Sendable {
 ```
 
 > Any app or web page can fire links before your app is ready, so an unbounded
-> queue grows without limit. Prefer a `maxQueueSize` in production and pass
+> queue (`maxQueueSize: nil`) grows without limit. Keep the default bound of 50
+> (or your own) in production and pass
 > `onEvict` to observe the oldest links dropped to make room; it runs after the
 > queue lock is released, on the enqueuing thread.
 
@@ -760,7 +775,7 @@ public struct DefaultDeepLinkNotificationPresenter: DeepLinkNotificationPresente
 @MainActor public func compose<Route>(_ delegates: [any DeepLinkCoordinatorDelegate<Route>]) -> CompositeDeepLinkDelegate<Route>
 ```
 
-Middleware arrays are passed directly to ``DeepLinkCoordinatorBuilder.middleware(_:)`` — no `compose` helper is required.
+Middleware arrays are passed directly to `DeepLinkCoordinatorBuilder.middleware(_:)` — no `compose` helper is required.
 
 ## SwiftUI Integration
 
