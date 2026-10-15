@@ -6,6 +6,24 @@ All notable changes to `swift-deep-links` are tracked here. The format follows
 
 ## [Unreleased]
 
+### Internal refactors
+
+Internal restructuring (one middleware chain loop, a single task-local per
+link pass, a shared percent-decoding helper, a smaller coordinator) with no
+behavior change. User-visible additions:
+
+- `SecurityViolationReason` and `DeepLinkError.securityViolationReason` let
+  code branch on why a link was rejected (`.expiredLink`, `.reusedNonce`,
+  `.unauthorizedHost`, `.invalidConfiguration` for an invalid blocked
+  pattern, `.other` for custom reasons) instead of comparing strings. The
+  reason strings are unchanged.
+- `SecurityStrategy.init(_:)` and `validate(url:policy:)` are public, and
+  `SecurityPolicy` exposes the normalized `allowedSchemes`, `allowedHosts`,
+  `allowedHosts(forScheme:)` and `blockedPatterns()`, so you can write a
+  custom strategy or wrap a built-in one. `.whitelist` is documented as the
+  allow-list it is.
+- `handle(shortcutItem:)` is also available on visionOS.
+
 ## [2.0.0] - 2026-10-14
 
 Every change since `1.1.0`. Upgrading? Follow [MIGRATION-2.0.md](MIGRATION-2.0.md),
