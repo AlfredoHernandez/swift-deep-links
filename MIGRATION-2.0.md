@@ -1,9 +1,11 @@
 # Migrating from 1.x to 2.0
 
-2.0 makes deep links secure by default and lets every component see where a
-link came from. Most apps need a handful of mechanical edits. This guide lists
-every source or behavior break since `1.1.0`, each with a before/after
-snippet, then the recommended middleware order and a hardening checklist.
+2.0 hardens the built-in middleware's defaults and lets every component see
+where a link came from. Most apps need a handful of mechanical edits. This
+guide covers the source and behavior breaks found by comparing the public API
+of `1.1.0` with 2.0, with before/after snippets, then the recommended
+middleware order and a hardening checklist. If you hit a break that is not
+listed here, please open an issue.
 
 New, additive features (signed links, confirmation prompts, replay
 protection, token-bucket limits, path patterns, pending links, notification /
@@ -24,8 +26,9 @@ described in the [CHANGELOG](CHANGELOG.md) and the
 9. [`PathPatternMatch.int` is canonical](#9-pathpatternmatchint-is-canonical)
 10. [Removed APIs](#10-removed-apis)
 11. [Custom nonce stores](#11-custom-nonce-stores)
-12. [Recommended middleware order](#recommended-middleware-order)
-13. [Hardening checklist](#hardening-checklist)
+12. [Smaller changes](#12-smaller-changes)
+13. [Recommended middleware order](#recommended-middleware-order)
+14. [Hardening checklist](#hardening-checklist)
 
 ## 1. Coordinator and builder
 
@@ -266,7 +269,8 @@ authentication strategy protects `myapp://Account./x`, `myapp://account%2e/x`,
 .authentication(provider: auth, requiredFor: .paths(["/admin"]))
 ```
 
-**Pending links come only from trusted sources.** `AuthenticationMiddleware`
+**Pending links come only from trusted sources** (pending links are new in
+2.0). `AuthenticationMiddleware`
 saves a rejected link only when its source is in `pendingSources` (by default
 every source except `.customScheme` and `.unknown`). To resume custom-scheme
 links, opt in and confirm them on resume:
@@ -352,12 +356,15 @@ source; give each middleware its own `key` for separate budgets.
 
 ## 8. `handle(activity:)` checks the activity type
 
-Only `NSUserActivityTypeBrowsingWeb` (as `.universalLink`) and the Handoff
-types you list (as `.handoff`) are processed; anything else returns `nil`.
+`handle(activity:)` is new in 2.0 (1.1.0 had no `NSUserActivity` entry point),
+so this matters only if you adopted a 2.0 pre-release or forward
+`webpageURL` yourself. Only `NSUserActivityTypeBrowsingWeb` (as
+`.universalLink`) and the Handoff types you list (as `.handoff`) are
+processed; anything else returns `nil`.
 
 ```swift
-// 1.x: any activity with a webpageURL
-await coordinator.handle(activity: activity)
+// 1.1.0: forward the URL yourself
+if let url = activity.webpageURL { await coordinator.handle(url: url) }
 
 // 2.0: declare your Handoff types (Info.plist NSUserActivityTypes)
 await coordinator.handle(
@@ -372,11 +379,12 @@ await coordinator.handle(searchableItemActivity: activity)
 
 ## 9. `PathPatternMatch.int` is canonical
 
-`int(_:)` rejects `-5`, `+5` and zero-padded values such as `007`, so one
-resource has one spelling.
+`PathPatternParser` is new in 2.0; this matters only if you adopted a 2.0
+pre-release. `int(_:)` rejects `-5`, `+5` and zero-padded values such as
+`007`, so one resource has one spelling.
 
 ```swift
-// 2.0: the lenient 1.x conversion
+// 2.0: the lenient `Int(_:)` conversion
 let id = try match.value("id", as: Int.self)
 ```
 
@@ -395,6 +403,7 @@ let id = try match.value("id", as: Int.self)
 
 ## 11. Custom nonce stores
 
+Nonce stores are new in 2.0; this section matters if you write your own.
 `SignedLinkMiddleware` uses nonces in two phases: it **reserves** the nonce
 when the signature verifies and the coordinator **commits** it once a handler
 runs, or **releases** it when authentication, confirmation or the parsers stop
@@ -436,6 +445,82 @@ Declare the methods `async`: in an actor, a synchronous method with the same
 name loses overload resolution to the protocol's `async` default, which
 silently reintroduces consume-at-reserve. The built-in `InMemoryNonceStore` and
 `UserDefaultsNonceStore` implement the full protocol.
+
+## 12. Smaller changes
+
+**`advancedMiddleware(_:)` is gone,** with the `add(_:)` overloads on
+`DeepLinkCoordinator` and `DeepLinkMiddlewareCoordinator` that took an
+`AdvancedDeepLinkMiddleware`. Rewrite the middleware as a
+`DeepLinkMiddleware` (see [Removed APIs](#10-removed-apis)) and register it
+with `.middleware(...)` or `add(_:)`.
+
+**The built-in delegates are generic over `Route`.** `DeepLinkLoggingDelegate`,
+`DeepLinkAnalyticsDelegate`, `DeepLinkNotificationDelegate` and
+`CompositeDeepLinkDelegate` take the route type, `compose(_:)` returns a
+`CompositeDeepLinkDelegate<Route>`, `.delegate(_:)` and `.delegates(_:)` take
+`any DeepLinkCoordinatorDelegate<Route>`, and `coordinator.delegate` is
+`(any DeepLinkCoordinatorDelegate<Route>)?`. The factories infer the route
+inside the builder; spell it out when you create a delegate yourself:
+
+```swift
+// 1.x
+let logging = DeepLinkLoggingDelegate(enableDebugLogging: true)
+let observer: DeepLinkCoordinatorDelegate? = coordinator.delegate
+
+// 2.0
+let logging = DeepLinkLoggingDelegate<AppRoute>(enableDebugLogging: true)
+let observer: (any DeepLinkCoordinatorDelegate<AppRoute>)? = coordinator.delegate
+```
+
+The built-in delegates and their factories (`.logging()`, `.analytics(provider:)`,
+`.notification()`) are still `@MainActor`, as in 1.x: create them, and call
+`build()` with them, on the main actor.
+
+**Built-in middleware no longer declares `intercept(_ url: URL)`.** Calling
+`securityMiddleware.intercept(url)` still compiles, but it now goes through
+the protocol's bridge and runs with the `.unknown` source, so
+`allowedSources` and source-based matchers treat the link as unknown. Call
+`intercept(_: DeepLinkRequest)` with the link's context:
+
+```swift
+// 1.x
+let checked = try await security.intercept(url)
+
+// 2.0
+let checked = try await security.intercept(DeepLinkRequest(url: url, context: context))?.url
+```
+
+**Draining a readiness queue by hand runs the whole chain.** 1.x drained with
+`queue.markReady()` and `handle(url:)`; that still works, but every link runs
+the stages before the readiness gate a second time (rate limiting counts it twice)
+and loses its source. 2.0 adds `markReadyAndDrain(queue:)`, which resumes each
+link right after the `ReadinessMiddleware` that queued it, with the context
+it arrived with:
+
+```swift
+// 1.x
+for url in queue.markReady() { await coordinator.handle(url: url) }
+
+// 2.0
+await coordinator.markReadyAndDrain(queue: queue)
+```
+
+**`URLNormalizationTransformer` resolves dot segments.** Besides trimming
+slashes and dropping empty query values, it decodes `%2F` into a separator and
+resolves `.` and `..` segments (including `%2e`) without climbing above the
+root: `myapp://files/a/../../etc` becomes `myapp://files/etc`. Parsers that
+expected the raw segments see the resolved path.
+
+**Analytics report the host as `url.host()`.** The `host` parameter is the
+percent-encoded host, not the decoded or Punycode form: `https://bücher.de`
+is reported as `b%C3%BCcher.de` (1.x: `xn--bcher-kva.de`) and
+`myapp://caf%C3%A9` as `caf%C3%A9` (1.x: `café`). Dashboards keyed on
+international hosts see new keys.
+
+**`RateLimitMiddleware` can throw `CancellationError`.** Checks are
+serialized; a task cancelled while it waits for its turn throws
+`CancellationError` and spends no budget. Code that treated every error from
+the chain as a rate-limit or security failure should let cancellation through.
 
 ## Recommended middleware order
 
@@ -485,11 +570,12 @@ come first and side effects (prompts, analytics) last:
 
 ## Hardening checklist
 
-- [ ] `.security(...)` is first, uses `.hardened`, lists every Universal Link
+- [ ] `.security(...)` (or `.secureDefaults(allowedSchemes:)` on the builder) is first, uses `.hardened`, lists every Universal Link
       domain in `allowedHosts`, and keeps the default `limits: .recommended` (plus
       `rejectDuplicateParameters: true` if your parsers read single values).
 - [ ] Sensitive flows are restricted by source:
-      `.security(allowedSources: [.universalLink])` or a `DeepLinkMatcher.sources` rule.
+      `.security(allowedSchemes: ["https"], allowedHosts: ["pay.example.com"], allowedSources: [.universalLink])`
+      or a `DeepLinkMatcher.sources` rule.
       Custom schemes can be opened by any app.
 - [ ] Password resets, invitations and payment links are signed
       (`.signedLinks`) with an expiry, a `maximumLifetime` and a nonce; prefer
