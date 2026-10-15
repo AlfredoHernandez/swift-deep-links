@@ -198,7 +198,7 @@ private extension DeepLinkError {
 		case let .invalidURL(url):
 			Self.invalidURL(redactor.redact(url)).plainDescription
 
-		case let .invalidParameterValue(name, value):
+		case let .invalidParameterValue(name, _):
 			Self.invalidParameterValue(name: name, value: redactor.placeholder).plainDescription
 
 		case let .routeNotFound(url):
