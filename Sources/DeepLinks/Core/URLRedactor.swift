@@ -97,18 +97,45 @@ public struct URLRedactor: Sendable {
 		redact(url, nestingBudget: Self.maximumNestedURLDepth)
 	}
 
+	/// The longest free-form text, in Unicode scalars, that ``redactingURLs(in:)``
+	/// redacts; longer text is cut to this length and ends with ``truncationMarker``.
+	static let maximumRedactedTextLength = 2048
+
+	/// Appended to free-form text cut at ``maximumRedactedTextLength``.
+	static let truncationMarker = "… [truncated]"
+
 	/// Returns `text` with every embedded `scheme://` URL redacted.
+	///
+	/// Text longer than ``maximumRedactedTextLength`` is cut first, and a URL
+	/// the cut splits is replaced whole by ``placeholder``, so no fragment of a
+	/// secret survives. The scan is linear in the length of the text.
 	func redactingURLs(in text: String) -> String {
-		let embeddedURL = #/[A-Za-z][A-Za-z0-9+.\-]*://[^\s'"<>]+/#
-		var result = text
-		for match in text.matches(of: embeddedURL).reversed() {
-			guard let url = URL(string: String(match.output)) else { continue }
-			let redacted = redact(url)
-			if redacted != url {
-				result.replaceSubrange(match.range, with: redacted.absoluteString)
-			}
+		let scalars = text.unicodeScalars
+		let cut = scalars.index(scalars.startIndex, offsetBy: Self.maximumRedactedTextLength, limitedBy: scalars.endIndex) ?? scalars.endIndex
+		let isTruncated = cut < scalars.endIndex
+		let bounded = String(scalars[..<cut])
+		let boundedScalars = bounded.unicodeScalars
+
+		var scanner = EmbeddedURLScanner()
+		var result = String.UnicodeScalarView()
+		var position = boundedScalars.startIndex
+		for range in scanner.urlRanges(in: bounded) {
+			result.append(contentsOf: boundedScalars[position ..< range.lowerBound])
+			let isCut = isTruncated && range.upperBound == boundedScalars.endIndex
+			result.append(contentsOf: (isCut ? placeholder : redactedURLText(String(boundedScalars[range]))).unicodeScalars)
+			position = range.upperBound
 		}
-		return result
+		result.append(contentsOf: boundedScalars[position...])
+		if isTruncated {
+			result.append(contentsOf: Self.truncationMarker.unicodeScalars)
+		}
+		return String(result)
+	}
+
+	private func redactedURLText(_ text: String) -> String {
+		guard let url = URL(string: text) else { return text }
+		let redacted = redact(url)
+		return redacted == url ? text : redacted.absoluteString
 	}
 }
 

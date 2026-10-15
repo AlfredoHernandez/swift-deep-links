@@ -166,6 +166,33 @@ struct URLRedactorTests {
 	}
 
 	@Test
+	func `bounds the text it redacts and marks it as truncated`() {
+		let text = "Unauthorized host: " + String(repeating: "a", count: 100_000)
+
+		let redacted = sut.redactingURLs(in: text)
+
+		#expect(redacted.unicodeScalars.count <= URLRedactor.maximumRedactedTextLength + URLRedactor.truncationMarker.unicodeScalars.count)
+		#expect(redacted.hasSuffix(URLRedactor.truncationMarker))
+	}
+
+	@Test
+	func `replaces a URL cut by the length bound instead of keeping part of it`() {
+		let padding = String(repeating: "p", count: URLRedactor.maximumRedactedTextLength - 30)
+		let text = padding + " https://example.com/x?state=" + String(repeating: "s", count: 100)
+
+		let redacted = sut.redactingURLs(in: text)
+
+		#expect(redacted == padding + " REDACTED" + URLRedactor.truncationMarker)
+	}
+
+	@Test
+	func `keeps text within the length bound intact`() {
+		let text = "open https://example.com/x?token=abc now"
+
+		#expect(sut.redactingURLs(in: text) == "open https://example.com/x?token=REDACTED now")
+	}
+
+	@Test
 	func `default sensitive keys cover the documented set`() {
 		let documented: Set = ["token", "code", "password", "email", "key", "secret", "otp", "auth", "session"]
 

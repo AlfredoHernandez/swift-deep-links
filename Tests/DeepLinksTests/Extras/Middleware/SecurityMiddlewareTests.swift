@@ -34,7 +34,7 @@ struct SecurityMiddlewareTests {
 			_ = try await middleware.intercept(url: testURL)
 			#expect(Bool(false), "Expected security violation error")
 		} catch let error as DeepLinkError {
-			#expect(error == .securityViolation("Unauthorized scheme: http"))
+			#expect(error == .securityViolation("Unauthorized scheme"))
 		}
 	}
 
@@ -65,7 +65,7 @@ struct SecurityMiddlewareTests {
 			_ = try await middleware.intercept(url: testURL)
 			#expect(Bool(false), "Expected security violation error")
 		} catch let error as DeepLinkError {
-			#expect(error == .securityViolation("Unauthorized host: disallowed"))
+			#expect(error == .securityViolation("Unauthorized host"))
 		}
 	}
 
@@ -99,5 +99,38 @@ struct SecurityMiddlewareTests {
 		let result = try await middleware.intercept(url: testURL)
 
 		#expect(result == testURL)
+	}
+
+	@Test
+	func `SecurityMiddleware applies the recommended input limits by default`() async throws {
+		let oversized = try #require(URL(string: "testapp://host?q=" + String(repeating: "a", count: DeepLinkURL.defaultMaxLength)))
+
+		await #expect(throws: DeepLinkError.securityViolation("URL exceeds maximum length")) {
+			_ = try await SecurityMiddleware(allowedSchemes: ["testapp"]).intercept(url: oversized)
+		}
+		await #expect(throws: DeepLinkError.securityViolation("URL exceeds maximum length")) {
+			_ = try await SecurityMiddleware.security(allowedSchemes: ["testapp"]).intercept(url: oversized)
+		}
+	}
+
+	@Test(arguments: [SecurityStrategy.hardened, .standard, .strict, .hostOnly, .whitelist])
+	func `SecurityMiddleware does not echo an unauthorized host in the violation`(strategy: SecurityStrategy) async throws {
+		let host = String(repeating: "h", count: 5000)
+		let url = try #require(URL(string: "testapp://\(host)"))
+		let middleware = SecurityMiddleware(allowedSchemes: ["testapp"], allowedHosts: ["allowed"], strategy: strategy, limits: .unlimited)
+
+		await #expect(throws: DeepLinkError.securityViolation("Unauthorized host")) {
+			_ = try await middleware.intercept(url: url)
+		}
+	}
+
+	@Test(arguments: [SecurityStrategy.hardened, .standard, .strict, .permissive, .schemeOnly, .whitelist])
+	func `SecurityMiddleware does not echo an unauthorized scheme in the violation`(strategy: SecurityStrategy) async throws {
+		let url = try #require(URL(string: "evil-scheme://allowed"))
+		let middleware = SecurityMiddleware(allowedSchemes: ["testapp"], allowedHosts: ["allowed"], strategy: strategy)
+
+		await #expect(throws: DeepLinkError.securityViolation("Unauthorized scheme")) {
+			_ = try await middleware.intercept(url: url)
+		}
 	}
 }

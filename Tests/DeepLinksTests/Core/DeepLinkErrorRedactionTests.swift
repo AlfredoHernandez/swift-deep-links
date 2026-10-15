@@ -23,6 +23,13 @@ struct DeepLinkErrorRedactionTests {
 	}
 
 	@Test
+	func `redactedDescription of a huge attacker-controlled host is bounded`() {
+		let error = DeepLinkError.unsupportedHost(String(repeating: "a", count: 100_000))
+
+		#expect(error.redactedDescription.unicodeScalars.count <= URLRedactor.maximumRedactedTextLength + URLRedactor.truncationMarker.unicodeScalars.count)
+	}
+
+	@Test
 	func `errorDescription keeps the full URL`() {
 		let error = DeepLinkError.invalidURL(Self.sensitiveURL)
 

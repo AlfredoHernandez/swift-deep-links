@@ -112,14 +112,15 @@ public final class SecurityMiddleware: DeepLinkMiddleware {
 	///     source; links replayed from the built-in queues and stores keep theirs.
 	///   - strategy: The security validation strategy to use (defaults to ``SecurityStrategy/hardened``;
 	///     pass `.standard` for the 1.x behavior)
-	///   - limits: Size limits checked before the strategy runs (defaults to ``DeepLinkInputLimits/unlimited``)
+	///   - limits: Size limits checked before the strategy runs (defaults to ``DeepLinkInputLimits/recommended``; pass ``DeepLinkInputLimits/unlimited`` to lift
+	/// them)
 	public init(
 		allowedSchemes: Set<String>,
 		allowedHosts: Set<String> = [],
 		blockedPatterns: [NSRegularExpression] = [],
 		allowedSources: Set<DeepLinkContext.Source>? = nil,
 		strategy: SecurityStrategy = .hardened,
-		limits: DeepLinkInputLimits = .unlimited,
+		limits: DeepLinkInputLimits = .recommended,
 	) {
 		self.allowedSchemes = allowedSchemes
 		self.allowedHosts = allowedHosts

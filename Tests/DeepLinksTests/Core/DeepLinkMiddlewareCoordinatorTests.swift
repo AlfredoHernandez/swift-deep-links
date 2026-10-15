@@ -261,7 +261,7 @@ struct DeepLinkMiddlewareCoordinatorTests {
 			_ = try await middleware.intercept(url: testURL)
 			#expect(Bool(false), "Expected security violation error")
 		} catch let error as DeepLinkError {
-			#expect(error == .securityViolation("Unauthorized scheme: http"))
+			#expect(error == .securityViolation("Unauthorized scheme"))
 		}
 	}
 
@@ -292,7 +292,7 @@ struct DeepLinkMiddlewareCoordinatorTests {
 			_ = try await middleware.intercept(url: testURL)
 			#expect(Bool(false), "Expected security violation error")
 		} catch let error as DeepLinkError {
-			#expect(error == .securityViolation("Unauthorized host: disallowed"))
+			#expect(error == .securityViolation("Unauthorized host"))
 		}
 	}
 

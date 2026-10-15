@@ -57,8 +57,8 @@ struct SecurityMiddlewareInputLimitsTests {
 	}
 
 	@Test
-	func `default middleware applies no limits`() async throws {
-		let sut = SecurityMiddleware(allowedSchemes: ["myapp"])
+	func `unlimited limits accept an oversized link`() async throws {
+		let sut = SecurityMiddleware(allowedSchemes: ["myapp"], limits: .unlimited)
 		let value = String(repeating: "v", count: DeepLinkURL.defaultMaxLength)
 		let url = try #require(URL(string: "myapp://home?a=\(value)"))
 

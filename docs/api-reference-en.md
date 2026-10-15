@@ -565,7 +565,7 @@ public struct DeepLinkInputLimits: Sendable, Equatable {
 }
 ```
 
-Bounds the work an untrusted link can cause. `SecurityMiddleware` and `URLCanonicalizer` check the limits before anything else and throw `DeepLinkError.securityViolation`. The URL length is checked before the query is parsed; the parameter count includes duplicates and valueless parameters; value lengths are measured after percent-decoding. `rejectDuplicateParameters: true` throws `securityViolation("Duplicate query parameter")` for a repeated key, so the check runs in the middleware chain rather than only in `DeepLinkURL`. `nil` disables a limit and negative values are clamped to `0`. Error messages never include the attacker-controlled parameter name or value. Put `.security(..., limits: .recommended)` first in the chain so oversized links never reach logging, analytics or parsing.
+Bounds the work an untrusted link can cause. `SecurityMiddleware` and `URLCanonicalizer` check the limits before anything else and throw `DeepLinkError.securityViolation`. The URL length is checked before the query is parsed; the parameter count includes duplicates and valueless parameters; value lengths are measured after percent-decoding. `rejectDuplicateParameters: true` throws `securityViolation("Duplicate query parameter")` for a repeated key, so the check runs in the middleware chain rather than only in `DeepLinkURL`. `nil` disables a limit and negative values are clamped to `0`. Error messages never include the attacker-controlled parameter name or value. `SecurityMiddleware` defaults to `.recommended` since 2.0 (pass `.unlimited` to lift it); put `.security(...)` first in the chain so oversized links never reach logging, analytics or parsing.
 
 ## Pending Links
 

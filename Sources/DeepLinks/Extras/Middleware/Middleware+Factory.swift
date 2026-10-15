@@ -147,7 +147,7 @@ public extension DeepLinkMiddleware where Self == SecurityMiddleware {
 	///   - blockedPatterns: Array of regex patterns for blocked URLs
 	///   - allowedSources: Accepted link sources; `nil` (default) accepts every source
 	///   - strategy: The security validation strategy (default: .hardened)
-	///   - limits: Size limits checked before the strategy runs (default: ``DeepLinkInputLimits/unlimited``)
+	///   - limits: Size limits checked before the strategy runs (default: ``DeepLinkInputLimits/recommended``)
 	/// - Returns: A configured security middleware instance
 	static func security(
 		allowedSchemes: Set<String>,
@@ -155,7 +155,7 @@ public extension DeepLinkMiddleware where Self == SecurityMiddleware {
 		blockedPatterns: [NSRegularExpression] = [],
 		allowedSources: Set<DeepLinkContext.Source>? = nil,
 		strategy: SecurityStrategy = .hardened,
-		limits: DeepLinkInputLimits = .unlimited,
+		limits: DeepLinkInputLimits = .recommended,
 	) -> SecurityMiddleware {
 		SecurityMiddleware(
 			allowedSchemes: allowedSchemes,

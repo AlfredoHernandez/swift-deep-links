@@ -334,7 +334,7 @@ URL → Security → RateLimit → Replay → SignedLinks → Auth → Readiness
 )
 ```
 
-Pass `limits: .recommended` (or your own `DeepLinkInputLimits`) to `.security(...)` to cap URL length, query-parameter count and parameter-value length. Limits run before any other check, so keep security first in the chain.
+`.security(...)` applies `limits: .recommended` by default (pass your own `DeepLinkInputLimits`, or `.unlimited`, to change it) to cap URL length, query-parameter count and parameter-value length. Limits run before any other check, so keep security first in the chain.
 
 If you use `URLNormalizationTransformer`, run it **before** `.security(...)` or use `strategy: .hardened`. The transformer resolves `.`/`..` segments (including `%2e%2e` and `%2F`), so with `.standard` or `.strict` a link such as `/public/%2e%2e/admin` would pass validation and only turn into `/admin` afterwards. `.hardened` rejects `..` segments in any encoding.
 

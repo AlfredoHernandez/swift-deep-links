@@ -45,7 +45,7 @@ struct SecureDefaultsTests {
 		let sut = SecurityMiddleware(allowedSchemes: ["https", "http"], strategy: .hardened)
 		let url = try #require(URL(string: string))
 
-		await #expect(throws: DeepLinkError.securityViolation("Unauthorized host: example.com")) {
+		await #expect(throws: DeepLinkError.securityViolation("Unauthorized host")) {
 			try await sut.intercept(url: url)
 		}
 	}
@@ -55,7 +55,7 @@ struct SecureDefaultsTests {
 		let sut = SecurityMiddleware(allowedSchemes: ["myapp"], allowedHosts: ["profile"], strategy: .hardened)
 		let url = try #require(URL(string: "myapp://admin/1"))
 
-		await #expect(throws: DeepLinkError.securityViolation("Unauthorized host: admin")) {
+		await #expect(throws: DeepLinkError.securityViolation("Unauthorized host")) {
 			try await sut.intercept(url: url)
 		}
 	}

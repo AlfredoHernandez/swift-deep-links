@@ -247,6 +247,20 @@ checked once you list any host.
 (including the emoji zero-width joiner), `..` segments in any encoding and
 malformed encodings.
 
+**Input limits are on.** `.security(...)` and `SecurityMiddleware` default to
+`limits: .recommended` (8192-character URLs, 50 query parameters, 1024
+characters per decoded value).
+
+```swift
+// 2.0: lift the limits (not recommended)
+.security(allowedSchemes: ["myapp"], limits: .unlimited)
+```
+
+**Violations do not echo the rejected value.** Built-in strategies throw
+`securityViolation("Unauthorized scheme")` and `securityViolation("Unauthorized host")`
+without the attacker-supplied scheme or host; update tests that matched
+`"Unauthorized host: evil.com"`.
+
 **Readiness queues are bounded.** `DeepLinkReadinessQueue()` keeps 50 links and
 drops the oldest.
 
@@ -428,7 +442,7 @@ come first and side effects (prompts, analytics) last:
 ## Hardening checklist
 
 - [ ] `.security(...)` is first, uses `.hardened`, lists every Universal Link
-      domain in `allowedHosts`, and passes `limits: .recommended` (plus
+      domain in `allowedHosts`, and keeps the default `limits: .recommended` (plus
       `rejectDuplicateParameters: true` if your parsers read single values).
 - [ ] Sensitive flows are restricted by source:
       `.security(allowedSources: [.universalLink])` or a `DeepLinkMatcher.sources` rule.

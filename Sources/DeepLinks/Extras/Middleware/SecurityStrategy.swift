@@ -84,12 +84,12 @@ public extension SecurityStrategy {
 	/// empty host allow-list accepts every host, including for `http(s)`.
 	static let standard = SecurityStrategy { url, allowedSchemes, allowedHosts, blockedPatterns in
 		guard let scheme = url.scheme, allowedSchemes.contains(scheme) else {
-			throw DeepLinkError.securityViolation("Unauthorized scheme: \(url.scheme ?? "nil")")
+			throw DeepLinkError.securityViolation("Unauthorized scheme")
 		}
 
 		if !allowedHosts.isEmpty {
 			guard let host = url.host, allowedHosts.contains(host) else {
-				throw DeepLinkError.securityViolation("Unauthorized host: \(url.host ?? "nil")")
+				throw DeepLinkError.securityViolation("Unauthorized host")
 			}
 		}
 
@@ -136,7 +136,7 @@ public extension SecurityStrategy {
 		let canonicalURL = try canonicalizer.canonicalize(url)
 
 		guard let scheme = canonicalURL.scheme, allowedSchemes.containsCaseInsensitive(scheme) else {
-			throw DeepLinkError.securityViolation("Unauthorized scheme: \(canonicalURL.scheme ?? "nil")")
+			throw DeepLinkError.securityViolation("Unauthorized scheme")
 		}
 
 		let isWebLink = webSchemes.contains(scheme)
@@ -146,7 +146,7 @@ public extension SecurityStrategy {
 			}
 
 			guard allowedHosts.containsCaseInsensitive(host) else {
-				throw DeepLinkError.securityViolation("Unauthorized host: \(host)")
+				throw DeepLinkError.securityViolation("Unauthorized host")
 			}
 		}
 
@@ -168,11 +168,11 @@ public extension SecurityStrategy {
 	/// rejected outright.
 	static let strict = SecurityStrategy { url, allowedSchemes, allowedHosts, blockedPatterns in
 		guard let scheme = url.scheme, allowedSchemes.contains(scheme) else {
-			throw DeepLinkError.securityViolation("Unauthorized scheme: \(url.scheme ?? "nil")")
+			throw DeepLinkError.securityViolation("Unauthorized scheme")
 		}
 
 		guard let host = url.host, allowedHosts.contains(host) else {
-			throw DeepLinkError.securityViolation("Unauthorized host: \(url.host ?? "nil")")
+			throw DeepLinkError.securityViolation("Unauthorized host")
 		}
 
 		let urlString = url.absoluteString
@@ -189,7 +189,7 @@ public extension SecurityStrategy {
 	/// Allows all hosts and only blocks explicitly defined patterns.
 	static let permissive = SecurityStrategy { url, allowedSchemes, _, blockedPatterns in
 		guard let scheme = url.scheme, allowedSchemes.contains(scheme) else {
-			throw DeepLinkError.securityViolation("Unauthorized scheme: \(url.scheme ?? "nil")")
+			throw DeepLinkError.securityViolation("Unauthorized scheme")
 		}
 
 		let urlString = url.absoluteString
@@ -206,7 +206,7 @@ public extension SecurityStrategy {
 	/// Only validates URL schemes, ignores hosts and patterns.
 	static let schemeOnly = SecurityStrategy { url, allowedSchemes, _, _ in
 		guard let scheme = url.scheme, allowedSchemes.contains(scheme) else {
-			throw DeepLinkError.securityViolation("Unauthorized scheme: \(url.scheme ?? "nil")")
+			throw DeepLinkError.securityViolation("Unauthorized scheme")
 		}
 
 		return url
@@ -220,7 +220,7 @@ public extension SecurityStrategy {
 		}
 
 		guard let host = url.host, allowedHosts.contains(host) else {
-			throw DeepLinkError.securityViolation("Unauthorized host: \(url.host ?? "nil")")
+			throw DeepLinkError.securityViolation("Unauthorized host")
 		}
 
 		return url
@@ -243,12 +243,12 @@ public extension SecurityStrategy {
 	/// Only allows URLs that match specific patterns (opposite of blacklist).
 	static let whitelist = SecurityStrategy { url, allowedSchemes, allowedHosts, _ in
 		guard let scheme = url.scheme, allowedSchemes.contains(scheme) else {
-			throw DeepLinkError.securityViolation("Unauthorized scheme: \(url.scheme ?? "nil")")
+			throw DeepLinkError.securityViolation("Unauthorized scheme")
 		}
 
 		if !allowedHosts.isEmpty {
 			guard let host = url.host, allowedHosts.contains(host) else {
-				throw DeepLinkError.securityViolation("Unauthorized host: \(url.host ?? "nil")")
+				throw DeepLinkError.securityViolation("Unauthorized host")
 			}
 		}
 

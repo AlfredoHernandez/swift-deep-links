@@ -52,6 +52,16 @@ middleware order and a hardening checklist.
     empty, so `.security(allowedSchemes: ["myapp"])` keeps working. Migration:
     list your Universal Link domains in `allowedHosts`, or pass
     `strategy: .standard` for the 1.x behavior.
+  - `SecurityMiddleware` and `.security(...)` default to
+    `limits: .recommended` (was `.unlimited`): URLs over 8192 characters, more
+    than 50 query parameters or a decoded value over 1024 characters are
+    rejected before any other stage reads them. Migration: pass
+    `limits: .unlimited` (or your own `DeepLinkInputLimits`) to lift them.
+  - Security violations no longer echo the rejected scheme or host:
+    every built-in `SecurityStrategy` throws
+    `securityViolation("Unauthorized scheme")` / `("Unauthorized host")`.
+    Migration: tests matching the old `"Unauthorized host: <host>"` text
+    compare the fixed reason instead.
   - `DeepLinkReadinessQueue()` keeps at most
     `DeepLinkReadinessQueue.defaultMaxQueueSize` (50) links, dropping the
     oldest. Pass `maxQueueSize: nil` for the old unbounded queue, and
@@ -511,8 +521,8 @@ middleware order and a hardening checklist.
   before the security strategy or any decoding runs and throw
   `DeepLinkError.securityViolation`; place the security middleware first so
   oversized links never reach logging, analytics or parsing. Error messages
-  never echo the offending parameter name or value. Defaults are
-  `.unlimited`, so existing configurations are unchanged.
+  never echo the offending parameter name or value. The 1.x default was
+  `.unlimited`; since 2.0 `SecurityMiddleware` defaults to `.recommended`.
 - **Observable readiness eviction (S7).**
   `DeepLinkReadinessQueue(maxQueueSize:onEvict:)` reports each URL dropped
   to make room, outside the queue lock. Prefer a bounded queue in production.
@@ -559,6 +569,13 @@ middleware order and a hardening checklist.
   logs, `ReadinessMiddleware`'s queued-link log, `DeepLinkLoggingDelegate`,
   `DeepLinkAnalyticsDelegate` error descriptions, `DefaultAnalyticsProvider`
   event logging and `LoggingProvider.console`.
+- **Linear-time redaction of free-form text.** `redactedDescription` and
+  `DeepLinkLogPrivacy.redactingURLs(in:)` used a regular expression that took
+  quadratic time on long letter runs without `://` (a 100 000-character host
+  in a rejected link), and it ran for every rejected link. Embedded URLs are
+  now found by a single-pass scanner, and free-form text over 2048 characters
+  is cut (a URL split by the cut is replaced whole) and marked
+  `… [truncated]`.
 - **Invisible Unicode characters rejected (`.hardened`).** `URLCanonicalizer`
   (and so `SecurityStrategy.hardened`) also rejects Unicode format (Cf) and
   line/paragraph separator (Zl, Zp) characters in any decoded form, such as
