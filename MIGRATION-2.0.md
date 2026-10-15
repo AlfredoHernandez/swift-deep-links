@@ -331,6 +331,10 @@ actor KeychainRateLimitPersistence: RateLimitPersistence {
 }
 ```
 
+Every rate limiter built with the default persistence shares
+`UserDefaultsRateLimitPersistence.shared()` (one actor per key), so two
+middleware for the same key never overwrite each other's records.
+
 Persistences that prune old timestamps should also implement
 `mutateRequests(retaining:_:)` and keep at least `window` seconds, as
 `UserDefaultsRateLimitPersistence` does; otherwise a long `timeWindow` loses
@@ -503,5 +507,6 @@ come first and side effects (prompts, analytics) last:
 - [ ] `handle(activity:)` gets an explicit `handoffActivityTypes`; notification,
       Spotlight and quick-action payloads are trusted for their URL only.
 - [ ] `DeepLinkDiagnostics` runs in debug builds, with your `applinks:`
-      entitlement values.
+      entitlement values, and `checkMiddleware(_:)` over your chain (it warns
+      about `.signedLinks` without a `nonceStore`).
 - [ ] Your test suite runs your middleware chain over `URLFuzzCorpus.hostile(...)`.

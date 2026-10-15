@@ -36,6 +36,10 @@ public enum DeepLinkDiagnosticWarning: Sendable, Hashable, CustomStringConvertib
 	/// the `shadowed` parsers (indices into the parser list) never see it.
 	case shadowedParsers(probe: URL, handledBy: Int, shadowed: [Int])
 
+	/// A ``SignedLinkMiddleware`` has no ``NonceStore``, so a signed link can
+	/// be opened any number of times until it expires.
+	case signedLinksWithoutNonceStore
+
 	/// A readable explanation; probe URLs are passed through ``URLRedactor``.
 	public var description: String {
 		switch self {
@@ -62,6 +66,9 @@ public enum DeepLinkDiagnosticWarning: Sendable, Hashable, CustomStringConvertib
 
 		case let .shadowedParsers(probe, handledBy, shadowed):
 			"Parser \(handledBy) handles \(URLRedactor().redact(probe).absoluteString) first; parsers \(shadowed.map(String.init).joined(separator: ", ")) are never reached for it."
+
+		case .signedLinksWithoutNonceStore:
+			"Signed links have no nonce store; each signed link can be reused until it expires. Pass a nonceStore (InMemoryNonceStore or UserDefaultsNonceStore)."
 		}
 	}
 }

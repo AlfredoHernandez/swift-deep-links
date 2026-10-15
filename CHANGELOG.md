@@ -650,6 +650,16 @@ middleware order and a hardening checklist.
   now found by a single-pass scanner, and free-form text over 2048 characters
   is cut (a URL split by the cut is replaced whole) and marked
   `… [truncated]`.
+- **Configuration hardening.** `SecurityMiddleware` normalizes its allow-lists
+  (lower-cased; hosts without a trailing dot) and recompiles blocked patterns
+  case-insensitively once, at init, instead of on every link. The default
+  rate-limit persistence is `UserDefaultsRateLimitPersistence.shared(key:)`,
+  one actor per key, so several `.rateLimit()` middleware no longer race
+  through separate actors on the same `UserDefaults` entry.
+  `DeepLinkDiagnostics.checkMiddleware(_:)` warns
+  (`.signedLinksWithoutNonceStore`) when `.signedLinks(...)` has no nonce
+  store, leaving its links reusable until they expire; `nonceStore` stays
+  optional.
 - **SwiftUI double delivery.** `onDeepLink(_:)` routes a web link once when
   SwiftUI hands the same tap to both `onOpenURL` and
   `onContinueUserActivity` within a second, preferring the browsing-web

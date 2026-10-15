@@ -97,7 +97,7 @@ public extension DeepLinkMiddleware where Self == RateLimitMiddleware {
 	static func rateLimit(
 		maxRequests: Int = 100,
 		timeWindow: TimeInterval = 60.0,
-		persistence: RateLimitPersistence = UserDefaultsRateLimitPersistence(),
+		persistence: RateLimitPersistence = UserDefaultsRateLimitPersistence.shared(),
 		strategy: RateLimitStrategy = .slidingWindow,
 		dateProvider: @Sendable @escaping () -> Date = Date.init,
 	) -> RateLimitMiddleware {

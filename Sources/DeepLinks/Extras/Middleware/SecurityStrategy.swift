@@ -77,11 +77,18 @@ public struct SecurityStrategy: Sendable {
 }
 
 /// What a ``SecurityMiddleware`` allows, handed to its ``SecurityStrategy``.
+///
+/// Built once per middleware: allow-lists are normalized (lower-cased, hosts
+/// without a trailing dot) and blocked patterns recompiled case-insensitively
+/// here, not on every link.
 struct SecurityPolicy: Sendable {
 	let allowedSchemes: Set<String>
 	let allowedHosts: Set<String>
-	let allowedHostsByScheme: [String: Set<String>]
 	let blockedPatterns: [NSRegularExpression]
+	let normalizedSchemes: Set<String>
+	let normalizedHosts: Set<String>
+	let caseInsensitiveBlockedPatterns: Result<[NSRegularExpression], DeepLinkError>
+	private let normalizedHostsByScheme: [String: Set<String>]
 
 	init(
 		allowedSchemes: Set<String>,
@@ -91,16 +98,29 @@ struct SecurityPolicy: Sendable {
 	) {
 		self.allowedSchemes = allowedSchemes
 		self.allowedHosts = allowedHosts
-		self.allowedHostsByScheme = Dictionary(
-			allowedHostsByScheme.map { ($0.key.lowercased(), $0.value) },
+		self.blockedPatterns = blockedPatterns
+		normalizedSchemes = Set(allowedSchemes.map { $0.lowercased() })
+		normalizedHosts = Self.normalized(allowedHosts)
+		normalizedHostsByScheme = Dictionary(
+			allowedHostsByScheme.map { ($0.key.lowercased(), Self.normalized($0.value)) },
 			uniquingKeysWith: { $0.union($1) },
 		)
-		self.blockedPatterns = blockedPatterns
+		caseInsensitiveBlockedPatterns = Result { () throws(DeepLinkError) in
+			var compiled: [NSRegularExpression] = []
+			for pattern in blockedPatterns {
+				try compiled.append(caseInsensitiveRegex(pattern: pattern.pattern, options: pattern.options))
+			}
+			return compiled
+		}
 	}
 
-	/// The hosts listed for `scheme` in ``allowedHostsByScheme``, or `nil` when it has no entry.
-	func hostsListed(forScheme scheme: String) -> Set<String>? {
-		allowedHostsByScheme[scheme.lowercased()]
+	/// The normalized hosts listed for `scheme` in `allowedHostsByScheme`, or `nil` when it has no entry.
+	func normalizedHosts(forScheme scheme: String) -> Set<String>? {
+		normalizedHostsByScheme[scheme.lowercased()]
+	}
+
+	private static func normalized(_ hosts: Set<String>) -> Set<String> {
+		Set(hosts.map(DeepLinkMatcher.normalizedHost))
 	}
 }
 
@@ -168,37 +188,30 @@ public extension SecurityStrategy {
 	/// )
 	/// ```
 	static let hardened = SecurityStrategy { url, policy in
-		let allowedSchemes = policy.allowedSchemes
-		let allowedHosts = policy.allowedHosts
-		let blockedPatterns = policy.blockedPatterns
 		let canonicalizer = URLCanonicalizer()
 		let canonicalURL = try canonicalizer.canonicalize(url)
 
-		guard let scheme = canonicalURL.scheme, allowedSchemes.containsCaseInsensitive(scheme) else {
+		guard let scheme = canonicalURL.scheme, policy.normalizedSchemes.contains(scheme) else {
 			throw DeepLinkError.securityViolation("Unauthorized scheme")
 		}
 
-		let isWebLink = webSchemes.contains(scheme)
 		if hasEmptyAuthority(canonicalURL) {
 			throw DeepLinkError.securityViolation("Missing host")
 		}
-		let listedHosts = policy.hostsListed(forScheme: scheme)
-		if isWebLink || listedHosts != nil || !allowedHosts.isEmpty {
+		let listedHosts = policy.normalizedHosts(forScheme: scheme)
+		if webSchemes.contains(scheme) || listedHosts != nil || !policy.normalizedHosts.isEmpty {
 			guard let host = canonicalURL.host(), !host.isEmpty else {
 				throw DeepLinkError.securityViolation("Missing host")
 			}
 
-			guard (listedHosts ?? allowedHosts).containsCaseInsensitive(host) else {
+			guard (listedHosts ?? policy.normalizedHosts).contains(host) else {
 				throw DeepLinkError.securityViolation("Unauthorized host")
 			}
 		}
 
 		let forms = canonicalizer.matchableForms(of: url)
-		for blockedPattern in blockedPatterns {
-			let pattern = try caseInsensitiveRegex(pattern: blockedPattern.pattern, options: blockedPattern.options)
-			if forms.contains(where: pattern.matches) {
-				throw DeepLinkError.blockedURL(url)
-			}
+		for pattern in try policy.caseInsensitiveBlockedPatterns.get() where forms.contains(where: pattern.matches) {
+			throw DeepLinkError.blockedURL(url)
 		}
 
 		return canonicalURL
@@ -321,12 +334,6 @@ private let webSchemes: Set<String> = ["http", "https"]
 /// the first path segment as the host would see `account`.
 private func hasEmptyAuthority(_ url: URL) -> Bool {
 	URLComponents(url: url, resolvingAgainstBaseURL: false)?.percentEncodedHost?.isEmpty == true
-}
-
-private extension Set<String> {
-	func containsCaseInsensitive(_ value: String) -> Bool {
-		contains { $0.caseInsensitiveCompare(value) == .orderedSame }
-	}
 }
 
 func caseInsensitiveRegex(

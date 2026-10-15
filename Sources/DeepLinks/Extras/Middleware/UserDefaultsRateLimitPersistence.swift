@@ -3,6 +3,7 @@
 //
 
 import Foundation
+import os
 
 /// Default implementation using UserDefaults for persistence.
 ///
@@ -18,6 +19,11 @@ import Foundation
 /// spends the same budget, and the user (or any code in the app) can edit or
 /// clear it in `UserDefaults`. Use separate keys for separate budgets.
 public actor UserDefaultsRateLimitPersistence: RateLimitPersistence {
+	/// The key ``init(userDefaults:key:maxAge:dateProvider:)`` uses by default.
+	public static let defaultKey = "deeplink.ratelimit.requests"
+
+	private static let sharedInstances = OSAllocatedUnfairLock<[String: UserDefaultsRateLimitPersistence]>(initialState: [:])
+
 	private let userDefaults: UserDefaults
 	private let key: String
 	private var retention: TimeInterval
@@ -34,7 +40,7 @@ public actor UserDefaultsRateLimitPersistence: RateLimitPersistence {
 	///     Useful for testing with controlled time.
 	public init(
 		userDefaults: UserDefaults = .standard,
-		key: String = "deeplink.ratelimit.requests",
+		key: String = UserDefaultsRateLimitPersistence.defaultKey,
 		maxAge: TimeInterval = 3600,
 		dateProvider: @escaping @Sendable () -> Date = Date.init,
 	) {
@@ -42,6 +48,25 @@ public actor UserDefaultsRateLimitPersistence: RateLimitPersistence {
 		self.key = key
 		retention = maxAge
 		self.dateProvider = dateProvider
+	}
+
+	/// The one persistence for `key` in `UserDefaults.standard`, created on first use.
+	///
+	/// Rate limiters built with the default persistence share it, so every
+	/// middleware for one key goes through the same actor and records are
+	/// never lost between two actors writing the same `UserDefaults` entry.
+	///
+	/// - Parameter key: The `UserDefaults` key. Defaults to ``defaultKey``.
+	/// - Returns: The shared persistence for `key`.
+	public static func shared(key: String = UserDefaultsRateLimitPersistence.defaultKey) -> UserDefaultsRateLimitPersistence {
+		sharedInstances.withLock { instances in
+			if let existing = instances[key] {
+				return existing
+			}
+			let created = UserDefaultsRateLimitPersistence(key: key)
+			instances[key] = created
+			return created
+		}
 	}
 
 	public func loadRequests() -> [TimeInterval] {

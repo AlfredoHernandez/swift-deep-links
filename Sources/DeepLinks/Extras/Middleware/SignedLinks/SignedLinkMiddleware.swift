@@ -170,7 +170,9 @@ public final class SignedLinkMiddleware: DeepLinkMiddleware {
 	///     a later expiry is rejected with ``lifetimeTooLongReason``, so a leaked
 	///     key or a long-lived link cannot be used indefinitely. Requires an expiry.
 	///     Defaults to `nil` (no cap).
-	///   - nonceStore: Makes each link single-use and requires a nonce and an expiry. Defaults to `nil`.
+	///   - nonceStore: Makes each link single-use and requires a nonce and an expiry. Defaults to `nil`,
+	///     which lets a signed link be opened again until it expires; pass a store
+	///     for anything with side effects. ``DeepLinkDiagnostics/checkMiddleware(_:)`` warns when it is `nil`.
 	///   - reusedNonce: Whether a reused nonce is rejected (default) or dropped quietly.
 	///   - stripsSignatureParameters: Whether verified links continue without the
 	///     signature, key id, expiry and nonce parameters. Defaults to `true`.
@@ -228,6 +230,11 @@ public final class SignedLinkMiddleware: DeepLinkMiddleware {
 		self.reusedNonce = reusedNonce
 		self.stripsSignatureParameters = stripsSignatureParameters
 		self.dateProvider = dateProvider
+	}
+
+	/// Whether links are single-use; ``DeepLinkDiagnostics/checkMiddleware(_:)`` warns when not.
+	var hasNonceStore: Bool {
+		nonceStore != nil
 	}
 
 	public func intercept(_ request: DeepLinkRequest) async throws -> DeepLinkRequest? {

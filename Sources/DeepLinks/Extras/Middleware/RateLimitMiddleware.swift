@@ -73,7 +73,7 @@ import Foundation
 public final class RateLimitMiddleware: DeepLinkMiddleware {
 	private let maxRequests: Int
 	private let timeWindow: TimeInterval
-	private let persistence: RateLimitPersistence
+	let persistence: RateLimitPersistence
 	private let strategy: RateLimitStrategy
 	private let dateProvider: @Sendable () -> Date
 	private let gate = AsyncSerialGate()
@@ -84,7 +84,8 @@ public final class RateLimitMiddleware: DeepLinkMiddleware {
 	///   - maxRequests: Maximum number of requests allowed in the time window. Must be greater than 0.
 	///   - timeWindow: Time window in seconds. Negative and NaN values are
 	///     treated as `0`, which only counts requests made at the same instant.
-	///   - persistence: Persistence mechanism for storing request data (defaults to UserDefaults-based persistence)
+	///   - persistence: Persistence mechanism for storing request data (defaults to
+	///     ``UserDefaultsRateLimitPersistence/shared(key:)``, shared by every rate limiter using the default)
 	///   - strategy: The rate limiting strategy to use (defaults to .slidingWindow)
 	///   - dateProvider: Supplies the current time for rate-limit bookkeeping.
 	///     Defaults to `Date.init`; inject a deterministic provider in tests to
@@ -117,7 +118,7 @@ public final class RateLimitMiddleware: DeepLinkMiddleware {
 	public init(
 		maxRequests: Int = 100,
 		timeWindow: TimeInterval = 60.0,
-		persistence: RateLimitPersistence = UserDefaultsRateLimitPersistence(),
+		persistence: RateLimitPersistence = UserDefaultsRateLimitPersistence.shared(),
 		strategy: RateLimitStrategy = .slidingWindow,
 		dateProvider: @Sendable @escaping () -> Date = Date.init,
 	) {

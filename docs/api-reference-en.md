@@ -869,6 +869,7 @@ public struct DeepLinkDiagnostics: Sendable {
     public static func declaredURLSchemes(inInfoDictionary info: [String: Any]?) -> Set<String>
     public func checkSecurityConfiguration(allowedSchemes: Set<String>, allowedHosts: Set<String>) -> [DeepLinkDiagnosticWarning]
     public func checkParsers<Route>(_ parsers: [any DeepLinkParser<Route>], probes: [URL]) async -> [DeepLinkDiagnosticWarning]
+    public func checkMiddleware(_ middleware: [any DeepLinkMiddleware]) -> [DeepLinkDiagnosticWarning]
 }
 
 public enum DeepLinkDiagnosticWarning: Sendable, Hashable, CustomStringConvertible {
@@ -880,10 +881,11 @@ public enum DeepLinkDiagnosticWarning: Sendable, Hashable, CustomStringConvertib
     case associatedDomainNotAllowed(String)
     case unhandledProbe(URL)
     case shadowedParsers(probe: URL, handledBy: Int, shadowed: [Int])
+    case signedLinksWithoutNonceStore   // .signedLinks(...) without nonceStore: links reusable until expiry
 }
 ```
 
-Run it from a unit test or a `#if DEBUG` hook; it never changes link handling. **Limits:** entitlements cannot be read at runtime, so pass your `applinks:` values in `associatedDomains` (without them the associated-domain checks are skipped); only allowed hosts containing a `.` are treated as web domains; the `apple-app-site-association` file is not fetched or validated; parser checks cover only the probes you supply and call every parser for each probe, so parsers must be side-effect free. A wildcard `applinks:*.example.com` covers subdomains, not `example.com` itself. Pass third-party SDK callback schemes in `ignoredDeclaredSchemes` or `ignoredDeclaredSchemePrefixes` (for example `fb` for `fb<app id>`) so they are not reported as `declaredSchemeNotAllowed`.
+Run it from a unit test or a `#if DEBUG` hook; it never changes link handling. `checkMiddleware(_:)` takes the chain you pass the builder and warns about every `SignedLinkMiddleware` without a `nonceStore` (its links can be opened again until they expire). **Limits:** entitlements cannot be read at runtime, so pass your `applinks:` values in `associatedDomains` (without them the associated-domain checks are skipped); only allowed hosts containing a `.` are treated as web domains; the `apple-app-site-association` file is not fetched or validated; parser checks cover only the probes you supply and call every parser for each probe, so parsers must be side-effect free. A wildcard `applinks:*.example.com` covers subdomains, not `example.com` itself. Pass third-party SDK callback schemes in `ignoredDeclaredSchemes` or `ignoredDeclaredSchemePrefixes` (for example `fb` for `fb<app id>`) so they are not reported as `declaredSchemeNotAllowed`.
 
 ## Testing Utilities (`DeepLinksTesting` module)
 

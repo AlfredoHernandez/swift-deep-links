@@ -142,6 +142,31 @@ public struct DeepLinkDiagnostics: Sendable {
 	}
 }
 
+// MARK: - Middleware
+
+public extension DeepLinkDiagnostics {
+	/// Checks a middleware chain for risky settings.
+	///
+	/// Warns with ``DeepLinkDiagnosticWarning/signedLinksWithoutNonceStore``
+	/// for every ``SignedLinkMiddleware`` without a ``NonceStore``. Pass the
+	/// same middleware you give the coordinator builder.
+	///
+	/// - Parameter middleware: The middleware chain, in order.
+	/// - Returns: The warnings found, in chain order.
+	func checkMiddleware(_ middleware: [any DeepLinkMiddleware]) -> [DeepLinkDiagnosticWarning] {
+		middleware.compactMap(Self.warning(for:))
+	}
+
+	private static func warning(for middleware: any DeepLinkMiddleware) -> DeepLinkDiagnosticWarning? {
+		#if canImport(CryptoKit)
+		if let signed = middleware as? SignedLinkMiddleware, !signed.hasNonceStore {
+			return .signedLinksWithoutNonceStore
+		}
+		#endif
+		return nil
+	}
+}
+
 // MARK: - Checks
 
 private extension DeepLinkDiagnostics {
