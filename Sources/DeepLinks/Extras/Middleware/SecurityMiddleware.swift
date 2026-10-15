@@ -125,7 +125,7 @@ public final class SecurityMiddleware: DeepLinkMiddleware {
 	///     intercepted as a bare URL has the ``DeepLinkContext/Source/unknown``
 	///     source; links replayed from the built-in queues and stores keep theirs.
 	///   - strategy: The security validation strategy to use (defaults to ``SecurityStrategy/hardened``;
-	///     pass `.standard` for the 1.x behavior)
+	///     pass `.standard` for the 1.x allow-lists)
 	///   - limits: Size limits checked before the strategy runs (defaults to ``DeepLinkInputLimits/recommended``; pass ``DeepLinkInputLimits/unlimited`` to lift
 	/// them)
 	public init(

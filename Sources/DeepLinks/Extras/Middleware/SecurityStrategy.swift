@@ -15,6 +15,11 @@ import Foundation
 /// - **Pattern blocking**: Block URLs matching regex patterns
 /// - **Flexible strictness**: From permissive to strict validation
 ///
+/// Every strategy compares schemes and hosts case-insensitively (hosts
+/// percent-decoded and without a trailing dot) and matches blocked patterns
+/// case-insensitively against the raw URL and each percent-decoded form;
+/// they differ in which checks run and in what they return.
+///
 /// ## Available Strategies
 /// - `.standard`: Validates schemes, hosts, and blocked patterns
 /// - `.strict`: Enforces all security checks with additional validations
@@ -82,9 +87,6 @@ public struct SecurityStrategy: Sendable {
 /// without a trailing dot) and blocked patterns recompiled case-insensitively
 /// here, not on every link.
 struct SecurityPolicy: Sendable {
-	let allowedSchemes: Set<String>
-	let allowedHosts: Set<String>
-	let blockedPatterns: [NSRegularExpression]
 	let normalizedSchemes: Set<String>
 	let normalizedHosts: Set<String>
 	let caseInsensitiveBlockedPatterns: Result<[NSRegularExpression], DeepLinkError>
@@ -96,9 +98,6 @@ struct SecurityPolicy: Sendable {
 		allowedHostsByScheme: [String: Set<String>] = [:],
 		blockedPatterns: [NSRegularExpression] = [],
 	) {
-		self.allowedSchemes = allowedSchemes
-		self.allowedHosts = allowedHosts
-		self.blockedPatterns = blockedPatterns
 		normalizedSchemes = Set(allowedSchemes.map { $0.lowercased() })
 		normalizedHosts = Self.normalized(allowedHosts)
 		normalizedHostsByScheme = Dictionary(
@@ -131,26 +130,11 @@ public extension SecurityStrategy {
 	/// This was the default before 2.0; ``hardened`` is the default now. An
 	/// empty host allow-list accepts every host, including for `http(s)`.
 	static let standard = SecurityStrategy { url, policy in
-		let allowedSchemes = policy.allowedSchemes
-		let allowedHosts = policy.allowedHosts
-		let blockedPatterns = policy.blockedPatterns
-		guard let scheme = url.scheme, allowedSchemes.contains(scheme) else {
-			throw DeepLinkError.securityViolation("Unauthorized scheme")
+		try requireScheme(of: url, in: policy)
+		if !policy.normalizedHosts.isEmpty {
+			try requireHost(of: url, in: policy.normalizedHosts)
 		}
-
-		if !allowedHosts.isEmpty {
-			guard let host = url.host, allowedHosts.contains(host) else {
-				throw DeepLinkError.securityViolation("Unauthorized host")
-			}
-		}
-
-		let urlString = url.absoluteString
-		for pattern in blockedPatterns {
-			if pattern.firstMatch(in: urlString, range: NSRange(urlString.startIndex..., in: urlString)) != nil {
-				throw DeepLinkError.blockedURL(url)
-			}
-		}
-
+		try rejectBlocked(url, in: policy)
 		return url
 	}
 
@@ -223,99 +207,49 @@ public extension SecurityStrategy {
 	/// allowed-host set; URLs without a host (or with a host not on the allowlist) are
 	/// rejected outright.
 	static let strict = SecurityStrategy { url, policy in
-		let allowedSchemes = policy.allowedSchemes
-		let allowedHosts = policy.allowedHosts
-		let blockedPatterns = policy.blockedPatterns
-		guard let scheme = url.scheme, allowedSchemes.contains(scheme) else {
-			throw DeepLinkError.securityViolation("Unauthorized scheme")
-		}
-
-		guard let host = url.host, allowedHosts.contains(host) else {
-			throw DeepLinkError.securityViolation("Unauthorized host")
-		}
-
-		let urlString = url.absoluteString
-		for pattern in blockedPatterns {
-			if pattern.firstMatch(in: urlString, range: NSRange(urlString.startIndex..., in: urlString)) != nil {
-				throw DeepLinkError.blockedURL(url)
-			}
-		}
-
+		try requireScheme(of: url, in: policy)
+		try requireHost(of: url, in: policy.normalizedHosts)
+		try rejectBlocked(url, in: policy)
 		return url
 	}
 
 	/// Permissive security strategy that only checks schemes.
 	/// Allows all hosts and only blocks explicitly defined patterns.
 	static let permissive = SecurityStrategy { url, policy in
-		let allowedSchemes = policy.allowedSchemes
-		let blockedPatterns = policy.blockedPatterns
-		guard let scheme = url.scheme, allowedSchemes.contains(scheme) else {
-			throw DeepLinkError.securityViolation("Unauthorized scheme")
-		}
-
-		let urlString = url.absoluteString
-		for pattern in blockedPatterns {
-			if pattern.firstMatch(in: urlString, range: NSRange(urlString.startIndex..., in: urlString)) != nil {
-				throw DeepLinkError.blockedURL(url)
-			}
-		}
-
+		try requireScheme(of: url, in: policy)
+		try rejectBlocked(url, in: policy)
 		return url
 	}
 
 	/// Scheme-only security strategy.
 	/// Only validates URL schemes, ignores hosts and patterns.
 	static let schemeOnly = SecurityStrategy { url, policy in
-		let allowedSchemes = policy.allowedSchemes
-		guard let scheme = url.scheme, allowedSchemes.contains(scheme) else {
-			throw DeepLinkError.securityViolation("Unauthorized scheme")
-		}
-
+		try requireScheme(of: url, in: policy)
 		return url
 	}
 
 	/// Host-only security strategy.
 	/// Only validates hosts, ignores schemes and patterns.
 	static let hostOnly = SecurityStrategy { url, policy in
-		let allowedHosts = policy.allowedHosts
-		guard !allowedHosts.isEmpty else {
-			return url
+		if !policy.normalizedHosts.isEmpty {
+			try requireHost(of: url, in: policy.normalizedHosts)
 		}
-
-		guard let host = url.host, allowedHosts.contains(host) else {
-			throw DeepLinkError.securityViolation("Unauthorized host")
-		}
-
 		return url
 	}
 
 	/// Pattern-only security strategy.
 	/// Only checks blocked patterns, ignores schemes and hosts.
 	static let patternOnly = SecurityStrategy { url, policy in
-		let blockedPatterns = policy.blockedPatterns
-		let urlString = url.absoluteString
-		for pattern in blockedPatterns {
-			if pattern.firstMatch(in: urlString, range: NSRange(urlString.startIndex..., in: urlString)) != nil {
-				throw DeepLinkError.blockedURL(url)
-			}
-		}
-
+		try rejectBlocked(url, in: policy)
 		return url
 	}
 
 	/// Whitelist security strategy.
 	/// Only allows URLs that match specific patterns (opposite of blacklist).
 	static let whitelist = SecurityStrategy { url, policy in
-		let allowedSchemes = policy.allowedSchemes
-		let allowedHosts = policy.allowedHosts
-		guard let scheme = url.scheme, allowedSchemes.contains(scheme) else {
-			throw DeepLinkError.securityViolation("Unauthorized scheme")
-		}
-
-		if !allowedHosts.isEmpty {
-			guard let host = url.host, allowedHosts.contains(host) else {
-				throw DeepLinkError.securityViolation("Unauthorized host")
-			}
+		try requireScheme(of: url, in: policy)
+		if !policy.normalizedHosts.isEmpty {
+			try requireHost(of: url, in: policy.normalizedHosts)
 		}
 
 		guard url.path.hasPrefix("/") || url.path.isEmpty else {
@@ -323,6 +257,33 @@ public extension SecurityStrategy {
 		}
 
 		return url
+	}
+}
+
+// MARK: - Shared Checks
+
+/// Schemes compare case-insensitively.
+private func requireScheme(of url: URL, in policy: SecurityPolicy) throws(DeepLinkError) {
+	guard let scheme = url.scheme?.lowercased(), policy.normalizedSchemes.contains(scheme) else {
+		throw .securityViolation("Unauthorized scheme")
+	}
+}
+
+/// Hosts compare case-insensitively, percent-decoded and without a trailing
+/// dot, so `HOME`, `home.` and `%68ome` all match an allowed `home`.
+private func requireHost(of url: URL, in normalizedHosts: Set<String>) throws(DeepLinkError) {
+	guard let encodedHost = url.host(percentEncoded: true), !encodedHost.isEmpty,
+	      normalizedHosts.contains(DeepLinkMatcher.normalizedHost(encodedHost.removingPercentEncoding ?? encodedHost))
+	else { throw .securityViolation("Unauthorized host") }
+}
+
+/// Patterns match case-insensitively against the raw URL and every percent-decoded form.
+private func rejectBlocked(_ url: URL, in policy: SecurityPolicy) throws(DeepLinkError) {
+	let patterns = try policy.caseInsensitiveBlockedPatterns.get()
+	guard !patterns.isEmpty else { return }
+	let forms = URLCanonicalizer().matchableForms(of: url)
+	if patterns.contains(where: { pattern in forms.contains(where: pattern.matches) }) {
+		throw .blockedURL(url)
 	}
 }
 

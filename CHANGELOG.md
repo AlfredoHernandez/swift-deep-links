@@ -62,6 +62,16 @@ middleware order and a hardening checklist.
     `securityViolation("Unauthorized scheme")` / `("Unauthorized host")`.
     Migration: tests matching the old `"Unauthorized host: <host>"` text
     compare the fixed reason instead.
+  - The other strategies (`.standard`, `.strict`, `.permissive`,
+    `.schemeOnly`, `.hostOnly`, `.patternOnly`, `.whitelist`) keep their
+    allow-list semantics (which checks run, an empty host list accepting every
+    host where it did, the URL returned unchanged) but now match like
+    `.hardened`: schemes and hosts case-insensitively, hosts percent-decoded
+    and without a trailing dot, and blocked patterns case-insensitively
+    against the raw URL and every percent-decoded form, so
+    `%6A%61vascript:` and `MYAPP://` no longer slip past a pattern or differ
+    from what a parser sees. Migration: a pattern meant to match only a raw
+    spelling, or an allow-list relying on case to reject, needs revisiting.
   - Host spellings are canonical. `URLCanonicalizer` (and `.hardened`)
     percent-decodes the host and drops a trailing dot (`myapp://Account%2E/x`
     continues as `myapp://account/x`), rejecting a host that decodes to a

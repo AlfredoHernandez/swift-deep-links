@@ -165,30 +165,8 @@ struct HardenedSecurityStrategyTests {
 	}
 }
 
-/// Pins the pre-existing strategies so the hardened work cannot change them.
+/// Pins what the pre-existing strategies keep from 1.x: their allow-list semantics and the URL they return.
 struct ExistingSecurityStrategiesCompatibilityTests {
-	@Test
-	func `standard still matches blocked patterns against the raw encoded string only`() async throws {
-		let sut = try SecurityMiddleware(
-			allowedSchemes: ["myapp"],
-			blockedPatterns: [NSRegularExpression(pattern: "javascript:")],
-			strategy: .standard,
-		)
-		let url = try #require(URL(string: "myapp://home/open?target=%6A%61vascript:alert(1)"))
-
-		#expect(try await sut.intercept(url: url) == url)
-	}
-
-	@Test
-	func `standard still compares schemes case-sensitively`() async throws {
-		let sut = SecurityMiddleware(allowedSchemes: ["myapp"], strategy: .standard)
-		let url = try #require(URL(string: "MYAPP://home"))
-
-		await #expect(throws: DeepLinkError.securityViolation("Unauthorized scheme")) {
-			try await sut.intercept(url: url)
-		}
-	}
-
 	@Test
 	func `standard still accepts any host and userinfo when the host allow-list is empty`() async throws {
 		let sut = SecurityMiddleware(allowedSchemes: ["https"], strategy: .standard)

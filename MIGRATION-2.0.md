@@ -247,6 +247,13 @@ checked once you list any host.
 (including the emoji zero-width joiner), `..` segments in any encoding and
 malformed encodings.
 
+**Legacy strategies match like `.hardened`.** `.standard`, `.strict`,
+`.permissive`, `.schemeOnly`, `.hostOnly`, `.patternOnly` and `.whitelist`
+keep their allow-list rules but compare schemes and hosts case-insensitively
+(hosts percent-decoded, without a trailing dot) and match blocked patterns
+case-insensitively against every decoded form. `strategy: .standard` is
+therefore "1.x allow-lists", not byte-for-byte 1.x matching.
+
 **Hosts are compared in every spelling.** `.hardened` decodes the host and
 drops a trailing dot, and rejects `myapp:///path` (empty host). The default
 authentication strategy protects `myapp://Account./x`, `myapp://account%2e/x`,
