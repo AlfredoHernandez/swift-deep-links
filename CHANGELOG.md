@@ -4,7 +4,7 @@ All notable changes to `swift-deep-links` are tracked here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
-## [2.0.0] - Unreleased
+## [2.0.0] - 2026-10-15
 
 Every change since `1.1.0`, described as it behaves in 2.0.0. Upgrading?
 Follow [MIGRATION-2.0.md](MIGRATION-2.0.md), which covers the breaking items
@@ -736,7 +736,7 @@ Every removal is a breaking change.
 
 Initial release.
 
-[2.0.0]: https://github.com/AlfredoHernandez/swift-deep-links/compare/1.1.0...HEAD
+[2.0.0]: https://github.com/AlfredoHernandez/swift-deep-links/compare/1.1.0...2.0.0
 [1.1.0]: https://github.com/AlfredoHernandez/swift-deep-links/compare/1.0.1...1.1.0
 [1.0.1]: https://github.com/AlfredoHernandez/swift-deep-links/compare/1.0.0...1.0.1
 [1.0.0]: https://github.com/AlfredoHernandez/swift-deep-links/releases/tag/1.0.0
