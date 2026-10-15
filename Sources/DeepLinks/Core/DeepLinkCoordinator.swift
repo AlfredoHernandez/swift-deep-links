@@ -29,6 +29,16 @@ import OSLog
 /// )
 /// ```
 ///
+/// ## Cancellation
+///
+/// Cancelling the task that awaits ``handle(url:context:)`` does not abandon
+/// the link: every route still reaches the handler, middleware is still told
+/// how the link ended through ``DeepLinkMiddleware/didFinish(_:outcome:)``,
+/// and the result is still delivered and published to ``results``. A link
+/// that already passed security checks is never left half-settled. The default
+/// sleep returns at once in a cancelled task, so `routeExecutionDelay` is
+/// skipped; handlers that should stop early can check `Task.isCancelled`.
+///
 /// ## Thread Safety
 ///
 /// Thread-safe coordinator for handling deep links.
@@ -46,9 +56,8 @@ public final class DeepLinkCoordinator<Route: DeepLinkRoute>: Sendable {
 	// MARK: - Private Properties
 
 	private let routing: any DeepLinkRouting<Route>
-	private let handler: any DeepLinkHandler<Route>
-	private let middlewareCoordinator: DeepLinkMiddlewareCoordinator
-	private let routeExecutionDelay: Duration
+	private let routeExecutor: RouteExecutor<Route>
+	let middlewareCoordinator: DeepLinkMiddlewareCoordinator
 	private let broadcaster = ResultBroadcaster<Route>()
 
 	// MARK: - Public Properties
@@ -61,12 +70,6 @@ public final class DeepLinkCoordinator<Route: DeepLinkRoute>: Sendable {
 	/// - Deep link processing completion (`didProcess`)
 	/// - Deep link processing failures (`didFailProcessing`)
 	public let delegate: (any DeepLinkCoordinatorDelegate<Route>)?
-
-	/// Injectable sleep primitive used between route executions when
-	/// ``routeExecutionDelay`` is positive. Defaults to `Task.sleep(for:)`;
-	/// tests can inject a no-op or a recorder closure to retire wall-clock
-	/// waits.
-	private let sleep: @Sendable (Duration) async -> Void
 
 	/// A stream of every result this coordinator produces from now on.
 	///
@@ -174,11 +177,9 @@ public final class DeepLinkCoordinator<Route: DeepLinkRoute>: Sendable {
 		self.log = log
 		self.logPrivacy = logPrivacy
 		self.routing = routing
-		self.handler = handler
+		routeExecutor = RouteExecutor(handler: handler, delay: routeExecutionDelay, sleep: sleep, log: log, logPrivacy: logPrivacy)
 		self.middlewareCoordinator = middlewareCoordinator
-		self.routeExecutionDelay = routeExecutionDelay
 		self.delegate = delegate
-		self.sleep = sleep
 	}
 
 	// MARK: - Public Interface
@@ -292,257 +293,40 @@ private extension DeepLinkCoordinator {
 		let processed: DeepLinkRequest
 		switch run.result {
 		case let .failure(error):
-			return await (handleProcessingError(url: request.url, error: error, startTime: startTime), .failed(error))
+			return await (fail(url: request.url, error: error, startTime: startTime), .failed(error))
 
 		case .success(nil):
-			return await (createMiddlewareStoppedResult(url: request.url, startTime: startTime), run.wasDeferred ? .deferred : .stopped)
+			log.log(level: .info, "Deep link processing stopped by middleware")
+			let result = DeepLinkResultFactory<Route>.stopped(url: request.url, startTime: startTime)
+			await notifyDelegateDidProcess(request.url, result: result)
+			return (result, run.wasDeferred ? .deferred : .stopped)
 
 		case let .success(request?):
 			processed = request.bindingSignatureToURL()
 		}
 
 		do {
-			let routes = try await routeURL(processed.url)
-			let executionResult = await DeepLinkRun.updating({ $0.routedURL = processed.url }) {
-				await executeRoutes(routes, context: processed.context)
+			let routes = try await routing.route(from: processed.url)
+			let execution = await DeepLinkRun.updating({ $0.routedURL = processed.url }) {
+				await routeExecutor.execute(routes, context: processed.context)
 			}
-			let result = await createSuccessResult(
+			let result = DeepLinkResultFactory.completed(
 				originalURL: request.url,
 				processedURL: processed.url,
 				routes: routes,
-				executionResult: executionResult,
+				execution: execution,
 				startTime: startTime,
 			)
-			return (result, executionResult.outcome)
+			await notifyDelegateDidProcess(request.url, result: result)
+			return (result, execution.outcome)
 		} catch {
-			return await (handleProcessingError(url: request.url, error: error, startTime: startTime), .failed(error))
+			return await (fail(url: request.url, error: error, startTime: startTime), .failed(error))
 		}
 	}
 
-	/// Routes the processed URL to determine the appropriate routes.
-	///
-	/// - Parameter url: The processed URL to route
-	/// - Returns: An array of routes
-	func routeURL(_ url: URL) async throws -> [Route] {
-		try await routing.route(from: url)
-	}
-
-	/// Executes all routes with customizable delays.
-	///
-	/// - Parameters:
-	///   - routes: The routes to execute
-	///   - context: The context handed to the handler with each route
-	/// - Returns: The execution result containing success/failure counts and errors
-	func executeRoutes(_ routes: [Route], context: DeepLinkContext) async -> RouteExecutionResult {
-		var successfulRoutes = 0
-		var failedRoutes = 0
-		var declinedRoutes = 0
-		var errors: [any Error] = []
-
-		for (index, route) in routes.enumerated() {
-			let decline = RouteDecline()
-			do {
-				try await DeepLinkRun.updating({ $0.routeDecline = decline }) {
-					try await handler.handle(route, context: context)
-				}
-				successfulRoutes += 1
-			} catch {
-				failedRoutes += 1
-				declinedRoutes += decline.declined(error) ? 1 : 0
-				errors.append(error)
-				log.log(level: .error, "Error handling route \(route.id): \(logPrivacy.describe(error))")
-			}
-
-			if routeExecutionDelay > .zero, index < routes.count - 1 {
-				await sleep(routeExecutionDelay)
-			}
-		}
-
-		return RouteExecutionResult(
-			successfulRoutes: successfulRoutes,
-			failedRoutes: failedRoutes,
-			declinedRoutes: declinedRoutes,
-			errors: errors,
-		)
-	}
-
-	/// Handles processing errors and creates an error result.
-	///
-	/// - Parameters:
-	///   - url: The URL that failed to process
-	///   - error: The error that occurred
-	///   - startTime: The start time for execution timing
-	/// - Returns: An error result
-	func handleProcessingError(url: URL, error: Error, startTime: Date) async -> DeepLinkResult<Route> {
+	func fail(url: URL, error: any Error, startTime: Date) async -> DeepLinkResult<Route> {
 		log.log(level: .error, "Error while handling deep link \(url.host() ?? "Unknown URL host"): \(logPrivacy.describe(error))")
-
 		await notifyDelegateDidFailProcessing(url, error: error)
-
-		let executionTime = Date().timeIntervalSince(startTime)
-		return DeepLinkResult<Route>(
-			originalURL: url,
-			processedURL: nil,
-			routes: [],
-			executionTime: executionTime,
-			errors: [error],
-			successfulRoutes: 0,
-			failedRoutes: 0,
-		)
-	}
-
-	/// Creates a result when middleware stops processing.
-	///
-	/// - Parameters:
-	///   - url: The original URL
-	///   - startTime: The start time for execution timing
-	/// - Returns: A middleware-stopped result
-	func createMiddlewareStoppedResult(url: URL, startTime: Date) async -> DeepLinkResult<Route> {
-		log.log(level: .info, "Deep link processing stopped by middleware")
-
-		let executionTime = Date().timeIntervalSince(startTime)
-		let result = DeepLinkResult<Route>(
-			originalURL: url,
-			processedURL: nil,
-			routes: [],
-			executionTime: executionTime,
-			errors: [],
-			successfulRoutes: 0,
-			failedRoutes: 0,
-		)
-
-		await notifyDelegateDidProcess(url, result: result)
-		return result
-	}
-
-	/// Creates a successful processing result.
-	///
-	/// - Parameters:
-	///   - originalURL: The original URL
-	///   - processedURL: The processed URL
-	///   - routes: The routes that were executed
-	///   - executionResult: The execution result
-	///   - startTime: The start time for execution timing
-	/// - Returns: A successful result
-	func createSuccessResult(
-		originalURL: URL,
-		processedURL: URL,
-		routes: [Route],
-		executionResult: RouteExecutionResult,
-		startTime: Date,
-	) async -> DeepLinkResult<Route> {
-		let executionTime = Date().timeIntervalSince(startTime)
-		let result = DeepLinkResult<Route>(
-			originalURL: originalURL,
-			processedURL: processedURL,
-			routes: routes,
-			executionTime: executionTime,
-			errors: executionResult.errors,
-			successfulRoutes: executionResult.successfulRoutes,
-			failedRoutes: executionResult.failedRoutes,
-		)
-
-		await notifyDelegateDidProcess(originalURL, result: result)
-		return result
-	}
-}
-
-// MARK: - Helper Types
-
-/// Represents the result of route execution.
-private struct RouteExecutionResult {
-	let successfulRoutes: Int
-	let failedRoutes: Int
-	let declinedRoutes: Int
-	let errors: [any Error]
-
-	/// ``DeepLinkOutcome/failed(_:)`` when route guards declined every route
-	/// before any handler ran, so nothing executed (a signed link's nonce is
-	/// released, as when ``ConfirmationMiddleware`` denies it);
-	/// ``DeepLinkOutcome/handlerFailed(_:)`` when anything else failed.
-	var outcome: DeepLinkOutcome {
-		guard let firstError = errors.first else { return .succeeded }
-		let nothingExecuted = successfulRoutes == 0 && declinedRoutes == failedRoutes
-		return nothingExecuted ? .failed(firstError) : .handlerFailed(firstError)
-	}
-}
-
-// MARK: - Delegate Notifications
-
-private extension DeepLinkCoordinator {
-	/// Notifies the delegate that processing will begin.
-	///
-	/// - Parameter url: The URL that will be processed
-	func notifyDelegateWillProcess(_ url: URL) async {
-		guard let delegate else { return }
-
-		await delegate.coordinator(self, willProcess: url)
-	}
-
-	/// Notifies the delegate that processing has completed.
-	///
-	/// - Parameters:
-	///   - url: The URL that was processed
-	///   - result: The result of the processing
-	func notifyDelegateDidProcess(_ url: URL, result: DeepLinkResult<Route>) async {
-		guard let delegate else { return }
-
-		await delegate.coordinator(self, didProcess: url, result: result)
-	}
-
-	/// Notifies the delegate that processing has failed.
-	///
-	/// - Parameters:
-	///   - url: The URL that failed to process
-	///   - error: The error that caused the failure
-	func notifyDelegateDidFailProcessing(_ url: URL, error: Error) async {
-		guard let delegate else { return }
-
-		await delegate.coordinator(self, didFailProcessing: url, error: error)
-	}
-}
-
-// MARK: - Middleware Management
-
-public extension DeepLinkCoordinator {
-	/// Adds middleware to the coordinator.
-	///
-	/// Middleware is executed in the order it's added. The first middleware added
-	/// will be the first to intercept URLs. This allows dynamic middleware configuration
-	/// after the coordinator has been created.
-	///
-	/// ## Thread Safety
-	///
-	/// This method is thread-safe and can be called from any thread.
-	///
-	/// - Parameter middleware: The middleware to add
-	func add(_ middleware: any DeepLinkMiddleware) async {
-		await middlewareCoordinator.add(middleware)
-	}
-
-	/// Removes all middleware from the coordinator.
-	///
-	/// After calling this method, the coordinator will process URLs without any
-	/// middleware interception. URLs will go directly to the routing system.
-	///
-	/// ## Thread Safety
-	///
-	/// This method is thread-safe and can be called from any thread.
-	func removeAllMiddleware() async {
-		await middlewareCoordinator.removeAll()
-	}
-
-	/// Removes all middleware of a specific type.
-	///
-	/// This method removes all instances of the specified middleware type from the
-	/// coordinator's middleware stack. If no middleware of that type is found,
-	/// this method completes without error.
-	///
-	/// ## Thread Safety
-	///
-	/// This method is thread-safe and can be called from any thread.
-	///
-	/// - Parameter type: The type of middleware to remove
-	func removeMiddleware(_ type: (some DeepLinkMiddleware).Type) async {
-		await middlewareCoordinator.remove(type)
+		return DeepLinkResultFactory.failed(url: url, error: error, startTime: startTime)
 	}
 }
