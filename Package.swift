@@ -4,6 +4,7 @@ import PackageDescription
 
 let package = Package(
 	name: "swift-deep-links",
+	// Apple platforms only: the library uses `os` (Logger, OSAllocatedUnfairLock, signposts) unconditionally.
 	platforms: [
 		.iOS(.v16),
 		.macOS(.v13),

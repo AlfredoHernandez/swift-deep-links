@@ -236,7 +236,9 @@ The [Sample App](./DeepLinkSample/) demonstrates all features: multiple route ty
 
 iOS 16+ · macOS 13+ · tvOS 16+ · watchOS 9+ · visionOS 1+ · Swift 6.2+ · Xcode 16+
 
-> `DeepLinkNotificationDelegate` and `handle(notificationResponse:)` are unavailable on tvOS, Spotlight entry points require CoreSpotlight (not on tvOS), `handle(shortcutItem:)` is iOS-only, and signed links require CryptoKit. All other APIs work on every supported platform.
+The package targets Apple platforms only: it uses `os` (`Logger`, `OSAllocatedUnfairLock`, signposts) unconditionally and does not build on Linux or Windows.
+
+> `DeepLinkNotificationDelegate` and `handle(notificationResponse:)` are unavailable on tvOS, Spotlight entry points require CoreSpotlight (not on tvOS), `handle(shortcutItem:)` requires UIKit on iOS or visionOS, and signed links require CryptoKit. All other APIs work on every supported platform.
 
 ## Contributing
 

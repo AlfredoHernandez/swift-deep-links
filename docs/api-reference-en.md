@@ -1035,3 +1035,15 @@ func rejectsHostileURL(_ fuzzCase: URLFuzzCase) async {
 - `UserDefaultsRateLimitPersistence` — `actor`
 - All protocols — `Sendable`
 - Delegates — `@MainActor`-isolated
+
+## Platform Availability
+
+The package supports Apple platforms only; `os` (`Logger`, `OSAllocatedUnfairLock`, signposts) is used unconditionally. Every platform-specific API is gated with exactly one of these conditions, spelled the same everywhere; a feature with its own file wraps the whole file in it:
+
+| Feature | Condition | Unavailable on |
+|---|---|---|
+| Notification entry points, `DeepLinkNotificationDelegate` | `canImport(UserNotifications) && !os(tvOS)` | tvOS |
+| Spotlight entry points | `canImport(CoreSpotlight) && !os(tvOS)` | tvOS |
+| Quick-action entry point, scene identifiers | `canImport(UIKit) && (os(iOS) \|\| os(visionOS))` | macOS, tvOS, watchOS |
+| Signed links | `canImport(CryptoKit)` | — |
+| SwiftUI modifier | `canImport(SwiftUI)` | — |
