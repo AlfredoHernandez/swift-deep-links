@@ -43,7 +43,7 @@ Severity: **H** high, **M** medium, **L** low. "Compat" = whether the fix can sh
 | F4 | `SignedLinkMiddleware` (HMAC-SHA256 via CryptoKit, expiry, nonce) | Password reset, invitations, payment confirmation |
 | F5 | `ReplayProtectionMiddleware` (dedupe window, idempotency key) | Double taps, malicious repeated triggers |
 | F6 | `ConfirmationMiddleware` / `SensitiveRoute` | User confirmation before destructive/financial actions |
-| F7 | `TokenBucket` rate strategy (already on the Roadmap) | Burst-tolerant limits |
+| F7 | `TokenBucket` rate strategy (already on the [Roadmap](./Roadmap.md)) | Burst-tolerant limits |
 | F8 | Additional entry points: `UNNotificationResponse`, App Intents / `CSSearchableItem`, `UIApplicationShortcutItem` | Push, Spotlight, Siri, quick actions |
 | F9 | Multi-scene routing (route to originating scene) | iPadOS / visionOS multi-window |
 | F10 | `DeepLinksTesting`: URL fuzz corpus (traversal, encoding, IDN, duplicates, oversize) + `TestClock` for rate limits | Regression-proof security tests |
@@ -51,7 +51,7 @@ Severity: **H** high, **M** medium, **L** low. "Compat" = whether the fix can sh
 
 ## 5. Phases and versioning
 
-### Phase 1 — `1.2.0` (additive, no source break) — security hardening — **Done**
+### Phase 1 — security hardening (shipped in 2.0.0) — **Done**
 1. S1 chain resumption on drain (A2) — test: auth after readiness blocks drained link.
 2. S2 atomic rate limiting + `timeWindow`/`maxRequests` validation (A3) — test: 50 concurrent calls with limit 5 allow exactly 5.
 3. S3 `SecurityStrategy.hardened` + `URLCanonicalizer` (A1): case-insensitive, decoded matching, userinfo/control/traversal rejection, host required.
@@ -62,7 +62,7 @@ Severity: **H** high, **M** medium, **L** low. "Compat" = whether the fix can sh
 
 Compatibility rule: every change adds API or fixes behavior that was a bug; existing initializers and defaults keep working. Defaults that remain insecure are documented and flagged `@available(*, deprecated)` only where a safe replacement exists.
 
-### Phase 2 — `1.3.0` (additive features) — **Done**
+### Phase 2 — additive features (shipped in 2.0.0) — **Done**
 F1, F3, F5, F7, F10, F11, A5. Also: `.hardened` rejects invisible Unicode format and separator characters (Cf, Zl, Zp).
 
 ### Phase 3 — `2.0.0` (breaking, only what cannot be additive) — **Done**
@@ -86,5 +86,5 @@ F1, F3, F5, F7, F10, F11, A5. Also: `.hardened` rejects invisible Unicode format
 ## 6. Quality gates (per phase)
 - TDD: failing test first for each finding (user rule), deterministic clocks (no real sleeps).
 - `swift test` green on all targets; CI matrix unchanged.
-- `code-review` agent pass at the end of each phase; findings triaged before the next phase.
+- A code review at the end of each phase; findings triaged before the next phase.
 - Docs: update `api-reference-en.md`, `how-to-use-deeplink-en.md`, and add a "Securing your deep links" guide (middleware ordering: security → rate limit → auth → readiness → transforms → analytics).

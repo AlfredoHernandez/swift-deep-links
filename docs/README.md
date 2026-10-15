@@ -10,6 +10,14 @@
 - [**Core Architecture**](./core-architecture-diagram.md) - Internal component interactions
 - [**FAQ**](./faq.md) - Frequently asked questions
 
+## Internal Planning
+
+Notes for contributors, not part of the public documentation:
+
+- [Security and evolution plan](./internal/SecurityAndEvolutionPlan.md)
+- [Roadmap](./internal/Roadmap.md)
+- [Improvement checklist](./internal/ImprovementChecklist.md)
+
 ## Quick Start
 
 1. Read the [How to Use DeepLink](./how-to-use-deeplink-en.md) guide

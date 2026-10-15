@@ -1,6 +1,6 @@
 # swift-deep-links — Architecture & DX Improvement Checklist
 
-> **Purpose of this file.** A long-lived, session-portable checklist for improving the `swift-deep-links` package. Designed to be picked up by any future Claude Code session (or human) without prior conversation context. Each item has enough grounding (files, line numbers, rationale) to act on it independently.
+> **Purpose of this file.** A long-lived checklist for improving the `swift-deep-links` package, written so a contributor can pick it up without prior context. Each item has enough grounding (files, line numbers, rationale) to act on it independently. Internal planning notes; not part of the public documentation.
 
 ---
 
@@ -8,7 +8,6 @@
 
 If you are opening this file cold, read this section first.
 
-- **Repository root:** `/Users/alfredo/Developer/iOS/Packages/swift-deep-link`
 - **Primary branch for this work:** `feature/modernization` (main branch is `main`)
 - **Test baseline:** 282 tests in 27 suites (Swift Testing framework, no XCTest). All must stay green after every change.
 - **Build / test commands:**
@@ -17,7 +16,7 @@ If you are opening this file cold, read this section first.
   swift test
   ```
 - **Swift version:** 6.2 (strict concurrency enabled by default via tools-version)
-- **Commit convention:** short subject line, optional bullet body (`git log --oneline` for style). Always use the `git-commit-messages` agent to draft messages. **Never add `Co-Authored-By` trailers.**
+- **Commit convention:** short subject line, optional bullet body (`git log --oneline` for style). **Never add `Co-Authored-By` trailers.**
 - **User preferences that constrain work:**
   - Do not push to remote until the user has tested locally.
   - Fix bugs by writing a failing test first, then the fix.
@@ -30,7 +29,7 @@ If you are opening this file cold, read this section first.
   - `Sources/DeepLinksTesting/` — public test doubles consumers import in their own test targets
   - `Tests/DeepLinksTests/` — unit tests for the main library
   - `Tests/DeepLinksTestingTests/` — tests for the test-doubles library
-  - `Docs/` — supplementary markdown (Roadmap, this file)
+  - `docs/` — public guides; `docs/internal/` — planning notes (Roadmap, this file)
 - **Protocol-witness pattern is used extensively** for strategy objects (`AnalyticsStrategy`, `LoggingFormat`, `LoggingProvider`, `SecurityStrategy`, `AuthenticationStrategy`, `RateLimitStrategy`, `URLTransformationStrategy`). Prefer extending via `static let` properties on those types rather than adding more protocols.
 
 ---
@@ -50,15 +49,15 @@ If you are opening this file cold, read this section first.
   - `64ef066` — tvOS/watchOS/visionOS declared in `Package.swift`; `NotificationDelegate` + factory + tests gated behind `#if canImport(UserNotifications) && !os(tvOS)`.
   - `3cfc7c0` — Doc drift sync (generic delegate + removed strategies).
   - `2584c93` — `coordinator.handle(activity:)` + SwiftUI `View.onDeepLink(_:)` modifier + 3 tests.
-  - `fc855a7` — Checklist convention: run `code-review` + `swift-testing` agents after every phase.
+  - `fc855a7` — Checklist convention: run a code review and a test review after every phase.
   - `f696ba2` — Phase-A review follow-up: drop `referrerURL` fallback; consolidate SwiftUI path to call `handle(activity:)`; mark `@MainActor`.
   - `9ce651e` — Extend NSUserActivity coverage (routing/handler/middleware-stop forwarding + `@discardableResult`) and add SwiftUI modifier smoke test; promote `StoppingMiddleware` to shared doubles.
-  - `2ff3495` — Roadmap §Development Process: every phase uses an agent team for dev + validation + cleanup.
+  - `2ff3495` — Roadmap: development process notes (since removed).
   - `b9e9a13` — `DeepLinksTests` now depends on `DeepLinksTesting` so unit tests can reuse the public testing helpers.
   - `b6a0ade` — Closure-based `DeepLinkHandler.from(_:)` factory + `ClosureDeepLinkHandler<Route>` adopter + 3 tests.
   - `17a3bba` — Closure-based `DeepLinkParser.from(_:)` factories (multi-route + single-route) + adopter structs + 7 tests.
   - `fc5bcc4` — `DeepLinkCoordinatorBuilder.parser(_:)` / `.parsers([...])` / `.parsers(_:...)` fluent shortcuts + 6 tests.
-  - `code-review` + `swift-testing` agents ran twice against Phase A (after §4.1+§4.2, and after §4.3 additive). Inline follow-ups applied in the commits above (last-one-wins doc on `routing(_:)`, empty-array parser test, outcome-oriented test names, `CollectingHandler` dedup, dropped unnecessary `@MainActor`). Overflow backlogged into §4.6 / §4.7. **Test baseline: 305 in 32 suites.**
+  - Code and test reviews ran twice against Phase A (after §4.1+§4.2, and after §4.3 additive). Inline follow-ups applied in the commits above (last-one-wins doc on `routing(_:)`, empty-array parser test, outcome-oriented test names, `CollectingHandler` dedup, dropped unnecessary `@MainActor`). Overflow backlogged into §4.6 / §4.7. **Test baseline: 305 in 32 suites.**
 - **Phase B — §4.3 breaking + §4.4 + §4.5 (API-surface cleanup, all bundled into one release).**
   - `3a9a8e0` — Add `DeepLinkResult.firstDeepLinkError` typed accessor (§4.4).
   - `22f372b` — **[BREAKING]** Drop `AnyObject` constraint from `DeepLinkCoordinatorDelegate` (§4.3).
@@ -76,7 +75,7 @@ If you are opening this file cold, read this section first.
   - `f305958` — Phase-B review follow-up: extend `ReadinessDrainIntegrationTests` with routing-failure, handler-failure, and second-drain-idempotence scenarios.
   - `c94a942` — Phase-B review follow-up: add dedicated `DeepLinkErrorTests.swift` covering `errorDescription` per case + `Equatable` coverage per case + the `parsingFailed` / `handlerError` underlying-error comparison path.
   - `6e080af` — Phase-B review follow-up: sync public docs (README, `api-reference-en.md`, `faq.md`, `how-to-use-deeplink-en.md`) with the new surface.
-  - `code-review` + `swift-testing` agents ran against Phase B. Findings triaged: pre-close follow-ups landed in `571775f`, `8db5a77`, `f305958`, `c94a942`, `6e080af`. Overflow backlogged into §4.7 (double consolidation, clock injection, parameterization, concurrency stress). **Test baseline: 331 in 35 suites.**
+  - Code and test reviews ran against Phase B. Findings triaged: pre-close follow-ups landed in `571775f`, `8db5a77`, `f305958`, `c94a942`, `6e080af`. Overflow backlogged into §4.7 (double consolidation, clock injection, parameterization, concurrency stress). **Test baseline: 331 in 35 suites.**
 - **Phase C — §4.6 cleanup of minor noise (mostly internal; three small breaking deletions).**
   - `398ae0e` — Tighten `ClosureDeepLinkHandler` / `ClosureDeepLinkParser` / `SingleRouteClosureDeepLinkParser` inits to `fileprivate` so the `.from(_:)` factory is the only construction path.
   - `4d71d39` — Replace fragile DocC disambiguators (`from(_:)-([R])` / `-(R?)`) on parser adopter types with prose references that survive parameter-type rendering.
@@ -90,7 +89,7 @@ If you are opening this file cold, read this section first.
   - `90065b9` — **[BREAKING]** Delete `CoordinatorOf` / `ResultOf` type aliases; canonical generic names only.
   - `3c2efd2` — **[BREAKING]** Variadic `parsers(_:any DeepLinkParser<Route>...)` now requires a leading `first` parser so `.parsers()` with zero arguments is a compile-time error rather than a silently-misbehaving coordinator.
   - `b4c4fbe` — Phase-C review follow-up: sync `Docs/api-reference-en.md` (delete removed `compose(middleware:...)` line, add Notification Presenter section, thread `presenter:` through `.notification(...)`, document middleware-array plumbing).
-  - `code-review` + `swift-testing` agents ran against Phase C. Findings triaged: pre-close follow-ups landed in `42d47a9` (JSON first-pass error), `6d4c26a` (kind: on presenter + expanded tests + AsyncStream fence + drop `@unchecked`), `b4c4fbe` (doc drift). Overflow backlogged into §4.7 / §4.8 (AnalyticsStrategy/.full asymmetry, `host` → `host()` changelog, DeepLinkSample staleness, `CollectingPresenter` → DeepLinksTesting, factory `is` → behaviour tests, `deinit` cancels-in-flight regression test, RateLimit clock-injection port). **Test baseline: 336 in 36 suites.**
+  - Code and test reviews ran against Phase C. Findings triaged: pre-close follow-ups landed in `42d47a9` (JSON first-pass error), `6d4c26a` (kind: on presenter + expanded tests + AsyncStream fence + drop `@unchecked`), `b4c4fbe` (doc drift). Overflow backlogged into §4.7 / §4.8 (AnalyticsStrategy/.full asymmetry, `host` → `host()` changelog, DeepLinkSample staleness, `CollectingPresenter` → DeepLinksTesting, factory `is` → behaviour tests, `deinit` cancels-in-flight regression test, RateLimit clock-injection port). **Test baseline: 336 in 36 suites.**
 - **Phase D — §4.7 test-suite overhaul (tests only + one additive production seam).**
   - `f7987b5` — Add dedicated `DeepLinkResultTests` covering `wasSuccessful` truth table + `summary` branches + convenience accessors.
   - `64e1db6` — Regression test for `DeepLinkNotificationDelegate` deinit cancelling pending notification tasks before they reach the presenter.
@@ -107,7 +106,7 @@ If you are opening this file cold, read this section first.
   - `2c12723` — Phase-D review follow-up: expose `routeExecutionDelay` and `sleep` on `DeepLinkCoordinatorBuilder` so the test seam is reachable from the recommended construction path.
   - `f2d2d4f` — Phase-D review follow-up: drop `CollectingNotificationPresenter.invocationCount` (redundant with `recordedInvocations`); trap on second concurrent awaiter in `waitFor(count:)`; rename `BlockingPresenter` → `RecordingPresenter`; replace the deinit-cancel test's `Task.sleep(50ms)` fence with a bounded `Task.yield` loop.
   - `51e9b8c` — Phase-D review follow-up: hoist parameterised scenario arrays from file scope into the owning suites; simplify `firstError` via `firstDeepLinkError`; add "processed with zero routes" summary case; bump handler concurrent-stress fan-in 8 → 64; tighten `urlTransformation` factory assertion to the exact normalised URL; add upper bound on `markReady-during-burst` drained count.
-  - `code-review` + `swift-testing` agents ran against Phase D. Pre-close follow-ups landed in `2c12723`, `f2d2d4f`, `51e9b8c`. Overflow backlogged into §4.7 / §4.8. **Test baseline: 344 in 40 suites; full suite runtime collapsed from ~1.2s to 0.019s by retiring every wall-clock sleep.**
+  - Code and test reviews ran against Phase D. Pre-close follow-ups landed in `2c12723`, `f2d2d4f`, `51e9b8c`. Overflow backlogged into §4.7 / §4.8. **Test baseline: 344 in 40 suites; full suite runtime collapsed from ~1.2s to 0.019s by retiring every wall-clock sleep.**
 - **Phase E — §4.8 release prep + §4.7 residuals + §4.1 CI matrix.**
   - `73bfd2a` — Reconcile `AnalyticsStrategy.detailed` with `AnalyticsEventBuilder` via a new `.fullOmittingEmptyPath` `URLDetail` case; pin all four shapes in `AnalyticsEventBuilderTests`.
   - `ca463cc` — `DeepLinkHandlerSpy.handle(_:)` now uses a single `withLock` that returns an `Outcome` enum; introduce an `expectDeepLinkError` helper in `DefaultDeepLinkRoutingTests` replacing the older `do/catch+Issue.record` idiom at six call sites.
@@ -117,7 +116,7 @@ If you are opening this file cold, read this section first.
   - `32fcaa9` — Drop stale `compose(...)` samples from `README.md` + `Docs/how-to-use-deeplink-en.md`.
   - `fa856fb` — Phase-E review follow-up: fix `swift-deep-link` singular typo across public docs (CHANGELOG / ImprovementChecklist / faq).
   - `5ed0865` — Phase-E review follow-up: fix `DeepLinkSampleTests` compilation after 093d164 migrated sample sources but not the test target (`CollectingDelegate<AppRoute>()`, constrained `delegate:` parameter, `@MainActor` test annotation); add `keys.sorted()` assertions to the three new `AnalyticsEventBuilderTests` cases.
-  - `code-review` + `swift-testing` agents ran against Phase E. Pre-close follow-ups landed in `fa856fb`, `586a50e`, `5ed0865`. `xcodebuild test -scheme DeepLinkSample` verified green on iPhone 17 Pro simulator. Overflow (expectDeepLinkError promote to Shared, Outcome enum collapse, README bullet split, xcodebuild test in CI matrix) backlogged into §4.7 / §4.8. **Test baseline: 347 in 40 suites; sample app tests green on iOS simulator.**
+  - Code and test reviews ran against Phase E. Pre-close follow-ups landed in `fa856fb`, `586a50e`, `5ed0865`. `xcodebuild test -scheme DeepLinkSample` verified green on iPhone 17 Pro simulator. Overflow (expectDeepLinkError promote to Shared, Outcome enum collapse, README bullet split, xcodebuild test in CI matrix) backlogged into §4.7 / §4.8. **Test baseline: 347 in 40 suites; sample app tests green on iOS simulator.**
 
 ### ⏭️ Open — residual backlog items in §4.1 / §4.7 / §4.8 below
 
@@ -127,12 +126,12 @@ If you are opening this file cold, read this section first.
 
 ## 2. How to resume work across sessions
 
-1. `cd /Users/alfredo/Developer/iOS/Packages/swift-deep-link`
+1. From the repository root:
 2. `git status` and `git log --oneline -10` to catch up on state.
 3. `swift test` to verify 282 baseline (or whatever number is current — record in this file if you change it).
-4. Read this file (`Docs/ImprovementChecklist.md`) and pick an unchecked item.
+4. Read this file (`docs/internal/ImprovementChecklist.md`) and pick an unchecked item.
 5. Each item lists: file(s), rationale, acceptance criteria, and whether it is breaking API.
-6. After finishing an item: tick the checkbox (`[x]`), run `swift build` and `swift test`, then commit with a message drafted by the `git-commit-messages` agent.
+6. After finishing an item: tick the checkbox (`[x]`), run `swift build` and `swift test`, then commit.
 7. Group commits by concern (one logical change per commit). Do not bundle unrelated items.
 8. If you introduce a breaking change, note migration guidance in the item's checkbox comment so the README / CHANGELOG update task (§6) stays in sync.
 
@@ -198,7 +197,7 @@ Ordered roughly by impact × inverse effort (top = do first). `[BREAKING]` flags
 
 ### 4.5 Middleware / strategy cleanup
 
-- [x] ~~**Unify the middleware protocol (M1 + M8).**~~ Done in prior commits on this branch (verified clean by the Phase-2 agent).
+- [x] ~~**Unify the middleware protocol (M1 + M8).**~~ Done in prior commits on this branch (verified clean in the Phase 2 review).
 - [x] ~~**Generic delegate, delete `DeepLinkResultProtocol` (M2 + M3).**~~ Done in `ac1055e`.
 - [x] ~~**Split multi-type files (M4).**~~ Done in `8393f3c`.
 - [x] ~~**Remove misleading strategies (M5 / M7 / Mi4 / Mi10).**~~ Done in `8393f3c`.
@@ -294,11 +293,11 @@ Ordered roughly by impact × inverse effort (top = do first). `[BREAKING]` flags
 
 - [ ] **Extend factory behaviour tests with non-default strategy sweeps.**
   - Files: `Tests/DeepLinksTests/Extras/Middleware/DeepLinkMiddlewareFactoryTests.swift`, `Tests/DeepLinksTests/Extras/Delegates/DeepLinkCoordinatorDelegateFactoryTests.swift`
-  - Phase D converted every factory `is` assertion to a behaviour assertion but exercises only the default strategy per factory. A single `@Test(arguments:)` sweep per factory would pin that non-default strategies (`.fixedWindow` rateLimit, `.detailed` analytics, `.strict` authentication, etc.) still plumb through. Low priority — strategy behaviour is already covered in the dedicated middleware suites. Surfaced by Phase-D `swift-testing` agent.
+  - Phase D converted every factory `is` assertion to a behaviour assertion but exercises only the default strategy per factory. A single `@Test(arguments:)` sweep per factory would pin that non-default strategies (`.fixedWindow` rateLimit, `.detailed` analytics, `.strict` authentication, etc.) still plumb through. Low priority — strategy behaviour is already covered in the dedicated middleware suites. Surfaced in review.
 
 - [ ] **Add runtime enforcement for `AnalyticsProviderSpy`'s single-threaded contract.**
   - File: `Tests/DeepLinksTests/Shared/TestDoubles.swift`
-  - `AnalyticsProviderSpy` stays `@unchecked Sendable` because `[String: Any]` can't flow through `OSAllocatedUnfairLock`. The documented "single-threaded by convention" guarantee has no runtime check — a future test that writes from two tasks would race silently. Options: (a) `dispatchPrecondition` inside `track(_:parameters:)`, (b) migrate to `[String: String]` at ingress and flip to checked `Sendable`, mirroring `CollectingAnalyticsProvider`. Surfaced by Phase-D `swift-testing` agent.
+  - `AnalyticsProviderSpy` stays `@unchecked Sendable` because `[String: Any]` can't flow through `OSAllocatedUnfairLock`. The documented "single-threaded by convention" guarantee has no runtime check — a future test that writes from two tasks would race silently. Options: (a) `dispatchPrecondition` inside `track(_:parameters:)`, (b) migrate to `[String: String]` at ingress and flip to checked `Sendable`, mirroring `CollectingAnalyticsProvider`. Surfaced in review.
 
 - [x] ~~**Refactor `DeepLinkHandlerSpy.handle(_:)` to hold the lock across the read-then-append.**~~ Done in Phase E (`ca463cc`). Folded the read-and-decide + append into a single `withLock` that returns a private `Outcome` enum; the throw happens outside the critical section.
 
@@ -306,7 +305,7 @@ Ordered roughly by impact × inverse effort (top = do first). `[BREAKING]` flags
 
 - [ ] **Unify deterministic-time primitives when a third clock-like seam lands.**
   - Files: `Tests/DeepLinksTests/Core/DeepLinkCoordinatorTests.swift` (`DurationRecorder`), `Tests/DeepLinksTests/Extras/Middleware/RateLimitMiddlewareTests.swift` (`ManualClock`).
-  - Phase D shipped two patterns — `DurationRecorder` actor for `@Sendable (Duration) async -> Void` sleeps, `ManualClock` lock-wrapped Date for `@Sendable () -> Date` providers. Acceptable today; promote to `DeepLinksTesting` only when a third clock-like primitive in production needs the same harness. Surfaced by Phase-D code-review agent.
+  - Phase D shipped two patterns — `DurationRecorder` actor for `@Sendable (Duration) async -> Void` sleeps, `ManualClock` lock-wrapped Date for `@Sendable () -> Date` providers. Acceptable today; promote to `DeepLinksTesting` only when a third clock-like primitive in production needs the same harness. Surfaced in review.
 
 ### 4.8 Package hygiene
 
@@ -318,27 +317,27 @@ Ordered roughly by impact × inverse effort (top = do first). `[BREAKING]` flags
 
 - [ ] **Promote `expectDeepLinkError` to a shared test helper.**
   - Files: `Tests/DeepLinksTests/Core/DefaultDeepLinkRoutingTests.swift`, potentially `Tests/DeepLinksTests/Shared/TestHelpers.swift` (new).
-  - Phase E introduced the helper as a private method on the one suite whose six error paths needed it. `JSONQueryParameterParserTests` still uses the older `do { #expect(Bool(false)) } catch { Issue.record }` idiom for `DeepLinkError` pattern-matching and would benefit from the same helper. Move when a second call site materialises. Surfaced by Phase-E code-review agent.
+  - Phase E introduced the helper as a private method on the one suite whose six error paths needed it. `JSONQueryParameterParserTests` still uses the older `do { #expect(Bool(false)) } catch { Issue.record }` idiom for `DeepLinkError` pattern-matching and would benefit from the same helper. Move when a second call site materialises. Surfaced in review.
 
 - [ ] **Collapse `DeepLinkHandlerSpy.Outcome` enum to an optional error return.**
   - File: `Tests/DeepLinksTests/Shared/TestDoubles.swift`
-  - `Outcome` is a two-case enum whose only purpose is distinguishing "recorded" from "threw". `withLock` can return `(any Error & Sendable)?` directly and the caller can `if let errorToThrow { throw errorToThrow }`. Cosmetic cleanup — correctness is unchanged. Surfaced by Phase-E swift-testing agent.
+  - `Outcome` is a two-case enum whose only purpose is distinguishing "recorded" from "threw". `withLock` can return `(any Error & Sendable)?` directly and the caller can `if let errorToThrow { throw errorToThrow }`. Cosmetic cleanup — correctness is unchanged. Surfaced in review.
 
 - [ ] **Run `xcodebuild test -scheme DeepLinkSample` in CI.**
   - File: `.github/workflows/swift.yml`
-  - The Phase E xcode-platforms matrix builds both package libraries for every platform but never exercises the sample's test target. Commit `093d164` proved the risk — it migrated sample sources but not tests, masked by `build`-only verification. Adding a `xcodebuild test -scheme DeepLinkSample -destination '<iOS Simulator>'` step on the iOS cell (sample doesn't target other platforms) would have caught the regression on CI. Surfaced by Phase-E swift-testing agent.
+  - The Phase E xcode-platforms matrix builds both package libraries for every platform but never exercises the sample's test target. Commit `093d164` proved the risk — it migrated sample sources but not tests, masked by `build`-only verification. Adding a `xcodebuild test -scheme DeepLinkSample -destination '<iOS Simulator>'` step on the iOS cell (sample doesn't target other platforms) would have caught the regression on CI. Surfaced in review.
 
 - [ ] **Split the README "Array-literal composition" bullet into two.**
   - File: `README.md`
-  - The current single-line bullet bundles the feature ("middleware/delegate arrays flow through the builder") with its caveat ("delegate-side compose() is still available") and reads dense. Break into two bullets in a follow-up. Low priority. Surfaced by Phase-E code-review agent.
+  - The current single-line bullet bundles the feature ("middleware/delegate arrays flow through the builder") with its caveat ("delegate-side compose() is still available") and reads dense. Break into two bullets in a follow-up. Low priority. Surfaced in review.
 
 - [ ] **Changelog entry: `AnalyticsStrategy` now reads `url.host()` instead of the deprecated `url.host`.**
   - File: `CHANGELOG.md` (to be created in Phase E).
-  - Phase C unified all analytics parameter assembly on `url.host()` via `AnalyticsEventBuilder`. Observable for IDN hosts: the property returns percent-decoded Unicode, the method returns percent-encoded. Dashboards aggregating deep-link analytics by `host` for IDN URLs will see a key shift. Surfaced by Phase-C `code-review` agent.
+  - Phase C unified all analytics parameter assembly on `url.host()` via `AnalyticsEventBuilder`. Observable for IDN hosts: the property returns percent-decoded Unicode, the method returns percent-encoded. Dashboards aggregating deep-link analytics by `host` for IDN URLs will see a key shift. Surfaced in review.
 
 - [ ] **Resolve `DeepLinkSample/` staleness.**
   - Directory: `DeepLinkSample/`.
-  - Sample app uses several symbols removed during Phase B + C (`CoordinatorOf`, `ResultOf`, middleware `compose(_:)`) and won't compile against the current Package. Either update the sample to the canonical names in Phase E, or mark it explicitly stale in the repo root README. Surfaced by Phase-C `code-review` agent.
+  - Sample app uses several symbols removed during Phase B + C (`CoordinatorOf`, `ResultOf`, middleware `compose(_:)`) and won't compile against the current Package. Either update the sample to the canonical names in Phase E, or mark it explicitly stale in the repo root README. Surfaced in review.
 
 ---
 
@@ -347,13 +346,13 @@ Ordered roughly by impact × inverse effort (top = do first). `[BREAKING]` flags
 A suggested sequencing — do not treat as rigid. Each phase should be reviewed + committed + tested before the next begins.
 
 1. **Phase A — Platform expansion & quickstart wins (mostly additive).** ✅ **Closed.**
-   Items in §4.1 + §4.2 + closure-based factories in §4.3 + `.parser(_:)` builder shortcut. All shipped on `feature/modernization`; post-phase `code-review` + `swift-testing` agents both ran and their findings were triaged (follow-ups applied inline; overflow backlogged into §4.4 / §4.6 / §4.7).
+   Items in §4.1 + §4.2 + closure-based factories in §4.3 + `.parser(_:)` builder shortcut. All shipped on `feature/modernization`; post-phase Code and test reviews both ran and their findings were triaged (follow-ups applied inline; overflow backlogged into §4.4 / §4.6 / §4.7).
 
 2. **Phase B — API surface cleanup (breaking changes bundled).** ✅ **Closed.**
-   All §4.3 breaking items (`build()` sync, `routeExecutionDelay = .zero`, `DeepLinkRoute: Equatable/Hashable/Sendable`, delegate drops `AnyObject`) + §4.4 (error enrichment + parser-error propagation + `firstDeepLinkError`) + §4.5 (`AdvancedDeepLinkMiddleware`/`MiddlewareResult` deletion, `markReadyAndDrain`). Shipped on `feature/modernization` as 16 commits. Post-phase `code-review` + `swift-testing` agents ran and their findings were triaged (follow-ups applied inline; overflow backlogged into §4.7).
+   All §4.3 breaking items (`build()` sync, `routeExecutionDelay = .zero`, `DeepLinkRoute: Equatable/Hashable/Sendable`, delegate drops `AnyObject`) + §4.4 (error enrichment + parser-error propagation + `firstDeepLinkError`) + §4.5 (`AdvancedDeepLinkMiddleware`/`MiddlewareResult` deletion, `markReadyAndDrain`). Shipped on `feature/modernization` as 16 commits. Post-phase Code and test reviews ran and their findings were triaged (follow-ups applied inline; overflow backlogged into §4.7).
 
 3. **Phase C — Middleware / strategy deep clean.** ✅ **Closed.**
-   All §4.6 items shipped on `feature/modernization` across 12 commits (includes three small-breaking deletions: `compose(middleware:)`, `CoordinatorOf` / `ResultOf`, empty-variadic `.parsers()`). Post-phase `code-review` + `swift-testing` agents ran and their findings were triaged (follow-ups applied inline; overflow backlogged into §4.7 / §4.8).
+   All §4.6 items shipped on `feature/modernization` across 12 commits (includes three small-breaking deletions: `compose(middleware:)`, `CoordinatorOf` / `ResultOf`, empty-variadic `.parsers()`). Post-phase Code and test reviews ran and their findings were triaged (follow-ups applied inline; overflow backlogged into §4.7 / §4.8).
 
 4. **Phase D — Test suite overhaul.** ✅ **Closed.**
    The bulk of §4.7 shipped on `feature/modernization` across 15 commits. Additive coverage (`DeepLinkResultTests`, deinit regression, concurrent handler, host-less URL), clock injection in `DeepLinkCoordinator` + builder surface, port of `RateLimitMiddlewareTests` to `ManualClock`, shared-double lock-protection + consolidation, `CollectingNotificationPresenter` promoted to `DeepLinksTesting`, end-to-end readiness integration + concurrency stress, factory `is` → behaviour tests, parameterisation of the logging matrix / routing happy paths / parsers overloads / AnalyticsEventBuilder shapes. Full suite runtime collapsed from ~1.2s to 0.019s. Residual items (uniform naming, non-default strategy factory sweep, AnalyticsProviderSpy enforcement, HandlerSpy single-lock, error-idiom migration, clock-primitive unification) remain in §4.7 as low-priority backlog.
@@ -370,18 +369,17 @@ A suggested sequencing — do not treat as rigid. Each phase should be reviewed 
 - **When an item is done, do not delete it** — keep it checked so history is visible.
 - **If an item is obsolete (e.g., superseded by another finding), replace the description with `~~Superseded by: <link to new item>~~` and tick it.**
 - **Flag anything that requires a user decision** with `⚠️ User decision needed:` and a short question — avoid guessing on API direction.
-- **At the end of every phase in §5, run two review agents on the phase's diff before moving on:**
-  1. `code-review` agent — senior-architect review of the source + any changed tests. Scope: the files touched during the phase.
-  2. `swift-testing` agent — test-suite audit for coverage gaps, naming drift, flakiness risks, missing edge cases on the new APIs.
-  Both are read-only research passes. Triage their findings into either (a) small follow-up commits on the same branch before the next phase starts, or (b) new checklist items appended to §4 if they're larger than a commit. Do not proceed to the next phase with unreviewed phase work.
+- **At the end of every phase in §5, run two reviews on the phase's diff before moving on:**
+  1. Code review — architecture review of the source + any changed tests. Scope: the files touched during the phase.
+  2. Test review — test-suite audit for coverage gaps, naming drift, flakiness risks, missing edge cases on the new APIs.
+  Both are read-only passes. Triage their findings into either (a) small follow-up commits on the same branch before the next phase starts, or (b) new checklist items appended to §4 if they're larger than a commit. Do not proceed to the next phase with unreviewed phase work.
 
 ---
 
 ## 7. Related files / references
 
-- `Docs/Roadmap.md` — higher-level roadmap, may overlap; reconcile before closing items.
+- [Roadmap](./Roadmap.md) — higher-level roadmap, may overlap; reconcile before closing items.
 - `README.md` — consumer-facing quickstart; update alongside breaking changes.
-- `CLAUDE.md` (user's private, not in repo) — global rules: never add Co-Authored-By, use agents for commit messages, test before push.
 - `Package.swift` — platform declarations, targets.
 
 ---
