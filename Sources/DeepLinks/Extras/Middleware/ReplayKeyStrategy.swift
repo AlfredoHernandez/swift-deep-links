@@ -30,7 +30,8 @@ public struct ReplayKeyStrategy: Sendable {
 // MARK: - Built-in Strategies
 
 public extension ReplayKeyStrategy {
-	/// The whole URL. Scheme and host compare case-insensitively, query
+	/// The whole URL. Scheme and host compare case-insensitively (the host
+	/// percent-decoded and without a trailing dot, as ``URLCanonicalizer`` does), query
 	/// parameter order is ignored, and equivalent percent-encodings
 	/// (`%2f`/`%2F`, `%41`/`A`) compare equal, so none of them bypasses
 	/// deduplication. Path, query values and fragment are otherwise compared
@@ -58,7 +59,10 @@ public extension ReplayKeyStrategy {
 
 	/// The value of one query parameter, such as an idempotency key or nonce.
 	/// Links without the parameter (or with an empty value) are never
-	/// deduplicated. When the parameter repeats, the first value is used.
+	/// deduplicated. Names compare case-sensitively after percent-decoding and,
+	/// when the parameter repeats, the last value is used, exactly as
+	/// ``DeepLinkURL/queryParameters`` reads it, so the key is the value your
+	/// parsers act on.
 	///
 	/// The key is the value alone, regardless of host or path, so a link
 	/// anywhere that reuses a value suppresses the original for the window:
@@ -70,7 +74,7 @@ public extension ReplayKeyStrategy {
 		ReplayKeyStrategy { url in
 			let value = URLComponents(url: url, resolvingAgainstBaseURL: false)?
 				.queryItems?
-				.first { $0.name == name }?
+				.last { $0.name == name && $0.value != nil }?
 				.value
 			guard let value, !value.isEmpty else { return nil }
 			return value
@@ -92,7 +96,7 @@ public extension ReplayKeyStrategy {
 private extension ReplayKeyStrategy {
 	static func origin(of components: URLComponents) -> String {
 		let scheme = components.scheme?.lowercased() ?? ""
-		let host = components.percentEncodedHost?.lowercased() ?? ""
+		let host = components.percentEncodedHost.map { DeepLinkMatcher.normalizedHost($0.removingPercentEncoding ?? $0) } ?? ""
 		let port = components.port.map { ":\($0)" } ?? ""
 		return "\(scheme)://\(host)\(port)"
 	}

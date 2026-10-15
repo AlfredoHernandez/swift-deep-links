@@ -8,9 +8,12 @@ import os
 /// Middleware that suppresses the same deep link arriving again within a
 /// short window.
 ///
-/// Guards against double taps, a link delivered through two entry points
-/// (`onOpenURL` and `NSUserActivity`), and pages that fire the same link
-/// repeatedly. A link is a replay when its key (see ``ReplayKeyStrategy``)
+/// Guards against **accidental** double delivery: double taps, a link
+/// delivered through two entry points (`onOpenURL` and `NSUserActivity`),
+/// and pages that fire the same link repeatedly. It is not a security
+/// control against deliberate replay: its memory is per process, short-lived
+/// and bounded, so an attacker can wait out the window or evict entries. Make
+/// sensitive links single-use with ``SignedLinkMiddleware`` and a ``NonceStore``. A link is a replay when its key (see ``ReplayKeyStrategy``)
 /// was first seen less than `window` seconds earlier. Replays do not extend
 /// the window, so a key is admitted at most once per window.
 ///

@@ -217,9 +217,13 @@ middleware order and a hardening checklist.
 - **`ReplayProtectionMiddleware` / `.replayProtection(...)` (F5).** Suppresses
   the same link arriving again within `window` seconds (double taps, a link
   delivered through both `onOpenURL` and `NSUserActivity`, pages firing a link
-  repeatedly). `ReplayKeyStrategy` picks what identifies a link: `.url`
-  (default; scheme/host case and query order ignored), `.path`,
-  `.queryParameter(_:)` for idempotency keys or nonces, or `.custom`.
+  repeatedly); it dedupes accidental double delivery and is not a defence
+  against deliberate replay (use signed links with a nonce store).
+  `ReplayKeyStrategy` picks what identifies a link: `.url`
+  (default; scheme/host case, host percent-encoding and trailing dot, and query
+  order ignored), `.path`, `.queryParameter(_:)` for idempotency keys or
+  nonces (the last value of a repeated parameter, as `DeepLinkURL` reads it),
+  or `.custom`.
   `ignoredQueryKeys` drops tracking parameters before keying. Replays are
   dropped (`.drop`, default) or rejected with
   `securityViolation("Replayed deep link")` (`.reject`). Memory is bounded by

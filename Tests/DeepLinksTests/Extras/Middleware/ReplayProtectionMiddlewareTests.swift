@@ -147,6 +147,32 @@ struct ReplayProtectionMiddlewareTests {
 	}
 
 	@Test
+	func `query parameter key uses the value parsers read, the last one`() async throws {
+		let (sut, _) = makeSUT(key: .queryParameter("nonce"))
+		_ = try await sut.intercept(url: url("myapp://pay/confirm?nonce=x&nonce=abc"))
+
+		#expect(try await sut.intercept(url: url("myapp://pay/confirm?nonce=y&nonce=abc")) == nil)
+		#expect(try await sut.intercept(url: url("myapp://pay/confirm?nonce=abc&nonce=z")) != nil)
+	}
+
+	@Test
+	func `query parameter key decodes the parameter name and value`() async throws {
+		let (sut, _) = makeSUT(key: .queryParameter("nonce"))
+		_ = try await sut.intercept(url: url("myapp://pay/confirm?nonce=a%20b"))
+
+		#expect(try await sut.intercept(url: url("myapp://pay/confirm?%6Eonce=a+b".replacingOccurrences(of: "+", with: "%20"))) == nil)
+	}
+
+	@Test(arguments: [ReplayKeyStrategy.url, .path])
+	func `hosts compare decoded and without a trailing dot`(key: ReplayKeyStrategy) async throws {
+		let (sut, _) = makeSUT(key: key)
+		_ = try await sut.intercept(url: url("myapp://account/x"))
+
+		#expect(try await sut.intercept(url: url("myapp://ACCOUNT%2E/x")) == nil)
+		#expect(try await sut.intercept(url: url("myapp://account./x")) == nil)
+	}
+
+	@Test
 	func `query parameter key never deduplicates URLs without the parameter`() async throws {
 		let (sut, _) = makeSUT(key: .queryParameter("nonce"))
 		_ = try await sut.intercept(url: url("myapp://pay/confirm"))
