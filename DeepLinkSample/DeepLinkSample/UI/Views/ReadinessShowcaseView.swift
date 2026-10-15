@@ -5,17 +5,9 @@
 import DeepLinks
 import SwiftUI
 
-/// A view that showcases the Readiness Middleware functionality.
-///
-/// This view demonstrates how deep links are queued when the app
-/// is not ready and automatically drained when readiness is signaled.
-///
-/// ## Features:
-/// - Toggle to simulate app readiness state
-/// - Send deep links while not ready (queued)
-/// - Drain and process queued deep links on "Mark Ready"
-/// - Visual feedback of pending queue count
-/// - Reset to simulate logout/login cycles
+/// Shows `.readiness(queue:)`: links sent before the app is ready are queued
+/// (shown redacted), "Mark Ready" drains them with `markReadyAndDrain(queue:)`,
+/// and "Reset" gates the queue again, as after a sign-out.
 struct ReadinessShowcaseView: View {
 	@Environment(NavigationRouter.self) var navigationRouter
 	@State private var viewModel = ReadinessShowcaseViewModel()
@@ -28,8 +20,7 @@ struct ReadinessShowcaseView: View {
 
 			VStack(spacing: 12) {
 				statusBadge
-				drainDelayPicker
-				queuedURLsList
+				queuedLinksList
 				actionButtons
 			}
 			.padding()
@@ -62,48 +53,30 @@ struct ReadinessShowcaseView: View {
 		}
 	}
 
-	private var queuedURLsList: some View {
-		Group {
-			if !viewModel.queuedURLs.isEmpty {
-				VStack(alignment: .leading, spacing: 4) {
-					ForEach(viewModel.queuedURLs, id: \.absoluteString) { url in
-						HStack(spacing: 6) {
-							Image(systemName: "link")
-								.font(.caption2)
-								.foregroundColor(.orange)
-							Text(url.absoluteString)
-								.font(.caption)
-								.foregroundColor(.secondary)
-								.lineLimit(1)
-						}
+	@ViewBuilder
+	private var queuedLinksList: some View {
+		if !viewModel.queuedLinks.isEmpty {
+			VStack(alignment: .leading, spacing: 4) {
+				ForEach(Array(viewModel.queuedLinks.enumerated()), id: \.offset) { _, link in
+					HStack(spacing: 6) {
+						Image(systemName: "link")
+							.font(.caption2)
+							.foregroundColor(.orange)
+						Text(link)
+							.font(.caption)
+							.foregroundColor(.secondary)
+							.lineLimit(1)
 					}
 				}
-				.frame(maxWidth: .infinity, alignment: .leading)
 			}
-		}
-	}
-
-	private var drainDelayPicker: some View {
-		HStack {
-			Text("Drain delay")
-				.font(.caption)
-				.foregroundColor(.secondary)
-			Spacer()
-			Picker("Delay", selection: $viewModel.drainDelaySeconds) {
-				Text("0s").tag(0.0)
-				Text("0.5s").tag(0.5)
-				Text("1s").tag(1.0)
-				Text("2s").tag(2.0)
-			}
-			.pickerStyle(.segmented)
-			.frame(width: 200)
+			.frame(maxWidth: .infinity, alignment: .leading)
 		}
 	}
 
 	private var actionButtons: some View {
 		VStack(spacing: 8) {
 			Button {
-				viewModel.queueRandomDeepLink()
+				Task { await viewModel.queueRandomDeepLink(navigationRouter: navigationRouter) }
 			} label: {
 				Label("Queue Random Deep Link", systemImage: "shuffle.circle")
 					.font(.caption)
@@ -115,7 +88,7 @@ struct ReadinessShowcaseView: View {
 
 			HStack(spacing: 8) {
 				Button {
-					viewModel.markReady(navigationRouter: navigationRouter)
+					Task { await viewModel.markReady(navigationRouter: navigationRouter) }
 				} label: {
 					Label("Mark Ready", systemImage: "checkmark.circle")
 						.font(.caption)

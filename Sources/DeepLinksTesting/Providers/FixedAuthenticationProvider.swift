@@ -27,7 +27,7 @@ import DeepLinks
 ///     let auth = FixedAuthenticationProvider(isAuthenticated: true)
 ///     let middleware = AuthenticationMiddleware(provider: auth)
 ///
-///     let coordinator = try await DeepLinkCoordinatorBuilder<AppRoute>()
+///     let coordinator = try DeepLinkCoordinatorBuilder<AppRoute>()
 ///         .routing(routing)
 ///         .handler(handler)
 ///         .build()
@@ -50,6 +50,7 @@ public struct FixedAuthenticationProvider: AuthenticationProvider, Sendable {
 		authenticated = isAuthenticated
 	}
 
+	/// The value passed to ``init(isAuthenticated:)``.
 	public func isAuthenticated() -> Bool {
 		authenticated
 	}

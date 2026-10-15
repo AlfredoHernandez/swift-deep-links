@@ -46,4 +46,33 @@ public protocol DeepLinkHandler<Route>: Sendable {
 	/// - Parameter route: The route to handle
 	/// - Throws: Any error that occurs during route handling
 	func handle(_ route: Route) async throws
+
+	/// Handles a route together with the ``DeepLinkContext`` its link arrived with.
+	///
+	/// The coordinator calls this method. Implement it instead of
+	/// ``handle(_:)`` when the handler needs the source or scene; implement
+	/// exactly one of the two, because each defaults to the other (a type
+	/// implementing neither throws ``DeepLinkError/missingRequiredConfiguration(_:)``).
+	///
+	/// - Parameters:
+	///   - route: The route to handle
+	///   - context: Where the link came from, after middleware ran
+	/// - Throws: Any error that occurs during route handling
+	func handle(_ route: Route, context: DeepLinkContext) async throws
+}
+
+public extension DeepLinkHandler {
+	/// Ignores the context and calls ``handle(_:)``.
+	func handle(_ route: Route, context _: DeepLinkContext) async throws {
+		try await ProtocolBridgeGuard.bridge(Self.self, .handle, hop: .contextToLegacy) {
+			try await handle(route)
+		}
+	}
+
+	/// Calls ``handle(_:context:)`` with a ``DeepLinkContext/unknown`` context.
+	func handle(_ route: Route) async throws {
+		try await ProtocolBridgeGuard.bridge(Self.self, .handle, hop: .legacyToContext) {
+			try await handle(route, context: .unknown)
+		}
+	}
 }

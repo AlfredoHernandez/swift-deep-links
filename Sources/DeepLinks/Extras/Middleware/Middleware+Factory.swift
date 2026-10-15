@@ -89,20 +89,25 @@ public extension DeepLinkMiddleware where Self == RateLimitMiddleware {
 	/// - Parameters:
 	///   - maxRequests: Maximum number of requests allowed (default: 100)
 	///   - timeWindow: Time window in seconds (default: 60)
-	///   - persistence: Persistence mechanism for storing request data
+	///   - persistence: Persistence mechanism for storing request data; `nil` (default) shares
+	///     a `UserDefaults` persistence among limiters with the same configuration
 	///   - strategy: The rate limiting strategy (default: .slidingWindow)
+	///   - dateProvider: Supplies the current time for rate-limit bookkeeping.
+	///     Defaults to `Date.init`; inject a deterministic provider in tests.
 	/// - Returns: A configured rate limit middleware instance
 	static func rateLimit(
 		maxRequests: Int = 100,
 		timeWindow: TimeInterval = 60.0,
-		persistence: RateLimitPersistence = UserDefaultsRateLimitPersistence(),
+		persistence: RateLimitPersistence? = nil,
 		strategy: RateLimitStrategy = .slidingWindow,
+		dateProvider: @Sendable @escaping () -> Date = Date.init,
 	) -> RateLimitMiddleware {
 		RateLimitMiddleware(
 			maxRequests: maxRequests,
 			timeWindow: timeWindow,
 			persistence: persistence,
 			strategy: strategy,
+			dateProvider: dateProvider,
 		)
 	}
 }
@@ -137,21 +142,33 @@ public extension DeepLinkMiddleware where Self == SecurityMiddleware {
 	///
 	/// - Parameters:
 	///   - allowedSchemes: Set of allowed URL schemes
-	///   - allowedHosts: Set of allowed hosts (empty means all hosts allowed)
+	///   - allowedHosts: Allowed hosts. With the default ``SecurityStrategy/hardened``,
+	///     `http(s)` links require a listed host (empty rejects every web link)
+	///     and custom-scheme hosts are checked only when the set is not empty
+	///   - allowedHostsByScheme: Hosts allowed per scheme, checked by ``SecurityStrategy/hardened``;
+	///     an entry replaces `allowedHosts` for its scheme and an empty entry rejects the scheme
 	///   - blockedPatterns: Array of regex patterns for blocked URLs
-	///   - strategy: The security validation strategy (default: .standard)
+	///   - allowedSources: Accepted link sources; `nil` (default) accepts every source
+	///   - strategy: The security validation strategy (default: .hardened)
+	///   - limits: Size limits checked before the strategy runs (default: ``DeepLinkInputLimits/recommended``)
 	/// - Returns: A configured security middleware instance
 	static func security(
 		allowedSchemes: Set<String>,
 		allowedHosts: Set<String> = [],
+		allowedHostsByScheme: [String: Set<String>] = [:],
 		blockedPatterns: [NSRegularExpression] = [],
-		strategy: SecurityStrategy = .standard,
+		allowedSources: Set<DeepLinkContext.Source>? = nil,
+		strategy: SecurityStrategy = .hardened,
+		limits: DeepLinkInputLimits = .recommended,
 	) -> SecurityMiddleware {
 		SecurityMiddleware(
 			allowedSchemes: allowedSchemes,
 			allowedHosts: allowedHosts,
+			allowedHostsByScheme: allowedHostsByScheme,
 			blockedPatterns: blockedPatterns,
+			allowedSources: allowedSources,
 			strategy: strategy,
+			limits: limits,
 		)
 	}
 }
@@ -183,17 +200,37 @@ public extension DeepLinkMiddleware where Self == AuthenticationMiddleware {
 	///   - provider: The authentication provider
 	///   - protectedHosts: Set of hosts that require authentication
 	///   - strategy: The authentication validation strategy (default: .standard)
+	///   - pendingLinks: Where to save rejected links for ``DeepLinkCoordinator/resumePendingLinks(from:)`` (default: `nil`)
+	///   - pendingSources: The sources whose rejected links are saved (default: ``AuthenticationMiddleware/defaultPendingSources``)
 	/// - Returns: A configured authentication middleware instance
 	static func authentication(
 		provider: AuthenticationProvider,
 		protectedHosts: Set<String>,
 		strategy: AuthenticationStrategy = .standard,
+		pendingLinks: (any PendingLinkStore)? = nil,
+		pendingSources: Set<DeepLinkContext.Source> = AuthenticationMiddleware.defaultPendingSources,
 	) -> AuthenticationMiddleware {
 		AuthenticationMiddleware(
 			authProvider: provider,
 			protectedHosts: protectedHosts,
 			strategy: strategy,
+			pendingLinks: pendingLinks,
+			pendingSources: pendingSources,
 		)
+	}
+}
+
+public extension DeepLinkMiddleware where Self == AuthenticationMiddleware {
+	/// Creates authentication middleware for the links `matcher` selects.
+	///
+	/// See ``AuthenticationMiddleware/init(authProvider:requiredFor:pendingLinks:pendingSources:)``.
+	static func authentication(
+		provider: AuthenticationProvider,
+		requiredFor matcher: DeepLinkMatcher,
+		pendingLinks: (any PendingLinkStore)? = nil,
+		pendingSources: Set<DeepLinkContext.Source> = AuthenticationMiddleware.defaultPendingSources,
+	) -> AuthenticationMiddleware {
+		AuthenticationMiddleware(authProvider: provider, requiredFor: matcher, pendingLinks: pendingLinks, pendingSources: pendingSources)
 	}
 }
 
@@ -229,6 +266,30 @@ public extension DeepLinkMiddleware where Self == URLTransformationMiddleware {
 	}
 }
 
+public extension DeepLinkMiddleware where Self == ReplayProtectionMiddleware {
+	/// Creates a middleware that suppresses the same link arriving again within `window`.
+	///
+	/// See ``ReplayProtectionMiddleware/init(window:maxEntries:key:ignoredQueryKeys:response:dateProvider:)``
+	/// for the parameters.
+	static func replayProtection(
+		window: TimeInterval = 2,
+		maxEntries: Int = 100,
+		key: ReplayKeyStrategy = .url,
+		ignoredQueryKeys: Set<String> = [],
+		response: ReplayProtectionMiddleware.Response = .drop,
+		dateProvider: @Sendable @escaping () -> Date = Date.init,
+	) -> ReplayProtectionMiddleware {
+		ReplayProtectionMiddleware(
+			window: window,
+			maxEntries: maxEntries,
+			key: key,
+			ignoredQueryKeys: ignoredQueryKeys,
+			response: response,
+			dateProvider: dateProvider,
+		)
+	}
+}
+
 public extension DeepLinkMiddleware where Self == ReadinessMiddleware {
 	/// Creates readiness middleware that queues deep links until
 	/// the app signals readiness.
@@ -248,11 +309,105 @@ public extension DeepLinkMiddleware where Self == ReadinessMiddleware {
 	/// }
 	/// ```
 	///
-	/// - Parameter queue: The readiness queue that stores URLs until ready
+	/// - Parameters:
+	///   - queue: The readiness queue that stores URLs until ready
+	///   - privacy: How the queued-link log describes the URL. Defaults to ``DeepLinkLogPrivacy/redacted``.
 	/// - Returns: A configured readiness middleware instance
 	static func readiness(
 		queue: any ReadinessQueue,
+		privacy: DeepLinkLogPrivacy = .redacted,
 	) -> ReadinessMiddleware {
-		ReadinessMiddleware(queue: queue)
+		ReadinessMiddleware(queue: queue, privacy: privacy)
+	}
+}
+
+#if canImport(CryptoKit)
+
+public extension DeepLinkMiddleware where Self == SignedLinkMiddleware {
+	/// Creates a middleware requiring an HMAC-SHA256 signature on the links `matcher` selects.
+	///
+	/// See ``SignedLinkMiddleware/init(keys:requiredFor:parameters:requiresExpiry:leeway:maximumLifetime:nonceStore:reusedNonce:stripsSignatureParameters:dateProvider:)``
+	/// for the parameters.
+	static func signedLinks(
+		keys: any SigningKeyProvider,
+		requiredFor matcher: DeepLinkMatcher = .all,
+		parameters: SignedLinkParameters = .default,
+		requiresExpiry: Bool = true,
+		leeway: TimeInterval = 0,
+		maximumLifetime: TimeInterval? = nil,
+		nonceStore: (any NonceStore)? = nil,
+		reusedNonce: SignedLinkMiddleware.ReusedNonceResponse = .reject,
+		stripsSignatureParameters: Bool = true,
+		dateProvider: @Sendable @escaping () -> Date = Date.init,
+	) -> SignedLinkMiddleware {
+		SignedLinkMiddleware(
+			keys: keys,
+			requiredFor: matcher,
+			parameters: parameters,
+			requiresExpiry: requiresExpiry,
+			leeway: leeway,
+			maximumLifetime: maximumLifetime,
+			nonceStore: nonceStore,
+			reusedNonce: reusedNonce,
+			stripsSignatureParameters: stripsSignatureParameters,
+			dateProvider: dateProvider,
+		)
+	}
+
+	/// Creates a middleware requiring a signature checked by `verifier`, such as
+	/// an ``Ed25519PublicKeyring``, on the links `matcher` selects.
+	///
+	/// See ``SignedLinkMiddleware/init(verifier:requiredFor:parameters:requiresExpiry:leeway:maximumLifetime:nonceStore:reusedNonce:stripsSignatureParameters:dateProvider:)``
+	/// for the parameters.
+	static func signedLinks(
+		verifier: any SignedLinkVerifier,
+		requiredFor matcher: DeepLinkMatcher = .all,
+		parameters: SignedLinkParameters = .default,
+		requiresExpiry: Bool = true,
+		leeway: TimeInterval = 0,
+		maximumLifetime: TimeInterval? = nil,
+		nonceStore: (any NonceStore)? = nil,
+		reusedNonce: SignedLinkMiddleware.ReusedNonceResponse = .reject,
+		stripsSignatureParameters: Bool = true,
+		dateProvider: @Sendable @escaping () -> Date = Date.init,
+	) -> SignedLinkMiddleware {
+		SignedLinkMiddleware(
+			verifier: verifier,
+			requiredFor: matcher,
+			parameters: parameters,
+			requiresExpiry: requiresExpiry,
+			leeway: leeway,
+			maximumLifetime: maximumLifetime,
+			nonceStore: nonceStore,
+			reusedNonce: reusedNonce,
+			stripsSignatureParameters: stripsSignatureParameters,
+			dateProvider: dateProvider,
+		)
+	}
+}
+
+#endif
+
+public extension DeepLinkMiddleware where Self == ConfirmationMiddleware {
+	/// Creates a middleware asking the user to confirm the links `matcher` selects.
+	///
+	/// See ``ConfirmationMiddleware/init(provider:requiredFor:redactor:timeout:maxPendingPrompts:sleep:)``
+	/// for the parameters.
+	static func confirmation(
+		provider: any DeepLinkConfirmationProvider,
+		requiredFor matcher: DeepLinkMatcher = .all,
+		redactor: URLRedactor = URLRedactor(),
+		timeout: Duration? = ConfirmationMiddleware.defaultTimeout,
+		maxPendingPrompts: Int = ConfirmationMiddleware.defaultMaxPendingPrompts,
+		sleep: @Sendable @escaping (Duration) async throws -> Void = { try await Task.sleep(for: $0) },
+	) -> ConfirmationMiddleware {
+		ConfirmationMiddleware(
+			provider: provider,
+			requiredFor: matcher,
+			redactor: redactor,
+			timeout: timeout,
+			maxPendingPrompts: maxPendingPrompts,
+			sleep: sleep,
+		)
 	}
 }

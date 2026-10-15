@@ -21,7 +21,7 @@ final class SettingsParser: DeepLinkParser {
 			return try parseSettingsData(from: deepLinkURL)
 
 		default:
-			throw DeepLinkError.unsupportedHost(deepLinkURL.host)
+			throw DeepLinkError.routeNotFound(url)
 		}
 	}
 

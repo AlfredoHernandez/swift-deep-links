@@ -1,0 +1,742 @@
+# Changelog
+
+All notable changes to `swift-deep-links` are tracked here. The format follows
+[Keep a Changelog](https://keepachangelog.com/) and this project adheres to
+[Semantic Versioning](https://semver.org/).
+
+## [2.0.0] - 2026-10-15
+
+Every change since `1.1.0`, described as it behaves in 2.0.0. Upgrading?
+Follow [MIGRATION-2.0.md](MIGRATION-2.0.md), which covers the breaking items
+below with before/after code, the recommended middleware order and a
+hardening checklist.
+
+### Breaking
+
+- **Middleware receives a `DeepLinkRequest` carrying a `DeepLinkContext` (S8/F2).**
+  `DeepLinkContext` records the delivering channel (`source`:
+  `.customScheme`, `.universalLink`, `.handoff`, `.notification`,
+  `.spotlight`, `.shortcut`, `.intent`, `.unknown`), the `sourceApplication`
+  and the `sceneID`. `DeepLinkMiddleware` gains the requirement
+  `intercept(_ request: DeepLinkRequest) async throws -> DeepLinkRequest?`.
+  **Source-compatible shim:** 1.x middleware implementing only
+  `intercept(_ url: URL)` still compiles and runs, bridged so the context is
+  kept; that form is deprecated and will be removed in 3.0. Each form defaults
+  to the other, so implement exactly one. New entry points:
+  `coordinator.handle(url:context:)` (`handle(url:)` uses `.unknown`),
+  `DeepLinkMiddlewareCoordinator.process(_: DeepLinkRequest)` and
+  `process(_:startingAfter:)` for requests, and
+  `DeepLinkContext.openedURL(_:sourceApplication:sceneID:)`. Handlers can read
+  the context by implementing `DeepLinkHandler.handle(_:context:)`, which the
+  coordinator now calls and which defaults to `handle(_:)`.
+  `View.onDeepLink(_:)` tags `onOpenURL` links as `.customScheme` (or
+  `.unknown` for unverified `http(s)`), and browsing-web activities as
+  `.universalLink`. A type implementing neither `intercept` form (or neither
+  `handle` form) throws `missingRequiredConfiguration` instead of recursing.
+  Readiness drains and pending-link resumes replay each link with the context
+  it arrived with (see below). `DeepLinksTesting.CollectingMiddleware`
+  records `interceptedRequests`.
+- **`DefaultDeepLinkRouting` stops at security errors.** A parser throwing
+  `DeepLinkError.securityViolation` or `.blockedURL` (directly or nested in a
+  delegating parser's `parsingFailed`) now ends routing with that error
+  instead of letting the next parser try, so a laxer parser can no longer
+  accept a link a stricter one (for example `PathPatternParser`'s traversal
+  check) rejected. Migration: parsers that used these errors to mean "not
+  mine" should throw `routeNotFound` instead.
+- **Secure defaults (S3/S6/S7).**
+  - `SecurityMiddleware` and `.security(...)` default to
+    `SecurityStrategy.hardened` (was `.standard`). `.hardened` requires a
+    listed host only for `http(s)` links (an empty `allowedHosts` rejects every
+    web link) and checks custom-scheme hosts only when `allowedHosts` is not
+    empty, so `.security(allowedSchemes: ["myapp"])` keeps working. Migration:
+    list your Universal Link domains in `allowedHosts`, or pass
+    `strategy: .standard` for the 1.x behavior.
+  - `SecurityMiddleware` and `.security(...)` default to
+    `limits: .recommended` (was `.unlimited`): URLs over 8192 characters, more
+    than 50 query parameters or a decoded value over 1024 characters are
+    rejected before any other stage reads them. Migration: pass
+    `limits: .unlimited` (or your own `DeepLinkInputLimits`) to lift them.
+  - Security violations no longer echo the rejected scheme or host:
+    every built-in `SecurityStrategy` throws
+    `securityViolation("Unauthorized scheme")` / `("Unauthorized host")`.
+    Migration: tests matching the old `"Unauthorized host: <host>"` text
+    compare the fixed reason instead.
+  - The other strategies (`.standard`, `.strict`, `.permissive`,
+    `.schemeOnly`, `.hostOnly`, `.patternOnly`, `.whitelist`) keep their
+    allow-list semantics (which checks run, an empty host list accepting every
+    host where it did, the URL returned unchanged) but now match like
+    `.hardened`: schemes and hosts case-insensitively, hosts percent-decoded
+    and without a trailing dot, and blocked patterns case-insensitively
+    against the raw URL and every percent-decoded form, so
+    `%6A%61vascript:` and `MYAPP://` no longer slip past a pattern or differ
+    from what a parser sees. Migration: a pattern meant to match only a raw
+    spelling, or an allow-list relying on case to reject, needs revisiting.
+  - Host spellings are canonical. `URLCanonicalizer` (and `.hardened`)
+    percent-decodes the host and drops a trailing dot (`myapp://Account%2E/x`
+    continues as `myapp://account/x`), rejecting a host that decodes to a
+    delimiter with `securityViolation("Malformed host")`; `.hardened` rejects
+    an empty authority host (`myapp:///account`) with
+    `securityViolation("Missing host")`. `AuthenticationStrategy.standard` and
+    `DeepLinkMatcher.hosts(_:)` match hosts case-insensitively, decoded,
+    without a trailing dot, and read the first path segment of a hostless
+    custom-scheme link (`myapp:///account/x`, `myapp:/account`,
+    `myapp:account/x`) as its host, so `protectedHosts` can no longer be
+    bypassed by a parser that ignores the host. `URLFuzzCorpus` replaces its
+    "trailing dot host" case with "empty authority host". Migration: links
+    that relied on `myapp:///path` must name a host, or use `.standard`.
+  - `AuthenticationMiddleware` saves rejected links to its pending store
+    only from `pendingSources` (default
+    `AuthenticationMiddleware.defaultPendingSources`: every source except
+    `.customScheme` and `.unknown`), so another app cannot plant a link that
+    runs after sign-in. Resumed links carry
+    `DeepLinkContext.isResumedPendingLink`, and
+    `DeepLinkMatcher.resumedPendingLinks` lets `.confirmation(...)` ask before
+    they act. Migration: pass `pendingSources:` (for example adding
+    `.customScheme`) to keep saving links from `onOpenURL` or `handle(url:)`,
+    preferably together with a confirmation on resume.
+  - `DeepLinkReadinessQueue()` keeps at most
+    `DeepLinkReadinessQueue.defaultMaxQueueSize` (50) links, dropping the
+    oldest. Pass `maxQueueSize: nil` for the old unbounded queue, and
+    `onEvict:` to observe drops (a flood of links can evict an earlier one).
+  - Built-in `AnalyticsStrategy` values (`.standard`, `.detailed`,
+    `.minimal`) and `LoggingFormat` values redact URLs by default;
+    `.unredacted(_:)` restores full URLs. `DeepLinkNotificationDelegate` and
+    `.notification(...)` default to `errorDetail: .redacted` (`.full` restores
+    the old text). Plain path segments are still not redacted.
+  - Every framework log site goes through the new `DeepLinkLogPrivacy`
+    (`.redacted` by default, `.unredacted` for debugging):
+    `DefaultDeepLinkRouting(logPrivacy:)`, `DeepLinkCoordinator(logPrivacy:)`
+    and `DeepLinkCoordinatorBuilder.logPrivacy(_:)`,
+    `ReadinessMiddleware(queue:privacy:)` / `.readiness(queue:privacy:)`,
+    `DeepLinkLoggingDelegate(privacy:)` / `.logging(privacy:)`,
+    `DeepLinkAnalyticsDelegate(privacy:)` / `.analytics(provider:privacy:)`
+    (URL envelope and `error_description(s)`),
+    `DefaultAnalyticsProvider(privacy:)` (sensitive parameter names and embedded
+    URLs), and `LoggingProvider.console` / `.console(privacy:)`.
+    `JSONQueryParameterParser` logs only the decoding error's type. Errors that
+    are not `DeepLinkError` are logged by type name when redacted.
+  - `DeepLinkCoordinator`'s public initializer is now a `convenience` init
+    (the class is `final`, so only `self.init` delegation is affected).
+- **`RateLimitPersistence.mutateRequests(_:)` is a new requirement (A3).**
+  `func mutateRequests<Output: Sendable>(_ mutation: @Sendable (inout [TimeInterval]) -> Output) async -> Output`
+  must read, change and store the timestamps without suspending in between.
+  Every built-in strategy now records only through it, so separate
+  `RateLimitMiddleware` instances sharing one persistence admit exactly their
+  limit (before, only a single instance was atomic).
+  `UserDefaultsRateLimitPersistence` (applying its pruning first) and
+  `DeepLinksTesting.InMemoryRateLimitPersistence` implement it. The window
+  strategies call the additive `mutateRequests(retaining:_:)` with their
+  `timeWindow` (the default forwards to `mutateRequests(_:)`);
+  `UserDefaultsRateLimitPersistence` raises its retention to
+  `max(maxAge, timeWindow)`, so a window longer than `maxAge` (one hour by
+  default) no longer forgets requests and admits more than its limit. The
+  stored count is global per install (every source shares one budget, and it
+  is user-editable); use separate keys for separate budgets. Migration:
+  custom persistences must implement it; in an actor, call
+  `mutation(&timestamps)` synchronously and persist before returning. There
+  is intentionally no default built on `loadRequests`/`saveRequests`, since it
+  could not be atomic.
+- **New `DeepLinkError.confirmationDenied(URL)` case.** Thrown by
+  `ConfirmationMiddleware` when the user declines a link or does not answer in
+  time, so a user's "no" is distinguishable from a security rejection (and need
+  not be reported as one). `errorDescription` is
+  `"Confirmation denied for URL: …"`, `redactedDescription` redacts the URL, and
+  `==` compares the URL. Migration: exhaustive `switch` statements over
+  `DeepLinkError` need a `confirmationDenied` branch (or `@unknown default`).
+
+- **`DeepLinkCoordinatorBuilder.build()` is synchronous.** Drop `await` at
+  the call site and `async` from your own factory protocols that wrap it.
+  `DeepLinkMiddlewareCoordinator` gains `init(middleware:)`, and
+  `CompositeDeepLinkDelegate.init` is `nonisolated`.
+- **`DeepLinkRoute` requires `Equatable & Hashable & Sendable`.** Enums
+  synthesize both; struct routes must declare them.
+- **Delegates are generic over `Route`.** `DeepLinkCoordinatorDelegate` no
+  longer requires `AnyObject` (value types and actors can conform; it stays
+  `@MainActor`) and receives `DeepLinkCoordinator<Route>` and
+  `DeepLinkResult<Route>`. `DeepLinkLoggingDelegate`, `DeepLinkAnalyticsDelegate`,
+  `DeepLinkNotificationDelegate` and `CompositeDeepLinkDelegate` take the
+  route type; `compose(_:)` returns `CompositeDeepLinkDelegate<Route>`;
+  `.delegate(_:)` / `.delegates(_:)` take `any DeepLinkCoordinatorDelegate<Route>`;
+  `coordinator.delegate` is `(any DeepLinkCoordinatorDelegate<Route>)?`.
+- **No implicit delay between routes.** `routeExecutionDelay` defaults to
+  `.zero` (was 500 ms); pass a `Duration` to keep the pacing.
+- **`DeepLinkError` case reshape.**
+  - `routeNotFound`, `unauthorizedAccess` and `blockedURL` carry a `URL`
+    instead of a `String`.
+  - `invalidParameterValue(name:value:)`,
+    `rateLimitExceeded(maxRequests:timeWindow:)` and
+    `handlerError(message:underlyingError:)` gain labels (and an underlying
+    error).
+  - New case `parsingFailed(url:underlyingErrors:)`, thrown when every parser
+    fails (nested ones are flattened).
+  - `Equatable` compares `parsingFailed` by URL and underlying-error count and
+    `handlerError` by message and whether an underlying error exists, never by
+    `localizedDescription`; unwrap the payloads to compare them in depth.
+- **Analytics report the host as `url.host()`.** The `host` parameter is now
+  percent-encoded (`b%C3%BCcher.de`, `caf%C3%A9`) instead of the decoded or
+  Punycode form; dashboards keyed on international hosts see new keys.
+- **Built-in middleware no longer declares `intercept(_ url: URL)`.** Calls
+  still compile through the protocol bridge and run with the `.unknown`
+  source; call `intercept(_: DeepLinkRequest)` to keep the context.
+- **`URLNormalizationTransformer` resolves dot segments and `%2F`**, and
+  **`RateLimitMiddleware` can throw `CancellationError`**: see Security.
+- **Removed APIs:** `AdvancedDeepLinkMiddleware`, `MiddlewareResult`, the
+  builder's `advancedMiddleware(_:)`, `CoordinatorOf`, `ResultOf`, middleware
+  `compose(_:)`, `AnalyticsStrategy.performance`,
+  `URLTransformationStrategy.batch` and `DeepLinkResultProtocol` (see
+  Removed).
+
+### Platform support
+
+- Added `tvOS 16+`, `watchOS 9+`, and `visionOS 1+` alongside existing
+  `iOS 16+` / `macOS 13+` targets. `DeepLinkNotificationDelegate` and its
+  `.notification(...)` factory are gated behind
+  `#if canImport(UserNotifications) && !os(tvOS)`.
+
+### Added
+
+- **SwiftUI one-liner** — `View.onDeepLink(_:)` wires the coordinator to
+  both `onOpenURL` and `onContinueUserActivity(NSUserActivityTypeBrowsingWeb)`
+  in a single modifier. Ordering is best-effort (documented).
+- **`View.onDeepLink(_:)` optional overload** — the modifier also
+  accepts `DeepLinkCoordinator<some DeepLinkRoute>?` and no-ops while
+  the coordinator is `nil`. Lets callers whose coordinator is built
+  asynchronously (for example inside `.task { … }` and stored in
+  `@State` as an optional) drop the private `if let` wrapper.
+- **`coordinator.handle(activity:handoffActivityTypes:sceneID:)`** routes an
+  `NSUserActivity` by its `webpageURL`.
+  `NSUserActivityTypeBrowsingWeb` runs as `.universalLink`, listed Handoff
+  types as `.handoff`; any other activity type is rejected (returns `nil`,
+  pipeline not run). Pass your `Info.plist` `NSUserActivityTypes`
+  as `handoffActivityTypes` if you route Handoff activities through it.
+- **Closure-based factories** — `DeepLinkHandler.from(_:)` and
+  `DeepLinkParser.from(_:)` (multi-route and single-route overloads) let
+  you wire a coordinator without declaring new types. Dot-shorthand is
+  supported via `where Self == ClosureDeepLinkHandler<R>`.
+- **Builder parser shortcuts** — `.parser(_:)` / `.parsers([...])` /
+  `.parsers(_:...)` on `DeepLinkCoordinatorBuilder` wrap their arguments
+  in `DefaultDeepLinkRouting`. The variadic form requires at least one
+  leading parser so `.parsers()` with zero arguments is a compile error.
+- **`DeepLinkResult.firstDeepLinkError`** — typed accessor returning the
+  first `DeepLinkError` in the error chain, skipping non-framework errors.
+- **`DefaultDeepLinkRouting` error propagation** — when every parser in
+  the chain throws, the router now throws
+  `DeepLinkError.parsingFailed(url:underlyingErrors:)` with the collected
+  failures instead of swallowing them into a generic `routeNotFound`.
+  Nested `parsingFailed` from a delegating parser is flattened.
+- **`coordinator.markReadyAndDrain(queue:)`** — marks a readiness queue
+  ready and resumes each queued link right after the `ReadinessMiddleware`
+  that queued it (see Security), with the context it arrived with.
+- **`DeepLinkNotificationPresenter`** — swap the default
+  `UNUserNotificationCenter` sink for a custom presenter (toast, in-app
+  banner, test double) via `.notification(presenter:)`. The protocol
+  carries a `DeepLinkNotificationKind` severity so custom presenters can
+  route by `.success` / `.failure` / `.info` without parsing the title.
+- **`RateLimitMiddleware.dateProvider`** — inject a deterministic time
+  source for testing without wall-clock sleeps.
+- **`DeepLinkCoordinator` clock injection** — `sleep:` init parameter
+  (also exposed on the builder via `.sleep(_:)` + `.routeExecutionDelay(_:)`)
+  replaces the hard-coded `Task.sleep(for:)` so tests can verify timing
+  assertions without real delays.
+- **`DeepLinksTesting` additions** —
+  `CollectingNotificationPresenter` public actor for asserting on
+  scheduled notifications; the test target now depends on
+  `DeepLinksTesting` to eat its own dogfood.
+- **`RateLimitStrategy.tokenBucket(capacity:refillRate:)` (F7).** Burst-tolerant
+  limiting: admits up to `capacity` links at once and refills `refillRate`
+  tokens per second. The state is a single timestamp in the existing
+  `RateLimitPersistence`, so it persists and is serialized like the window
+  strategies; the middleware's `maxRequests`/`timeWindow` are ignored. A
+  non-positive or NaN rate never refills, an infinite rate never limits, and
+  a clock moved backwards never blocks for longer than one full refill. A
+  bucket that never refills reports `rateLimitExceeded` with the seconds
+  since its first admitted request as `timeWindow` (never `inf`); a rate so
+  small that one refill would take infinite time is treated as no refill.
+- **`ReplayProtectionMiddleware` / `.replayProtection(...)` (F5).** Suppresses
+  the same link arriving again within `window` seconds (double taps, a link
+  delivered through both `onOpenURL` and `NSUserActivity`, pages firing a link
+  repeatedly); it dedupes accidental double delivery and is not a defence
+  against deliberate replay (use signed links with a nonce store).
+  `ReplayKeyStrategy` picks what identifies a link: `.url`
+  (default; scheme/host case, host percent-encoding and trailing dot, and query
+  order ignored), `.path`, `.queryParameter(_:)` for idempotency keys or
+  nonces (the last value of a repeated parameter, as `DeepLinkURL` reads it),
+  or `.custom`.
+  `ignoredQueryKeys` drops tracking parameters before keying. Replays are
+  dropped (`.drop`, default) or rejected with
+  `securityViolation("Replayed deep link")` (`.reject`). Memory is bounded by
+  `maxEntries` (oldest evicted), the check is atomic under concurrency, and
+  the clock is injectable through `dateProvider`. Equivalent percent-encodings
+  share a key. Place it before signed links, so a double delivery is dropped
+  quietly instead of failing as a reused nonce; if you resume protected links
+  after sign-in, place it after authentication (or keep the window shorter
+  than a sign-in), since `resumePendingLinks(from:)` runs the whole chain
+  again.
+- **`PathPatternParser` / `.pattern(...)` (F1).** Declarative templates such
+  as `/products/:id` and `/u/:handle/posts/*` replace hand-written parsers.
+  `PathPatternMatch` offers typed captures (`string`, `int`, `uuid`,
+  `value(_:as:)`, `wildcard`, `url`), throwing `invalidParameterValue` on a
+  failed conversion. Captured segments are percent-decoded once, after the
+  path is split, and must use the allowed character set (RFC 3986 unreserved
+  ASCII by default), so `%2F` cannot create a segment and `%252e%252e` cannot
+  become `..`; decoded `.`/`..` segments throw `securityViolation`. Non-matching
+  URLs throw `routeNotFound` so routing falls through to the next parser.
+  `int(_:)` accepts only canonical non-negative integers (`-5`, `+5`, `-0`
+  and `007` throw `invalidParameterValue`), so one resource has one
+  spelling; `value(name, as: Int.self)` keeps the lenient `Int(_:)`
+  conversion.
+  `hosts:` restricts hosts (case-insensitive) and `scope: .hostAndPath` treats
+  a custom-scheme host as the first segment. Invalid templates throw a
+  descriptive `PathPatternError`.
+- **Pending links and resume after sign-in (F3).** New `PendingLinkStore`
+  protocol with `InMemoryPendingLinkStore` and `UserDefaultsPendingLinkStore`
+  (bounded by `maxCount`, default 1; links expire after `expiry`, default
+  5 minutes; only the URL and the save time are stored).
+  `AuthenticationMiddleware(..., pendingLinks:)` and
+  `.authentication(..., pendingLinks:)` save a link rejected with
+  `unauthorizedAccess` (the link is still rejected).
+  `coordinator.resumePendingLinks(from:)` empties the store and runs each link
+  through the whole middleware chain again, so authentication is re-checked;
+  a link that is still unauthorized is saved again. The `UserDefaults` store
+  writes URLs in plain text; keep links carrying secrets in memory. Saved
+  links can be hostile: only protect routes safe to run after sign-in and
+  call `removeAll()` on sign-out.
+- **Observability (A5).** `DeepLinkCoordinator.results` returns an
+  `AsyncStream<DeepLinkResult<Route>>` of every result produced from then on
+  (`handle(url:)`, readiness drains and pending-link resumes, including
+  failures); each access is an independent subscriber, buffering at most 100
+  undelivered results, and streams finish when the coordinator is
+  deallocated. `DeepLinkMiddlewareCoordinator` wraps every middleware call in
+  an `os_signpost` interval (`swift-deep-links` / `Middleware`) labelled with
+  the middleware type name only, never the URL. No behavior change.
+- **`DeepLinksTesting`: fuzz corpus and manual clock (F10).**
+  `URLFuzzCorpus.hostile(scheme:host:)` (and per-category
+  `hostile(_:scheme:host:)`) returns `URLFuzzCase` values covering
+  traversal, broken or over-nested encodings, control characters, host
+  confusion (userinfo, `trusted@evil`, trailing dot), IDN homographs,
+  duplicate parameters, oversize input and dangerous schemes, built around the
+  host you allow; the package's own suite runs `SecurityStrategy.hardened`
+  with strict input limits over it. `ManualDateProvider` is a lock-protected
+  clock whose `dateProvider` plugs into rate limiting, replay protection and
+  pending-link stores; tests advance it instead of sleeping.
+- **`DeepLinkDiagnostics` (F11).** Debug-time checks returning
+  `DeepLinkDiagnosticWarning`s: `checkSecurityConfiguration(allowedSchemes:allowedHosts:)`
+  flags an empty scheme allow-list, allowed custom schemes missing from
+  `CFBundleURLTypes`, declared schemes the configuration rejects, `http(s)`
+  allowed without hosts and, when you pass your `applinks:` entitlement
+  values, hosts and associated domains that do not match.
+  `checkParsers(_:probes:)` flags probe URLs no parser handles and parsers
+  shadowed by an earlier one. Entitlements are not readable at runtime, so
+  associated domains must be supplied; the AASA file is not checked.
+  `ignoredDeclaredSchemes` / `ignoredDeclaredSchemePrefixes` silence
+  third-party SDK callback schemes (`fb<app id>`, Google client IDs).
+- **`SignedLinkMiddleware` / `.signedLinks(...)` (F4).** Requires an
+  HMAC-SHA256 signature (CryptoKit, unpadded base64url in `sig`) on the links a
+  `DeepLinkMatcher` selects (`.all`, `.hosts`, `.paths`, `.sources`,
+  `.custom`, `.anyOf`, `.allOf`). The signature covers a documented canonical
+  form (`DLSIG1`, lower-cased scheme and host, port, path, sorted query minus
+  `sig`, fragment, with percent-encoding normalized), so tampering with any
+  part, adding a parameter or a fragment fails while query order and
+  scheme/host case do not. `exp` (Unix seconds, required by default, with
+  `leeway`) bounds the lifetime; a `NonceStore` (`InMemoryNonceStore`:
+  bounded, injected clock, rejects rather than evicts when full) makes links
+  single-use through `nonce`. `SigningKeyProvider` / `SigningKeyring` pick the
+  key by `kid` for rotation; an unknown key fails like a bad signature.
+  Signatures are compared in constant time, failures throw
+  `securityViolation` with fixed reasons (`SignedLinkMiddleware.*Reason`) that
+  never include the key, signature or link, the nonce is consumed only after
+  verification, and verified links continue with the signature parameters
+  stripped. Nonces are two-phase inside `DeepLinkCoordinator`: reserved when
+  the signature verifies, spent once a handler ran (even if one threw, since
+  it may have acted; outcome `.handlerFailed`) or readiness queued the link,
+  and released when a later middleware or the router stopped or failed it
+  before any handler ran, so the user can retry (including after sign-in
+  through `resumePendingLinks(from:)`); concurrent deliveries still admit one.
+  Make handlers idempotent where a repeat could double a side effect.
+  While its link is in flight, `SignedLinkMiddleware` refuses the same nonce
+  even if the store's reservation lapsed (a long confirmation prompt), so a
+  link never runs twice in one process; keep prompt timeouts below the
+  reservation time to live for stores shared across processes.
+  `DeepLinkMiddlewareCoordinator.process(...)` called from a handler runs
+  standalone (it consumes at once), so it cannot disturb the outer link's nonce.
+  `NonceStore` gains `reserve(_:expiresAt:)`, `commit(_:)` and `release(_:)`
+  with defaults that consume at once, so 1.x-style stores keep compiling;
+  `InMemoryNonceStore(reservationTTL:)` lets abandoned reservations lapse
+  (default 300 s). `DeepLinkMiddleware` gains
+  `didFinish(_:outcome:)` (default no-op), which the coordinator calls for
+  every middleware that ran with a `DeepLinkOutcome` (`.succeeded`,
+  `.stopped`, `.deferred`, `.failed`, `.handlerFailed`). A link queued by
+  readiness keeps its nonce reserved: the middleware before the gate hears
+  `.deferred` and later the drained pass's outcome, or `.stopped` when
+  `DeepLinkReadinessQueue` evicts or resets it (releasing the nonce). `AuthenticationMiddleware` saves the
+  link as it entered the chain (also when it was drained from a readiness
+  queue), so a resumed signed link still carries its signature. `reusedNonce: .drop` stops a reused link silently, and replay
+  protection belongs before signed links so double deliveries are dropped
+  quietly. `SignedLinkBuilder` signs links for servers and tests. Matchers
+  compare hosts and paths case-insensitively and match paths after
+  percent-decoding and dot-segment resolution, erring towards protection; a
+  path that cannot be decoded or stays encoded past the decoding limit matches
+  every path rule (fail closed). Paths are also matched with empty segments
+  collapsed, `\` treated as a separator, `;` parameters and invisible or
+  control characters dropped, and a leading `/` forced (`myapp:reset`), both
+  before and after RFC 3986 dot-segment removal. For schemes other than
+  `http(s)` the host is also matched as the first segment, so `.paths(["/reset"])`
+  covers `myapp://reset?user=42` as well as `https://example.com/reset`.
+- **`ConfirmationMiddleware` / `.confirmation(...)` (F6).** For the links a
+  `DeepLinkMatcher` selects, asks an app-implemented
+  `DeepLinkConfirmationProvider` (`confirm(_:) async -> Bool`) with a
+  `DeepLinkConfirmationRequest` carrying the `URLRedactor`-redacted URL and the
+  `DeepLinkContext`. Approval continues unchanged; denial throws
+  `DeepLinkError.confirmationDenied`. A `timeout` (default
+  `ConfirmationMiddleware.defaultTimeout`, 60 s; `nil` waits forever; injectable
+  `sleep`) counts from the link's arrival, including the wait for earlier
+  prompts, denies an unanswered link and cancels the provider's task so it
+  can dismiss its UI; the timeout (and cancelling the link) denies at once even
+  when the provider ignores cancellation, releasing the next prompt. Prompts are serialized in arrival order; a link
+  cancelled while waiting is never shown. At most `maxPendingPrompts`
+  (default 2) links wait or prompt at once; more are rejected without a
+  prompt with `securityViolation(ConfirmationMiddleware.tooManyPendingPromptsReason)`. `DeepLinksTesting.CollectingConfirmation`
+  answers with a configurable decision and records every prompt.
+- **Notification, Spotlight and quick-action entry points (F8).**
+  `handle(notificationResponse:urlKey:sceneID:)` and
+  `handle(notificationUserInfo:actionIdentifier:urlKey:sceneID:)`
+  (`canImport(UserNotifications) && !os(tvOS)`, source `.notification`, URL
+  from `userInfo["deepLink"]` by default, dismiss action ignored, scene taken
+  from the response's `targetScene` on iOS/visionOS);
+  `handle(searchableItemActivity:sceneID:urlForIdentifier:)` and
+  `handle(searchableItemIdentifier:sceneID:urlForIdentifier:)`
+  (`canImport(CoreSpotlight) && !os(tvOS)`, source `.spotlight`, only
+  `CSSearchableItemActionType` activities); `handle(shortcutItem:urlKey:sceneID:)`
+  (iOS, source `.shortcut`, URL from `userInfo["deepLink"]` or the item's
+  `type`). Each reads a single absolute URL from its payload and delegates to
+  `handle(url:context:)`; no other payload value reaches the pipeline, and a
+  payload without a URL returns `nil` without running it. All are main-actor
+  isolated so the non-`Sendable` system objects can be passed directly.
+- **Deprecated the superseded URL forms.** `DeepLinkMiddleware.intercept(_: URL)`
+  and `DeepLinkMiddlewareCoordinator.process(_: URL)` /
+  `process(_: URL, startingAfter:)` are `@available(*, deprecated)` (removed in
+  3.0): they drop the link's context. 1.x middleware that implements the URL
+  form keeps compiling without a warning; calling the URL form through
+  `DeepLinkMiddleware` warns. Every built-in middleware and
+  `DeepLinksTesting.PassthroughMiddleware` now implement the request form.
+  Deliberately **not** deprecated: `DeepLinkCoordinator.handle(url:)` (a
+  convenience entry point equal to `handle(url:context: .unknown)`, for code
+  that has no context to give), `DeepLinkHandler.handle(_:)` (handlers that do
+  not need the context), and the URL requirements of `ReadinessQueue` and
+  `PendingLinkStore` (custom conformers must still implement them, and the new
+  request requirements default to them; deprecating them would warn every
+  conformer until 3.0 flips the defaults). The public `_DeepLinkURLIntercepting`
+  base protocol is an implementation detail of the bridge; do not use it.
+- **Queued and pending links keep their context.** `ReadinessQueue` gains
+  `enqueue(_: DeepLinkRequest)`, `markReadyReturningRequests()` and
+  `pendingRequests`, and `PendingLinkStore` gains `save(_: DeepLinkRequest)`
+  and `takeAllRequests()`, each with a default over the URL requirements so
+  1.x conformers still compile (and replay with `.unknown`).
+  `DeepLinkReadinessQueue`, both pending stores, `ReadinessMiddleware` and
+  `AuthenticationMiddleware` keep the whole request, so `markReadyAndDrain` and
+  `resumePendingLinks` hand the handler the original source, source
+  application and scene (a drained signed link stays verified for
+  `SignedRouteGuard`). `UserDefaultsPendingLinkStore` persists the context as
+  versioned JSON without the signature-verified flag; links stored in an
+  older format, or with a source this version does not know, load as
+  `.unknown`.
+- **`UserDefaultsNonceStore`.** A bounded, persistent `NonceStore` (injectable
+  `UserDefaults`, key and clock): spent nonces survive relaunch as versioned
+  JSON and are pruned by expiry; open reservations stay in memory and are
+  dropped on relaunch so an interrupted link can be retried. It writes only
+  when the spent set changes; unreadable data is logged and starts an empty
+  store, data from a newer format version is kept and the store refuses every
+  nonce, and a nonce whose spending cannot be written is refused. Not atomic
+  across processes sharing an app group.
+- **Route-level rules.** `RouteMatcher<Route>` (`.routes(where:)`, `.all`,
+  `.custom`) selects **parsed** routes, and two handler decorators enforce
+  rules on them regardless of URL spelling: `SignedRouteGuard` /
+  `handler.requiringSignature(for:)` rejects protected routes whose link was
+  not verified (`securityViolation(SignedRouteGuard.unsignedRouteReason)`),
+  and `ConfirmingHandler` / `handler.confirming(_:timeout:confirm:)` asks a
+  route-aware closure first (`confirmationDenied` on denial or timeout).
+  `DeepLinkContext.isSignatureVerified` records the result and only
+  `SignedLinkMiddleware` can set it, bound to the URL it verified: rewriting
+  the URL afterwards (`replacingURL`, assigning `url`, a bridged 1.x
+  middleware, `URLTransformationMiddleware`) clears it, so place rewriting
+  middleware before `.signedLinks(...)`; the middleware also verifies any link
+  that carries a signature, not only those its URL rule selects (an invalid
+  signature is rejected either way).
+- **Opt-in path redaction.** `URLRedactor(pathRedaction:)` redacts path
+  segments by template (`.templates(["/invite/:code"])`, custom-scheme hosts
+  counting as the first segment), by token shape (`.tokenLikeSegments()`), by
+  predicate (`.segments(where:)`) or any combination (`.anyOf`). It applies
+  everywhere a redactor is accepted (log privacy, logging formats, analytics
+  strategies, confirmation prompts, notification errors, error descriptions).
+  The default, `.none`, keeps paths as before.
+- **Signed-link keys.** `SignedLinkMiddleware(verifier:)` /
+  `.signedLinks(verifier:)` accept any `SignedLinkVerifier`; the new
+  `Ed25519PublicKeyring` verifies Ed25519 (RFC 8032) signatures, so the app
+  embeds only public keys, and `SignedLinkBuilder(signer:)` with
+  `Ed25519LinkSigner` mints them. HMAC keys shorter than 32 bytes
+  (`SignedLinkMiddleware.minimumKeyByteCount`) are refused when signing and
+  verifying (`securityViolation(weakKeyReason)`). `maximumLifetime:` rejects
+  links whose expiry is too far ahead (`lifetimeTooLongReason`). HMAC keys
+  on a device are extractable, and nonce stores are per install.
+- **Declined route guards release signed-link nonces.** When
+  `ConfirmingHandler` (user denied or timed out), `AuthenticatedHandler` or
+  `SignedRouteGuard` declines every route before its handler runs, the
+  outcome is `.failed` instead of `.handlerFailed`, so `SignedLinkMiddleware`
+  releases the nonce as it does for `ConfirmationMiddleware`, and the user
+  can retry. A handler that throws on its own still spends it.
+- **Hosts per scheme.** `SecurityMiddleware(allowedHostsByScheme:)` /
+  `.security(allowedHostsByScheme:)` (checked by `.hardened`) lists allowed
+  hosts per scheme, so a Universal Link domain is not accepted as a
+  custom-scheme host or the other way round. An entry replaces
+  `allowedHosts` for its scheme; schemes without one fall back to
+  `allowedHosts`; an empty entry rejects the scheme.
+- **Route- and matcher-level authentication.** `AuthenticatedHandler` /
+  `handler.requiringAuthentication(for:provider:)` rejects protected parsed
+  routes for a signed-out user (`unauthorizedAccess` with the routed URL),
+  whatever URL spelling produced them; it is the strongest authentication
+  rule. `AuthenticationMiddleware(authProvider:requiredFor:pendingLinks:pendingSources:)` /
+  `.authentication(provider:requiredFor:pendingLinks:pendingSources:)` protects any
+  `DeepLinkMatcher` selection, such as a path under a public host.
+- **Multi-scene routing (F9).** `SceneRoutingHandler<Route>` is a handler that
+  forwards each route to the handler registered for its
+  `DeepLinkContext.sceneID` (`register(_:forScene:)`, `unregister(scene:)`),
+  with a `fallback` for links without a known scene (or
+  `handlerError(message: SceneRoutingHandler.noSceneHandlerMessage, …)` when
+  there is none). `View.onDeepLink(_:sceneID:)` (plain and optional
+  coordinator) tags `onOpenURL` links and Universal Link activities with an
+  app-supplied scene identifier (empty means none), since SwiftUI exposes
+  none. `DeepLinksTesting.CollectingHandler.handledContexts` records the
+  context of each handled route.
+
+- **`DeepLinkCoordinatorBuilder.secureDefaults(allowedSchemes:...)`.** Puts
+  `.security` (`.hardened`, `limits: .recommended`), `.rateLimit` (30 links
+  per minute) and `.replayProtection` (2 s) in front of the chain, whatever
+  the order of the builder calls. In debug builds, `build()` logs a warning
+  when the chain has no `SecurityMiddleware`; behavior is unchanged.
+- **`SecurityMiddleware(allowedSources:)` / `.security(allowedSources:)`.**
+  Rejects links whose source is not listed with
+  `DeepLinkError.securityViolation("Source not allowed")`, before any other
+  check; `nil` (default) accepts every source.
+- **`SecurityViolationReason`** and `DeepLinkError.securityViolationReason`
+  let code branch on why a link was rejected (`.expiredLink`, `.reusedNonce`,
+  `.unauthorizedHost`, `.invalidConfiguration` for an invalid blocked
+  pattern, `.other` for custom reasons) instead of comparing strings. The
+  reason strings are unchanged. A `switch` over it should end with `default`,
+  since minor releases may add cases.
+- **Custom security strategies.** `SecurityStrategy.init(_:)` and
+  `validate(url:policy:)` are public, and `SecurityPolicy` exposes the
+  normalized `allowedSchemes`, `allowedHosts`, `allowedHosts(forScheme:)` and
+  `blockedPatterns()`, so you can write a strategy or wrap a built-in one.
+- `handle(shortcutItem:)` is available on iOS and visionOS.
+
+### Changed
+
+- **`DeepLinksTesting` types tightened to checked `Sendable`.**
+  `CollectingHandler`, `CollectingMiddleware`, and
+  `CollectingAnalyticsProvider` previously declared `@unchecked Sendable`.
+  Their conformance is now synthesised from the `OSAllocatedUnfairLock<T>`
+  stored state, so consumers that ban `@unchecked Sendable` can adopt
+  the test utilities directly. Public surface and behaviour are
+  unchanged.
+- **`DeepLinkNotificationDelegate` internals.** In-flight notification
+  tasks are tracked in an `OSAllocatedUnfairLock<[UUID: Task]>`
+  dictionary and cancelled from a nonisolated `deinit`; `print` fallback
+  replaced with `Logger`.
+- **`AnalyticsEventBuilder` (internal)** is now the single source of
+  truth for the scheme / host / url / path / timestamp envelope shared
+  by `DeepLinkAnalyticsDelegate` and the three `AnalyticsStrategy`
+  values.
+- **Internal restructuring** with no behavior change: one middleware chain
+  loop, a single task-local per link pass, a shared percent-decoding helper
+  and a smaller coordinator.
+
+### Removed
+
+Every removal is a breaking change.
+
+- **`AdvancedDeepLinkMiddleware` and `MiddlewareResult`**, with the builder's
+  `advancedMiddleware(_:)` and the `add(_:)` overloads that took one.
+  `DeepLinkMiddleware.intercept(_: DeepLinkRequest)` covers every case:
+  return the request to continue or transform it, `nil` to stop without an
+  error, or throw to fail.
+- **`CoordinatorOf` and `ResultOf` type aliases.** Use the canonical
+  generic names `DeepLinkCoordinator<Route>` and `DeepLinkResult<Route>`.
+- **Identity `compose(_:any DeepLinkMiddleware...)` / `compose(_:[any DeepLinkMiddleware])`
+  overloads.** Pass middleware arrays directly through
+  `.middleware(_:)` on the builder. The delegate-side `compose` overloads
+  stay — they wrap their input in `CompositeDeepLinkDelegate`.
+- **`AnalyticsStrategy.performance` and `URLTransformationStrategy.batch`.**
+  Both were misleading placeholders; removed.
+- **`DeepLinkResultProtocol`.** `DeepLinkCoordinatorDelegate` is now
+  directly generic over `Route`; the protocol layer was unnecessary.
+- **Substring-based security checks** in `SecurityStrategy.strict`
+  produced false positives; removed.
+
+### Fixed
+
+- `NotificationDelegate` no longer branches on `XCTestConfigurationFilePath`
+  in production code. The XCTest bypass is now handled via an injectable
+  `DeepLinkNotificationPresenter`.
+- `JSONQueryParameterParser.parse(_:fromAll:)` now falls back to an
+  array-preserving decode when the scalar-unwrap pass fails, so models
+  declaring `let tags: [String]` against a single-value URL decode
+  correctly. On both-pass failure, the first-pass error is rethrown to
+  preserve the clearer diagnostic.
+
+### Security
+
+- **Readiness drains resume the middleware chain (S1).**
+  `markReadyAndDrain(queue:)` resumes each drained link right after the
+  `ReadinessMiddleware` gating that queue: middleware before the gate does
+  not run twice, and middleware after it (authentication, confirmation,
+  transforms) evaluates the link at drain time, so a sign-out while the link
+  waited is honored. A queue that is not registered through
+  `ReadinessMiddleware` runs the whole chain.
+  `DeepLinkMiddlewareCoordinator.process(_:startingAfter:)` exposes the same
+  resumption for manual drains.
+- **`RateLimitMiddleware` is atomic under concurrency (S2).** Each
+  instance serializes the check-and-record step, so N simultaneous links
+  against a limit of K admit exactly K. A request cancelled before its turn
+  throws `CancellationError` and consumes no budget. `.fixedWindow` no longer computes a
+  NaN window for a zero or infinite `timeWindow` (zero counts same-instant
+  requests, infinite never resets), and a NaN `timeWindow` is treated as `0`.
+- **`SecurityStrategy.hardened` and `URLCanonicalizer` (S3).** `.hardened`,
+  the default strategy (see Breaking), canonicalizes the URL (lower-cased
+  scheme and host), rejects userinfo, control and invisible characters, `..`
+  path segments (path only, not query or fragment) and malformed or
+  over-nested percent-encoding, requires an allow-listed host for `http(s)`
+  links (and for custom schemes once any host is listed), and matches
+  `blockedPatterns` case-insensitively against the raw URL and every
+  percent-decoded form. `URLCanonicalizer` applies the same checks on its
+  own.
+- **Input limits (S7).** New `DeepLinkInputLimits` (maximum URL length,
+  query-parameter count and decoded parameter-value length; `.unlimited`
+  and `.recommended` presets) is accepted by `SecurityMiddleware(limits:)`,
+  `.security(limits:)` and `URLCanonicalizer(limits:)`. Limits are checked
+  before the security strategy or any decoding runs and throw
+  `DeepLinkError.securityViolation`; place the security middleware first so
+  oversized links never reach logging, analytics or parsing. Error messages
+  never echo the offending parameter name or value. `SecurityMiddleware` and
+  `.security(...)` default to `.recommended` (see Breaking).
+- **Observable readiness eviction (S7).**
+  `DeepLinkReadinessQueue(maxQueueSize:onEvict:)` reports each URL dropped
+  to make room, outside the queue lock. Prefer a bounded queue in production.
+- **Duplicate query parameters can be rejected (S4).**
+  `DeepLinkURL(url:maxLength:rejectDuplicateParameters:)` throws
+  `DeepLinkError.invalidURL` when a query key repeats (compared
+  case-sensitively after percent-decoding, valueless keys included), so
+  `queryParameters` and `allQueryParameters` can never disagree. Defaults to
+  `false`; existing last-value-wins behavior is unchanged. The same check is
+  available before any parser or middleware work as
+  `DeepLinkInputLimits(rejectDuplicateParameters:)` (in `SecurityMiddleware`
+  and `URLCanonicalizer`) and as
+  `DefaultDeepLinkRouting(parsers:rejectDuplicateParameters:)`; both throw
+  `DeepLinkError.securityViolation("Duplicate query parameter")`, so it can
+  be told apart from a malformed URL.
+- **`URLNormalizationTransformer` resolves dot segments (S10).** `.` and
+  `..` path segments (including percent-encoded `%2e`) are resolved and
+  clamped at the root, so `myapp://files/a/../../etc` normalizes to
+  `myapp://files/etc` instead of reaching parsers with `..` intact. Segments
+  that only contain dots (`..b`, `...`), the query and the fragment are
+  untouched; slash trimming and empty-value stripping are unchanged.
+  **Behavior change:** paths with `.`/`..` segments now come out resolved.
+  Percent-encoded slashes (`%2F`) are decoded into separators before
+  resolution (`a%2F..%2Fb` becomes `/b`); backslashes (`%5C`) are not
+  separators. **Ordering:** run the transformer *before* `SecurityMiddleware`,
+  or use `.hardened` (which rejects `..` outright): with `.standard` or
+  `.strict`, `/public/%2e%2e/admin` passes validation and only becomes
+  `/admin` if normalization runs afterwards.
+- **Redaction, on by default (S6).** New `URLRedactor` replaces the values of
+  sensitive query and fragment parameters (`token`, `code`, `password`,
+  `email`, `key`, `secret`, `otp`, `auth`, `session`, … matched per word,
+  plural or, for keys of five or more characters, by containment,
+  case-insensitively; configurable), path matrix parameters, JWT-shaped
+  values, sensitive values inside nested URL parameters, and userinfo. Use it through
+  `LoggingFormat.redacted(_:using:)`, `AnalyticsStrategy.redacted(_:using:)`,
+  `DeepLinkError.redactedDescription` / `redactedDescription(using:)` (also
+  redacts URLs embedded in free-form messages and every
+  `invalidParameterValue` value), and
+  `DeepLinkNotificationDelegate(errorDetail:)` / `.notification(errorDetail:)`
+  with `.redacted` or `.generic`. Every framework log, analytics strategy,
+  logging format and notification error is redacted by default (see
+  Breaking); `.unredacted` and `.full` opt out while debugging. In 1.x, the
+  routing and coordinator logs, the readiness queued-link log, the logging
+  and analytics delegates, `DefaultAnalyticsProvider` and
+  `LoggingProvider.console` all printed full URLs.
+- **Linear-time redaction of free-form text.** `redactedDescription` and
+  `DeepLinkLogPrivacy.redactingURLs(in:)` find embedded URLs with a
+  single-pass scanner, so a hostile link (a 100 000-character host) cannot
+  make redaction quadratic, and cut free-form text over 2048 characters (a
+  URL split by the cut is replaced whole), marking it `… [truncated]`.
+- **Configuration hardening.** `SecurityMiddleware` normalizes its allow-lists
+  (lower-cased; hosts without a trailing dot) and recompiles blocked patterns
+  case-insensitively once, at init, instead of on every link. The default
+  rate-limit persistence (`persistence: nil`) is
+  `UserDefaultsRateLimitPersistence.shared(key:)` with a key derived from the
+  strategy, `maxRequests` and `timeWindow`: limiters with the same
+  configuration share one actor and budget, and limiters with different
+  windows no longer prune each other's timestamps in one `UserDefaults` entry.
+  `DeepLinkDiagnostics.checkMiddleware(_:)` warns
+  (`.signedLinksWithoutNonceStore`) when `.signedLinks(...)` has no nonce
+  store, leaving its links reusable until they expire; `nonceStore` stays
+  optional.
+- **SwiftUI double delivery.** `onDeepLink(_:)` routes a web link once when
+  SwiftUI hands the same tap to both `onOpenURL` and
+  `onContinueUserActivity` within a second, preferring the browsing-web
+  activity (`.universalLink`) by letting the `onOpenURL` copy wait one
+  main-actor turn, so a single-use signed link is not reported as reused.
+- **Log injection.** Decoded control, invisible-format and line/paragraph
+  separator characters are escaped (`\n`, `\u{1B}`) in the host, path and
+  query parameters the logging formats print, in `redactedDescription`, and in
+  `DeepLinkLogPrivacy.redactingURLs(in:)`, so a link carrying `%0A` cannot
+  forge log lines.
+- **Invisible Unicode characters rejected (`.hardened`).** `URLCanonicalizer`
+  (and so `SecurityStrategy.hardened`) also rejects Unicode format (Cf) and
+  line/paragraph separator (Zl, Zp) characters in any decoded form, such as
+  the right-to-left override `U+202E`, zero-width space `U+200B`, BOM and
+  `U+2028`, with `securityViolation("Invisible formatting characters are not allowed")`.
+  Links carrying emoji sequences joined by `U+200D` are therefore rejected
+  by `.hardened`. `URLFuzzCorpus` gained matching cases.
+
+## [1.1.0] - 2026-03-18
+
+### Added
+
+- **Readiness gating.** `ReadinessMiddleware` / `.readiness(queue:)` and
+  `DeepLinkReadinessQueue` queue deep links until the app calls
+  `markReady()`, which returns the queued URLs for reprocessing. The
+  `ReadinessQueue` and `ReadinessCondition` protocols let you supply your
+  own queue; `maxQueueSize` (clamped to at least 1) drops the oldest link,
+  and `reset()` re-gates after sign-out.
+
+## [1.0.1] - 2026-03-18
+
+### Added
+
+- Static factories for middleware (`.analytics`, `.logging`, `.rateLimit`,
+  `.security`, `.authentication`, `.urlTransformation`) and delegates
+  (`.analytics`, `.logging`, `.notification`).
+- `compose(_:)` for delegates and middleware, and the type aliases
+  `CoordinatorOf`, `ParserOf`, `HandlerOf`, `RoutingOf` and `ResultOf`.
+- Array query parameters in `DeepLinkURL` and `JSONQueryParameterParser`.
+
+### Changed
+
+- Swift 6 strict concurrency: core protocols are `Sendable`,
+  `DeepLinkMiddlewareCoordinator` and `UserDefaultsRateLimitPersistence` are
+  actors, and `CompositeDeepLinkDelegate` holds an immutable delegate list.
+- Production logs no longer contain emojis.
+
+### Fixed
+
+- `DefaultDeepLinkRouting` reports the correct parser count when every
+  parser fails.
+
+## [1.0.0] - 2025-09-27
+
+Initial release.
+
+[2.0.0]: https://github.com/AlfredoHernandez/swift-deep-links/compare/1.1.0...2.0.0
+[1.1.0]: https://github.com/AlfredoHernandez/swift-deep-links/compare/1.0.1...1.1.0
+[1.0.1]: https://github.com/AlfredoHernandez/swift-deep-links/compare/1.0.0...1.0.1
+[1.0.0]: https://github.com/AlfredoHernandez/swift-deep-links/releases/tag/1.0.0

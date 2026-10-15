@@ -5,10 +5,8 @@
 import DeepLinks
 import Foundation
 
-/// Parser for profile-related deep links.
-///
-/// This parser demonstrates the use of the `ParserOf<Route>` type alias
-/// for cleaner type signatures when conforming to `DeepLinkParser`.
+/// Parser for profile-related deep links. `profile` is a protected host:
+/// authentication runs before this parser sees the link.
 ///
 /// ## Example URLs:
 /// ```
@@ -30,7 +28,7 @@ final class ProfileParser: DeepLinkParser {
 			return try parseProfileData(from: deepLinkURL)
 
 		default:
-			throw DeepLinkError.unsupportedHost(deepLinkURL.host)
+			throw DeepLinkError.routeNotFound(url)
 		}
 	}
 

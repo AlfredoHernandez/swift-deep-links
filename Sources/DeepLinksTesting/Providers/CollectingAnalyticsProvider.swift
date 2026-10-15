@@ -37,7 +37,7 @@ import os
 /// - Note: All parameter values are converted to strings for consistent, sendable storage.
 /// - Complexity: O(n) where n is the number of parameters being converted to strings.
 /// - SeeAlso: `AnalyticsProvider`
-public final class CollectingAnalyticsProvider: AnalyticsProvider, @unchecked Sendable {
+public final class CollectingAnalyticsProvider: AnalyticsProvider {
 	/// A captured analytics event with stringified parameters.
 	///
 	/// This structure stores both the event name and all its parameters
@@ -69,6 +69,8 @@ public final class CollectingAnalyticsProvider: AnalyticsProvider, @unchecked Se
 		state.withLock { $0 }
 	}
 
+	/// Records `event` with every parameter value converted to a string with
+	/// string interpolation, so tests compare `"true"`, `"42"` and so on.
 	public func track(_ event: String, parameters: [String: Any]) {
 		let sendableParams = parameters.compactMapValues { "\($0)" }
 		let tracked = TrackedEvent(name: event, parameters: sendableParams)

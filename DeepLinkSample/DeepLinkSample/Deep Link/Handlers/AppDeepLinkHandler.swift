@@ -22,10 +22,6 @@ import DeepLinks
 /// ## Usage:
 /// This handler is typically used with the `DeepLinkCoordinator` to process
 /// parsed deep link routes and execute the corresponding navigation actions.
-///
-/// ## Type Aliases:
-/// This handler demonstrates the use of the `HandlerOf<Route>` type alias
-/// for cleaner type signatures when conforming to `DeepLinkHandler`.
 final class AppDeepLinkHandler: DeepLinkHandler {
 	typealias Route = AppRoute
 	private let navigationRouter: NavigationRouter

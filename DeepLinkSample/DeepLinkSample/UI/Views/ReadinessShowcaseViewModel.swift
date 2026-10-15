@@ -7,112 +7,58 @@ import Foundation
 import Observation
 import OSLog
 
-/// ViewModel that manages the readiness middleware showcase state.
+/// Drives the readiness showcase with its own coordinator:
+/// `secureDefaults` → `.readiness(queue:)`.
 ///
-/// Demonstrates how `DeepLinkReadinessQueue` queues URLs when the app
-/// is not ready, drains them on `markReady()`, and supports `reset()`
-/// for logout/login cycles.
+/// Links sent before the app is ready pass the security checks and wait in the
+/// queue; ``markReady(navigationRouter:)`` calls `markReadyAndDrain(queue:)`,
+/// which resumes each one right after the readiness gate, with the source it
+/// arrived with. Queued links are shown and logged redacted.
 @Observable
 final class ReadinessShowcaseViewModel {
-	// MARK: - Private Properties
+	private static let logger = Logger(subsystem: "swift-deep-link-sample-app", category: "ReadinessShowcase")
 
-	private let logger = Logger(subsystem: "swift-deep-link-sample-app", category: "ReadinessShowcase")
 	private let queue = DeepLinkReadinessQueue(maxQueueSize: 10)
-	private var drainDelay: Duration
-	private var coordinator: CoordinatorOf<AppRoute>?
+	private let rateLimitPersistence: (any RateLimitPersistence)?
+	private var coordinator: DeepLinkCoordinator<AppRoute>?
 
-	// MARK: - Initialization
-
-	/// Creates a new showcase view model.
-	///
-	/// - Parameter drainDelay: The delay between processing each queued URL. Defaults to zero.
-	init(drainDelay: Duration = .zero) {
-		self.drainDelay = drainDelay
-	}
-
-	// MARK: - Public State
-
-	/// Whether the readiness queue is currently in the ready state
 	private(set) var isReady = false
-
-	/// Number of URLs pending in the queue
 	private(set) var pendingCount = 0
 
-	/// URLs currently queued for display purposes
-	private(set) var queuedURLs: [URL] = []
+	/// The queued links, redacted.
+	private(set) var queuedLinks: [String] = []
 
-	/// Configurable delay (in seconds) between processing each queued URL
-	var drainDelaySeconds: Double = 0 {
-		didSet { drainDelay = .milliseconds(Int(drainDelaySeconds * 1000)) }
+	init(rateLimitPersistence: (any RateLimitPersistence)? = nil) {
+		self.rateLimitPersistence = rateLimitPersistence
 	}
 
-	// MARK: - Public Interface
-
-	/// Queues a random deep link from a variety of route types.
-	///
-	/// Generates a randomized product, info, settings, or profile deep link
-	/// to demonstrate that different URLs are queued and processed independently.
-	func queueRandomDeepLink() {
-		let deepLink = Self.randomDeepLinks.randomElement()!
-		sendDeepLink(host: deepLink.host, params: deepLink.params)
+	func queueRandomDeepLink(navigationRouter: NavigationRouter) async {
+		let deepLink = Self.randomDeepLink()
+		await sendDeepLink(host: deepLink.host, params: deepLink.params, navigationRouter: navigationRouter)
 	}
 
-	/// Sends a deep link URL through the readiness middleware.
-	///
-	/// If the queue is not ready, the URL is stored and the pending
-	/// count is updated. If ready, the URL passes through immediately.
-	///
-	/// - Parameters:
-	///   - host: The deep link host (e.g., "product", "info")
-	///   - params: The query parameters string
-	func sendDeepLink(host: String, params: String) {
-		guard let url = URL(string: "deeplink://\(host)?\(params)") else { return }
+	func sendDeepLink(host: String, params: String, navigationRouter: NavigationRouter) async {
+		guard let url = URL(string: "deeplink://\(host)?\(params)"),
+		      let coordinator = coordinator(for: navigationRouter)
+		else { return }
 
-		let result = queue.enqueue(url)
-
-		if result == nil {
-			queuedURLs.append(url)
-			logger.info("URL queued (not ready): \(url.absoluteString)")
-		} else {
-			logger.info("URL passed through (ready): \(url.absoluteString)")
-		}
-
+		let result = await coordinator.handle(url: url, context: .openedURL(url))
+		Self.logger.info("\(DeepLinkLogPrivacy.redacted.describe(url)): \(LinkOutcomeText.describe(result))")
 		syncState()
 	}
 
-	/// Marks the queue as ready, drains pending URLs, and processes them
-	/// through the coordinator.
-	///
-	/// - Parameter navigationRouter: The router for handling navigation actions
-	func markReady(navigationRouter: NavigationRouter) {
-		let pending = queue.markReady()
-		queuedURLs = []
+	func markReady(navigationRouter: NavigationRouter) async {
+		guard let coordinator = coordinator(for: navigationRouter) else { return }
+
+		let drained = await coordinator.markReadyAndDrain(queue: queue)
+		Self.logger.info("Queue marked ready. Drained \(drained.count) links.")
 		syncState()
-
-		logger.info("Queue marked ready. Draining \(pending.count) URLs.")
-
-		guard !pending.isEmpty else { return }
-
-		Task { @MainActor in
-			let coordinator = await getOrCreateCoordinator(navigationRouter: navigationRouter)
-
-			for (index, url) in pending.enumerated() {
-				logger.info("Processing queued URL: \(url.absoluteString)")
-				await coordinator.handle(url: url)
-
-				if index < pending.count - 1 {
-					try? await Task.sleep(for: drainDelay)
-				}
-			}
-		}
 	}
 
-	/// Resets the queue to its not-ready state, simulating a logout/login cycle.
 	func resetQueue() {
 		queue.reset()
-		queuedURLs = []
 		syncState()
-		logger.info("Queue reset to not-ready state")
+		Self.logger.info("Queue reset to not-ready state")
 	}
 }
 
@@ -124,47 +70,47 @@ private extension ReadinessShowcaseViewModel {
 		let params: String
 	}
 
-	static let randomDeepLinks: [RandomDeepLink] = [
-		RandomDeepLink(host: "product", params: "productID=PROD-\(Int.random(in: 100 ... 999))&category=Electronics"),
-		RandomDeepLink(host: "product", params: "productID=PROD-\(Int.random(in: 100 ... 999))&category=Clothing"),
-		RandomDeepLink(host: "product", params: "productID=PROD-\(Int.random(in: 100 ... 999))&category=Books"),
-		RandomDeepLink(host: "info", params: "title=Welcome&brief=Thanks for joining us"),
-		RandomDeepLink(host: "info", params: "title=Sale&brief=50 percent off all items"),
-		RandomDeepLink(host: "info", params: "title=Update&brief=New version available"),
-		RandomDeepLink(host: "settings", params: "section=account"),
-		RandomDeepLink(host: "settings", params: "section=notifications"),
-		RandomDeepLink(host: "settings", params: "section=privacy"),
-		RandomDeepLink(host: "alert", params: "title=Reminder&message=Check your inbox&type=info"),
-		RandomDeepLink(host: "alert", params: "title=Warning&message=Storage almost full&type=warning"),
-		RandomDeepLink(host: "alert", params: "title=Success&message=Order confirmed&type=success"),
-	]
+	static func randomDeepLink() -> RandomDeepLink {
+		let productID = "PROD-\(Int.random(in: 100 ... 999))"
+		let choices = [
+			RandomDeepLink(host: "product", params: "productID=\(productID)&category=Electronics"),
+			RandomDeepLink(host: "product", params: "productID=\(productID)&category=Books"),
+			RandomDeepLink(host: "info", params: "title=Welcome&brief=Thanks for joining us"),
+			RandomDeepLink(host: "info", params: "title=Sale&brief=50 percent off all items"),
+			RandomDeepLink(host: "settings", params: "section=notifications"),
+			RandomDeepLink(host: "settings", params: "section=privacy"),
+			RandomDeepLink(host: "alert", params: "title=Reminder&message=Check your inbox&type=info"),
+			RandomDeepLink(host: "alert", params: "title=Success&message=Order confirmed&type=success"),
+		]
+		return choices.randomElement() ?? choices[0]
+	}
 
 	func syncState() {
 		isReady = queue.isReady
 		pendingCount = queue.pendingCount
+		queuedLinks = queue.pendingURLs.map(DeepLinkLogPrivacy.redacted.describe)
 	}
 
-	func getOrCreateCoordinator(navigationRouter: NavigationRouter) async -> CoordinatorOf<AppRoute> {
-		if let coordinator { return coordinator }
-
-		let parsers: [any DeepLinkParser<AppRoute>] = [
-			InformationParser(),
-			ProfileParser(),
-			ProductParser(),
-			SettingsParser(),
-			AlertParser(),
-		]
-
-		let routing = DefaultDeepLinkRouting<AppRoute>(parsers: parsers)
-		let handler = AppDeepLinkHandler(navigationRouter: navigationRouter)
-
-		let newCoordinator = DeepLinkCoordinator(
-			routing: routing,
-			handler: handler,
-			routeExecutionDelay: .milliseconds(250),
-		)
-
-		coordinator = newCoordinator
-		return newCoordinator
+	func coordinator(for navigationRouter: NavigationRouter) -> DeepLinkCoordinator<AppRoute>? {
+		if let coordinator {
+			return coordinator
+		}
+		do {
+			let newCoordinator = try DeepLinkCoordinatorBuilder<AppRoute>()
+				.parsers(DeepLinkService.parsers)
+				.handler(AppDeepLinkHandler(navigationRouter: navigationRouter))
+				.secureDefaults(
+					allowedSchemes: DeepLinkService.allowedSchemes,
+					allowedHosts: DeepLinkService.allowedHosts,
+					rateLimitPersistence: rateLimitPersistence,
+				)
+				.middleware(.readiness(queue: queue))
+				.build()
+			coordinator = newCoordinator
+			return newCoordinator
+		} catch {
+			Self.logger.error("Readiness showcase unavailable: \(DeepLinkLogPrivacy.redacted.describe(error))")
+			return nil
+		}
 	}
 }

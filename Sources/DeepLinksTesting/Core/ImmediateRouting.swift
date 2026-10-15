@@ -52,8 +52,12 @@ public struct ImmediateRouting<Route: DeepLinkRoute>: DeepLinkRouting, Sendable 
 		self.error = error
 	}
 
+	/// Returns the configured routes for any URL, or throws the configured error.
+	/// Middleware still runs before it; parsing is skipped.
 	public func route(from _: URL) async throws -> [Route] {
-		if let error { throw error }
+		if let error {
+			throw error
+		}
 		return routes
 	}
 }

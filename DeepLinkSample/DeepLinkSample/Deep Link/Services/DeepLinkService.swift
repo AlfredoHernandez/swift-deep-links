@@ -2,206 +2,175 @@
 //  Copyright © 2026 Jesús Alfredo Hernández Alarcón. All rights reserved.
 //
 
+import CryptoKit
 import DeepLinks
 import Foundation
-import OSLog
 
-/// Service responsible for creating and configuring deep link coordinators.
+/// Builds the sample's deep link coordinator with the recommended secure setup.
 ///
-/// This service encapsulates all the configuration logic for deep link processing,
-/// including middleware setup, delegate configuration, and coordinator creation.
-/// It provides a clean interface for the ViewModel and follows the Single Responsibility Principle.
+/// The chain runs in the order the security guide recommends:
 ///
-/// ## Responsibilities:
-/// - Deep link coordinator configuration
-/// - Middleware stack setup
-/// - Delegate configuration
-/// - Parser registration
-/// - Service provider management
+/// 1. `secureDefaults`: security (`.hardened`, `limits: .recommended`), rate limiting, replay protection
+/// 2. Signed links for `deeplink://reset`
+/// 3. Authentication for the protected hosts, saving `deeplink://account` to resume after sign-in
+/// 4. Confirmation for `deeplink://pay` and for every resumed link
+/// 5. URL normalization, then analytics and logging (both redacted by default)
+///
+/// The signing key is random per launch: the app signs its own demo links. A
+/// real app ships public keys (`Ed25519PublicKeyring`) or a Keychain key and
+/// lets its server sign.
 final class DeepLinkService {
-	// MARK: - Private Properties
+	/// The schemes the coordinator accepts; each is declared in `Info.plist`.
+	static let allowedSchemes: Set<String> = ["deeplink"]
 
-	private let logger = Logger(subsystem: "swift-deep-link-sample-app", category: "DeepLinkService")
-	private let navigationRouter: NavigationRouter
+	/// The hosts the coordinator accepts.
+	static let allowedHosts = Set(["info", "profile", "product", "settings", "alert"]).union(SecureActionParser.hosts)
 
-	// MARK: - Service Providers
+	static let protectedHosts: Set<String> = ["profile", "settings", SecureActionParser.accountHost]
 
-	private let authenticationProvider = SampleAuthenticationProvider()
-	private let analyticsProvider = SampleAnalyticsProvider()
+	/// One representative link per parser, for ``diagnosticWarnings()``.
+	static let probeLinks: [URL] = [
+		"deeplink://info?title=News&brief=Hello",
+		"deeplink://profile?userID=1",
+		"deeplink://product?productID=1",
+		"deeplink://settings?section=account",
+		"deeplink://alert?title=Hi&message=There&type=info",
+		"deeplink://reset?user=1",
+		"deeplink://pay?amount=1",
+		"deeplink://account",
+	].compactMap(URL.init(string:))
 
-	// MARK: - Initialization
+	private static let signingKeyID = "demo"
+	private static let signedLinkLifetime: TimeInterval = 15 * 60
 
-	/// Creates a new deep link service.
-	///
-	/// - Parameter navigationRouter: The navigation router for handling route actions
-	init(navigationRouter: NavigationRouter) {
-		self.navigationRouter = navigationRouter
+	let authenticationProvider: SampleAuthenticationProvider
+	let pendingLinks: any PendingLinkStore
+
+	private let handler: any DeepLinkHandler<AppRoute>
+	private let confirmationProvider: any DeepLinkConfirmationProvider
+	private let analyticsProvider: SampleAnalyticsProvider
+	private let nonceStore: any NonceStore
+	private let signingKey: SymmetricKey
+	private let rateLimitPersistence: (any RateLimitPersistence)?
+	private let delegates: [any DeepLinkCoordinatorDelegate<AppRoute>]
+	private let dateProvider: @Sendable () -> Date
+
+	init(
+		handler: any DeepLinkHandler<AppRoute>,
+		confirmationProvider: any DeepLinkConfirmationProvider,
+		authenticationProvider: SampleAuthenticationProvider = SampleAuthenticationProvider(),
+		analyticsProvider: SampleAnalyticsProvider = SampleAnalyticsProvider(),
+		pendingLinks: any PendingLinkStore = InMemoryPendingLinkStore(),
+		nonceStore: any NonceStore = InMemoryNonceStore(),
+		signingKey: SymmetricKey = SymmetricKey(size: .bits256),
+		rateLimitPersistence: (any RateLimitPersistence)? = nil,
+		delegates: [any DeepLinkCoordinatorDelegate<AppRoute>],
+		dateProvider: @Sendable @escaping () -> Date = Date.init,
+	) {
+		self.handler = handler
+		self.confirmationProvider = confirmationProvider
+		self.authenticationProvider = authenticationProvider
+		self.analyticsProvider = analyticsProvider
+		self.pendingLinks = pendingLinks
+		self.nonceStore = nonceStore
+		self.signingKey = signingKey
+		self.rateLimitPersistence = rateLimitPersistence
+		self.delegates = delegates
+		self.dateProvider = dateProvider
 	}
 
-	// MARK: - Public Interface
-
-	/// Creates a fully configured deep link coordinator.
-	///
-	/// This method demonstrates the modern functional API features:
-	/// - **Type Aliases**: Using `CoordinatorOf<AppRoute>` for cleaner signatures
-	/// - **Factory Methods**: Using `.analytics()`, `.logging()`, etc.
-	/// - **Functional Composition**: Using `compose()` for middleware and delegates
-	///
-	/// ## Traditional vs Modern Style
-	///
-	/// Before (verbose):
-	/// ```swift
-	/// let coordinator: DeepLinkCoordinator<AppRoute> = ...
-	/// .middleware(AnalyticsMiddleware(analyticsProvider: provider))
-	/// .delegates([
-	///     DeepLinkLoggingDelegate(enableDebugLogging: true),
-	///     DeepLinkAnalyticsDelegate(analyticsProvider: provider)
-	/// ])
-	/// ```
-	///
-	/// After (functional style):
-	/// ```swift
-	/// let coordinator: CoordinatorOf<AppRoute> = ...
-	/// .middleware(.analytics(provider: provider))
-	/// .delegate(compose(.logging(enableDebugLogging: true), .analytics(provider: provider)))
-	/// ```
-	///
-	/// - Returns: A fully configured deep link coordinator
-	/// - Throws: `DeepLinkError` if coordinator creation fails
-	func createCoordinator() async throws -> CoordinatorOf<AppRoute> {
-		logger.info("Creating deep link coordinator")
-
-		// Configure parsers
-		let parsers = createParsers()
-
-		// Configure middleware stack
-		let middleware = createMiddlewareStack()
-
-		// Configure delegates
-		let delegates = createDelegates()
-
-		// Create coordinator using builder pattern
-		let coordinator = try await DeepLinkCoordinatorBuilder<AppRoute>()
-			.routing(DefaultDeepLinkRouting<AppRoute>(parsers: parsers))
-			.handler(AppDeepLinkHandler(navigationRouter: navigationRouter))
-			.middleware(middleware)
-			.delegates(delegates)
-			.build()
-
-		logger.info("Deep link coordinator created successfully")
-		return coordinator
+	/// The service the app runs: navigation through `navigationRouter`, prompts
+	/// through `confirmationProvider`, and the logging, analytics and
+	/// notification delegates.
+	static func live(navigationRouter: NavigationRouter, confirmationProvider: any DeepLinkConfirmationProvider) -> DeepLinkService {
+		let analyticsProvider = SampleAnalyticsProvider()
+		return DeepLinkService(
+			handler: AppDeepLinkHandler(navigationRouter: navigationRouter),
+			confirmationProvider: confirmationProvider,
+			analyticsProvider: analyticsProvider,
+			delegates: [
+				.logging(enableDebugLogging: true),
+				.analytics(provider: analyticsProvider),
+				.notification(showSuccess: true, showErrors: true, showInfo: false),
+			],
+		)
 	}
 
-	/// Gets the current authentication provider for testing/debugging.
-	func getAuthenticationProvider() -> SampleAuthenticationProvider {
-		authenticationProvider
-	}
-
-	/// Gets the current analytics provider for testing/debugging.
-	func getAnalyticsProvider() -> SampleAnalyticsProvider {
-		analyticsProvider
-	}
-}
-
-// MARK: - Private Configuration Methods
-
-private extension DeepLinkService {
-	/// Creates the parser stack for all supported route types.
-	///
-	/// - Returns: An array of configured parsers
-	func createParsers() -> [any DeepLinkParser<AppRoute>] {
+	/// The parsers, in routing order.
+	static var parsers: [any DeepLinkParser<AppRoute>] {
 		[
 			InformationParser(),
 			ProfileParser(),
 			ProductParser(),
 			SettingsParser(),
 			AlertParser(),
+			SecureActionParser(),
 		]
 	}
 
-	/// Creates the middleware stack using functional factory methods.
-	///
-	/// **Modern Functional API**: This method uses static factory methods
-	/// and the `compose()` function for cleaner, more declarative configuration.
-	///
-	/// ## Before (Traditional Style):
-	/// ```swift
-	/// [
-	///     RateLimitMiddleware(maxRequests: 10, timeWindow: 60.0),
-	///     AnalyticsMiddleware(analyticsProvider: provider)
-	/// ]
-	/// ```
-	///
-	/// ## After (Functional Style):
-	/// ```swift
-	/// compose(
-	///     .rateLimit(maxRequests: 10, timeWindow: 60),
-	///     .analytics(provider: provider)
-	/// )
-	/// ```
-	///
-	/// The middleware stack is configured in the following order:
-	/// 1. Rate limiting (prevents abuse)
-	/// 2. Security validation (validates URLs against security policies)
-	/// 3. Authentication checks (validates user authentication for protected routes)
-	/// 4. URL transformation (normalizes URLs)
-	/// 5. Analytics tracking (tracks deep link usage)
-	/// 6. Logging (comprehensive logging of deep link attempts)
-	///
-	/// - Returns: An array of configured middleware
-	func createMiddlewareStack() -> [any DeepLinkMiddleware] {
-		compose(
-			.rateLimit(maxRequests: 10, timeWindow: 60.0),
-			.security(
-				allowedSchemes: ["deeplink", "testapp"],
-				allowedHosts: ["profile", "product", "settings", "info", "alert"],
+	func makeCoordinator() throws -> DeepLinkCoordinator<AppRoute> {
+		try DeepLinkCoordinatorBuilder<AppRoute>()
+			.parsers(Self.parsers)
+			.handler(handler)
+			.secureDefaults(
+				allowedSchemes: Self.allowedSchemes,
+				allowedHosts: Self.allowedHosts,
+				rateLimitPersistence: rateLimitPersistence,
+				dateProvider: dateProvider,
+			)
+			.middleware(appMiddleware())
+			.delegates(delegates)
+			.build()
+	}
+
+	/// The middleware after the `secureDefaults` preset, in chain order.
+	func appMiddleware() -> [any DeepLinkMiddleware] {
+		[
+			.signedLinks(
+				keys: SigningKeyring(keys: [Self.signingKeyID: signingKey]),
+				requiredFor: .hosts([SecureActionParser.resetHost]),
+				maximumLifetime: Self.signedLinkLifetime,
+				nonceStore: nonceStore,
+				dateProvider: dateProvider,
 			),
 			.authentication(
 				provider: authenticationProvider,
-				protectedHosts: ["profile", "settings"],
+				protectedHosts: Self.protectedHosts,
+				pendingLinks: pendingLinks,
+				// The demo opens links as custom-scheme links; resumed ones are confirmed below.
+				pendingSources: AuthenticationMiddleware.defaultPendingSources.union([.customScheme]),
+			),
+			.confirmation(
+				provider: confirmationProvider,
+				requiredFor: .anyOf(.hosts([SecureActionParser.paymentHost]), .resumedPendingLinks),
 			),
 			.urlTransformation(transformer: URLNormalizationTransformer()),
 			.analytics(provider: analyticsProvider),
 			.logging(),
+		]
+	}
+
+	/// A single-use reset link for `userID`, valid for 15 minutes.
+	func signedResetLink(userID: String) throws -> URL {
+		var components = URLComponents()
+		components.scheme = "deeplink"
+		components.host = SecureActionParser.resetHost
+		components.queryItems = [URLQueryItem(name: "user", value: userID)]
+		guard let url = components.url else { throw DeepLinkError.invalidParameterValue(name: "user", value: userID) }
+		return try SignedLinkBuilder(key: signingKey, keyID: Self.signingKeyID).sign(
+			url,
+			expiresAt: dateProvider().addingTimeInterval(Self.signedLinkLifetime),
+			nonce: UUID().uuidString,
 		)
 	}
 
-	/// Creates a composite delegate using functional composition.
-	///
-	/// **Modern Functional API**: This method uses static factory methods
-	/// and the `compose()` function to create a composite delegate.
-	///
-	/// ## Before (Traditional Style):
-	/// ```swift
-	/// [
-	///     DeepLinkLoggingDelegate(enableDebugLogging: true),
-	///     DeepLinkAnalyticsDelegate(analyticsProvider: provider)
-	/// ]
-	/// ```
-	///
-	/// ## After (Functional Style):
-	/// ```swift
-	/// [compose(
-	///     .logging(enableDebugLogging: true),
-	///     .analytics(provider: provider)
-	/// )]
-	/// ```
-	///
-	/// The delegate provides:
-	/// - Detailed logging of deep link processing
-	/// - Analytics tracking for usage insights
-	/// - User notifications for feedback
-	///
-	/// - Returns: An array with a single composite delegate
-	func createDelegates() -> [DeepLinkCoordinatorDelegate] {
-		[compose(
-			.logging(enableDebugLogging: true),
-			.analytics(provider: analyticsProvider),
-			.notification(
-				showSuccess: true,
-				showErrors: true,
-				showInfo: false,
-			),
-		)]
+	/// Warnings about the configuration: undeclared or unused schemes, signed
+	/// links without a nonce store, and probe links no parser (or more than
+	/// one) handles. Meant for debug builds and tests.
+	func diagnosticWarnings() async -> [DeepLinkDiagnosticWarning] {
+		let diagnostics = DeepLinkDiagnostics()
+		return await diagnostics.checkSecurityConfiguration(allowedSchemes: Self.allowedSchemes, allowedHosts: Self.allowedHosts)
+			+ diagnostics.checkMiddleware(appMiddleware())
+			+ (diagnostics.checkParsers(Self.parsers, probes: Self.probeLinks))
 	}
 }

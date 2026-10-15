@@ -40,7 +40,8 @@ public struct PassthroughMiddleware: DeepLinkMiddleware, Sendable {
 	/// Initializes a new passthrough middleware.
 	public init() {}
 
-	public func intercept(_ url: URL) async throws -> URL? {
-		url
+	/// Returns `request` unchanged, context included.
+	public func intercept(_ request: DeepLinkRequest) async throws -> DeepLinkRequest? {
+		request
 	}
 }

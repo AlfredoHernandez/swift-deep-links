@@ -52,8 +52,11 @@ public struct ImmediateParser<Route: DeepLinkRoute>: DeepLinkParser, Sendable {
 		self.error = error
 	}
 
+	/// Returns the configured routes for any URL, or throws the configured error.
 	public func parse(from _: URL) async throws -> [Route] {
-		if let error { throw error }
+		if let error {
+			throw error
+		}
 		return routes
 	}
 }

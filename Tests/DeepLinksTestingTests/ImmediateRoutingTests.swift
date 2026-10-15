@@ -37,9 +37,9 @@ struct ImmediateRoutingTests {
 
 	@Test
 	func `throws the exact configured error`() async {
-		let sut = ImmediateRouting<TestRoute>(error: DeepLinkError.routeNotFound("test"))
+		let sut = ImmediateRouting<TestRoute>(error: DeepLinkError.routeNotFound(testURL))
 
-		await #expect(throws: DeepLinkError.routeNotFound("test")) {
+		await #expect(throws: DeepLinkError.routeNotFound(testURL)) {
 			try await sut.route(from: testURL)
 		}
 	}

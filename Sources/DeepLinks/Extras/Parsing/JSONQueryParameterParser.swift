@@ -58,7 +58,7 @@ public final class JSONQueryParameterParser: QueryParameterParser {
 			let jsonData = try JSONSerialization.data(withJSONObject: parameters)
 			return try jsonDecoder.decode(type, from: jsonData)
 		} catch {
-			logger.error("Error while parsing data from deep link for data \(type) with error: \(error)")
+			logger.error("Error while parsing data from deep link for data \(type) with error: \(DeepLinkLogPrivacy.redacted.describe(error))")
 			throw error
 		}
 	}
@@ -81,6 +81,23 @@ public final class JSONQueryParameterParser: QueryParameterParser {
 	/// // params.tags = ["electronics", "new", "sale"]
 	/// ```
 	///
+	/// ## Single-value vs array keys
+	///
+	/// To accommodate both scalar and array-typed model fields, this method performs
+	/// up to two decode passes:
+	///
+	/// 1. First pass unwraps single-element values (`?tags=foo` → `"foo"`), matching
+	///    the common case where most URLs pass a single value and models declare
+	///    scalar fields (`let tags: String`).
+	/// 2. If the first pass fails to decode, a second pass keeps every value as an
+	///    array (`?tags=foo` → `["foo"]`). This lets models that declare
+	///    `let tags: [String]` decode a URL where the key only appears once.
+	///
+	/// If both passes fail, the **first** pass's decoding error is rethrown — it
+	/// corresponds to the scalar-oriented shape that most models target, so its
+	/// diagnostic is typically closer to the real problem (missing required key,
+	/// wrong type) than the array-shape error surfaced by the fallback.
+	///
 	/// - Parameters:
 	///   - type: The type to decode the parameters into
 	///   - parameters: The query parameters with array support
@@ -88,23 +105,31 @@ public final class JSONQueryParameterParser: QueryParameterParser {
 	/// - Throws: JSON encoding/decoding errors if the conversion fails
 	public func parse<T: Decodable>(_ type: T.Type, fromAll parameters: [String: [String]]) throws -> T {
 		do {
-			// Convert [String: [String]] to a format suitable for JSON decoding
-			// If an array has only one element, unwrap it to a single value
-			// This allows both single values and arrays to be decoded properly
-			var normalizedParams: [String: Any] = [:]
-			for (key, values) in parameters {
-				if values.count == 1 {
-					normalizedParams[key] = values[0]
-				} else {
-					normalizedParams[key] = values
-				}
+			return try decode(type, from: normalized(parameters, unwrapSingles: true))
+		} catch let firstError {
+			do {
+				return try decode(type, from: normalized(parameters, unwrapSingles: false))
+			} catch {
+				logger.error("Error while parsing array data from deep link for data \(type) with error: \(DeepLinkLogPrivacy.redacted.describe(firstError))")
+				throw firstError
 			}
-
-			let jsonData = try JSONSerialization.data(withJSONObject: normalizedParams)
-			return try jsonDecoder.decode(type, from: jsonData)
-		} catch {
-			logger.error("Error while parsing array data from deep link for data \(type) with error: \(error)")
-			throw error
 		}
+	}
+
+	private func decode<T: Decodable>(_ type: T.Type, from normalizedParams: [String: Any]) throws -> T {
+		let jsonData = try JSONSerialization.data(withJSONObject: normalizedParams)
+		return try jsonDecoder.decode(type, from: jsonData)
+	}
+
+	private func normalized(_ parameters: [String: [String]], unwrapSingles: Bool) -> [String: Any] {
+		var result: [String: Any] = [:]
+		for (key, values) in parameters {
+			if unwrapSingles, values.count == 1 {
+				result[key] = values[0]
+			} else {
+				result[key] = values
+			}
+		}
+		return result
 	}
 }

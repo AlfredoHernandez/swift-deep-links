@@ -11,12 +11,10 @@ import SwiftUI
 /// - **Navigation stack pushes**: Product and Settings views
 /// - **Alert presentations**: Warning and error alerts
 ///
-/// Each button demonstrates a specific deep link functionality and provides
-/// immediate visual feedback when tapped. The buttons use different colors
-/// to categorize the type of navigation they trigger.
-///
-/// The view integrates with the `NavigationRouter` to handle navigation state
-/// and provides a comprehensive testing interface for deep link behaviors.
+/// The buttons set `NavigationRouter` state directly, without a deep link, to
+/// preview where each kind of link lands. Links that go through the
+/// coordinator's checks come from other apps, the Secure and Readiness
+/// sections, and the custom link tester.
 struct DemoButtonsView: View {
 	@Environment(NavigationRouter.self) var navigationRouter
 

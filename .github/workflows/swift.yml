@@ -1,5 +1,17 @@
-# This workflow will build a Swift project
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-swift
+# Builds and tests swift-deep-links across every declared Apple platform.
+#
+# The SwiftPM job runs on macOS (`swift build` / `swift test`) because that
+# toolchain bundle ships the Swift Testing runtime.
+#
+# The Xcode matrix cross-compiles the package against each declared
+# platform's device SDK using `generic/platform=<plat>` destinations. Device
+# destinations require only the SDK to be installed, not a simulator
+# runtime — GitHub's `xcode-27` runners ship every Apple SDK but the
+# `watchOS Simulator` / `visionOS Simulator` runtimes are opt-in, so using
+# the device destinations keeps the matrix stable without a simulator
+# runtime install step.
+#
+# Docs: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-swift
 
 name: Swift
 
@@ -10,18 +22,55 @@ on:
     branches: [ "main" ]
 
 jobs:
-  build:
-
-    runs-on: macos-15
-
+  spm:
+    name: SwiftPM build + test (macOS)
+    runs-on: xcode-27
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Select Xcode Version
-      run: sudo xcode-select -switch /Applications/Xcode_26.0.app
+      - name: Select Xcode Version
+        run: sudo xcode-select -switch /Applications/Xcode_27.0.app
 
-    - name: Build
-      run: swift build -v
+      - name: Build
+        run: swift build -v
 
-    - name: Run tests
-      run: swift test --parallel -v
+      - name: Run tests
+        run: swift test --parallel -v
+
+  xcode-platforms:
+    name: xcodebuild (${{ matrix.platform }})
+    runs-on: xcode-27
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: iOS
+            destination: generic/platform=iOS
+          - platform: macOS
+            destination: generic/platform=macOS
+          - platform: tvOS
+            destination: generic/platform=tvOS
+          - platform: watchOS
+            destination: generic/platform=watchOS
+          - platform: visionOS
+            destination: generic/platform=visionOS
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode Version
+        run: sudo xcode-select -switch /Applications/Xcode_27.0.app
+
+      - name: Hide sample workspace so xcodebuild resolves the package schemes
+        run: mv DeepLink.xcworkspace "$RUNNER_TEMP/DeepLink.xcworkspace"
+
+      - name: Build DeepLinks for ${{ matrix.platform }}
+        run: |
+          xcodebuild build \
+            -scheme DeepLinks \
+            -destination '${{ matrix.destination }}'
+
+      - name: Build DeepLinksTesting for ${{ matrix.platform }}
+        run: |
+          xcodebuild build \
+            -scheme DeepLinksTesting \
+            -destination '${{ matrix.destination }}'

@@ -21,11 +21,11 @@ struct SettingsParserTests {
 	}
 
 	@Test
-	func `Parse throws unsupportedHost on non-settings host`() throws {
+	func `Parse throws routeNotFound on non-settings host so the next parser runs`() throws {
 		let sut = makeSUT()
 		let url = try #require(URL(string: "deeplink://unknown?section=account"))
 
-		#expect(throws: DeepLinkError.unsupportedHost("unknown")) {
+		#expect(throws: DeepLinkError.routeNotFound(url)) {
 			try sut.parse(from: url)
 		}
 	}

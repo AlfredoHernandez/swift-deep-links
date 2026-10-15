@@ -21,7 +21,7 @@ import DeepLinks
 /// These routes are used when deep links should trigger navigation stack pushes
 /// rather than modal presentations. They integrate with SwiftUI's `NavigationStack`
 /// and `navigationDestination` modifiers.
-enum Stack: DeepLinkRoute, Hashable {
+enum Stack: DeepLinkRoute {
 	/// Navigate to a product detail view
 	/// - Parameters:
 	///   - productID: The unique identifier of the product

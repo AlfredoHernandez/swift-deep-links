@@ -7,142 +7,127 @@ import Foundation
 import Testing
 
 struct DeepLinkMiddlewareFactoryTests {
+	private let sampleURL = URL(string: "myapp://profile")!
+
+	// MARK: - Analytics
+
 	@Test
-	func `Analytics factory method creates middleware with correct type`() {
-		let provider = DefaultAnalyticsProvider()
+	func `analytics factory forwards URLs to the provider`() async throws {
+		let provider = AnalyticsProviderSpy()
 		let middleware: any DeepLinkMiddleware = .analytics(provider: provider)
 
-		#expect(middleware is AnalyticsMiddleware)
+		let result = try await middleware.intercept(url: sampleURL)
+
+		#expect(result == sampleURL)
+		#expect(provider.trackedEvents.count == 1)
 	}
 
 	@Test
-	func `Analytics factory method with strategy creates middleware`() {
-		let provider = DefaultAnalyticsProvider()
-		let middleware: any DeepLinkMiddleware = .analytics(provider: provider, strategy: .detailed)
+	func `analytics factory honours the strategy it was built with`() async throws {
+		let provider = AnalyticsProviderSpy()
+		let middleware: any DeepLinkMiddleware = .analytics(provider: provider, strategy: .minimal)
 
-		#expect(middleware is AnalyticsMiddleware)
+		_ = try await middleware.intercept(url: sampleURL)
+
+		let event = try #require(provider.trackedEvents.first)
+		#expect(event.parameters["url"] == nil)
+		#expect(event.parameters["scheme"] as? String == "myapp")
 	}
 
+	// MARK: - Logging
+
 	@Test
-	func `Logging factory method creates middleware with correct type`() {
+	func `logging factory passes URLs through unchanged`() async throws {
 		let middleware: any DeepLinkMiddleware = .logging()
 
-		#expect(middleware is LoggingMiddleware)
+		let result = try await middleware.intercept(url: sampleURL)
+
+		#expect(result == sampleURL)
 	}
 
-	@Test
-	func `Logging factory method with parameters creates middleware`() {
-		let middleware: any DeepLinkMiddleware = .logging(
-			provider: .defaultSystemLogger(),
-			logLevel: .debug,
-			format: .detailed,
-		)
-
-		#expect(middleware is LoggingMiddleware)
-	}
+	// MARK: - RateLimit
 
 	@Test
-	func `RateLimit factory method creates middleware with correct type`() {
-		let middleware: any DeepLinkMiddleware = .rateLimit()
-
-		#expect(middleware is RateLimitMiddleware)
-	}
-
-	@Test
-	func `RateLimit factory method with parameters creates middleware`() {
+	func `rateLimit factory stops returning the URL after the request limit is reached`() async throws {
+		// Use an in-memory persistence to avoid cross-run pollution from the
+		// shared UserDefaults suite that the default would otherwise hit.
 		let middleware: any DeepLinkMiddleware = .rateLimit(
-			maxRequests: 5,
-			timeWindow: 30.0,
-			strategy: .fixedWindow,
+			maxRequests: 2,
+			timeWindow: 60.0,
+			persistence: InMemoryRateLimitPersistence(),
 		)
 
-		#expect(middleware is RateLimitMiddleware)
+		_ = try await middleware.intercept(url: sampleURL)
+		_ = try await middleware.intercept(url: sampleURL)
+
+		await #expect(throws: DeepLinkError.rateLimitExceeded(maxRequests: 2, timeWindow: 60.0)) {
+			try await middleware.intercept(url: sampleURL)
+		}
+	}
+
+	// MARK: - Security
+
+	@Test
+	func `security factory throws when the scheme is not allowed`() async throws {
+		let middleware: any DeepLinkMiddleware = .security(allowedSchemes: ["myapp"])
+		let blockedURL = try #require(URL(string: "https://example.com"))
+
+		await #expect(throws: DeepLinkError.self) {
+			try await middleware.intercept(url: blockedURL)
+		}
 	}
 
 	@Test
-	func `Security factory method creates middleware with correct type`() {
-		let middleware: any DeepLinkMiddleware = .security(
-			allowedSchemes: ["https", "myapp"],
-		)
+	func `security factory passes through when the URL matches policy`() async throws {
+		let middleware: any DeepLinkMiddleware = .security(allowedSchemes: ["myapp"])
 
-		#expect(middleware is SecurityMiddleware)
+		let result = try await middleware.intercept(url: sampleURL)
+
+		#expect(result == sampleURL)
 	}
 
-	@Test
-	func `Security factory method with all parameters creates middleware`() {
-		let middleware: any DeepLinkMiddleware = .security(
-			allowedSchemes: ["https"],
-			allowedHosts: ["secure.myapp.com"],
-			blockedPatterns: [],
-			strategy: .strict,
-		)
-
-		#expect(middleware is SecurityMiddleware)
-	}
+	// MARK: - Authentication
 
 	@Test
-	func `Authentication factory method creates middleware with correct type`() {
-		let provider = PermissiveAuthenticationProvider()
+	func `authentication factory halts when the provider reports unauthenticated access to a protected host`() async throws {
+		let provider = AuthenticationProviderStub(isAuthenticated: false)
 		let middleware: any DeepLinkMiddleware = .authentication(
 			provider: provider,
-			protectedHosts: ["secure.myapp.com"],
+			protectedHosts: ["profile"],
 		)
 
-		#expect(middleware is AuthenticationMiddleware)
+		await #expect(throws: DeepLinkError.self) {
+			try await middleware.intercept(url: sampleURL)
+		}
 	}
 
 	@Test
-	func `Authentication factory method with strategy creates middleware`() {
-		let provider = PermissiveAuthenticationProvider()
+	func `authentication factory lets authenticated URLs through`() async throws {
+		let provider = AuthenticationProviderStub(isAuthenticated: true)
 		let middleware: any DeepLinkMiddleware = .authentication(
 			provider: provider,
-			protectedHosts: [],
-			strategy: .strict,
+			protectedHosts: ["profile"],
 		)
 
-		#expect(middleware is AuthenticationMiddleware)
+		let result = try await middleware.intercept(url: sampleURL)
+
+		#expect(result == sampleURL)
 	}
 
+	// MARK: - URLTransformation
+
 	@Test
-	func `URLTransformation factory method creates middleware with correct type`() {
+	func `urlTransformation factory runs the supplied transformer on the URL`() async throws {
 		let transformer = URLNormalizationTransformer()
 		let middleware: any DeepLinkMiddleware = .urlTransformation(transformer: transformer)
+		let messyURL = try #require(URL(string: "myapp://profile/?id=123&name="))
 
-		#expect(middleware is URLTransformationMiddleware)
-	}
+		let result = try await middleware.intercept(url: messyURL)
 
-	@Test
-	func `URLTransformation factory method with strategy creates middleware`() {
-		let transformer = URLNormalizationTransformer()
-		let middleware: any DeepLinkMiddleware = .urlTransformation(
-			transformer: transformer,
-			strategy: .safe,
-		)
-
-		#expect(middleware is URLTransformationMiddleware)
-	}
-
-	@Test
-	func `Factory methods can be used in arrays`() {
-		let provider = DefaultAnalyticsProvider()
-		let authProvider = PermissiveAuthenticationProvider()
-		let transformer = URLNormalizationTransformer()
-
-		let middleware: [any DeepLinkMiddleware] = [
-			.analytics(provider: provider),
-			.logging(),
-			.rateLimit(maxRequests: 10, timeWindow: 60),
-			.security(allowedSchemes: ["https", "myapp"]),
-			.authentication(provider: authProvider, protectedHosts: []),
-			.urlTransformation(transformer: transformer),
-		]
-
-		#expect(middleware.count == 6)
-		#expect(middleware[0] is AnalyticsMiddleware)
-		#expect(middleware[1] is LoggingMiddleware)
-		#expect(middleware[2] is RateLimitMiddleware)
-		#expect(middleware[3] is SecurityMiddleware)
-		#expect(middleware[4] is AuthenticationMiddleware)
-		#expect(middleware[5] is URLTransformationMiddleware)
+		// `URLNormalizationTransformer` strips the trailing slash from the path
+		// and drops empty query values, so asserting the exact normalised URL
+		// proves the factory actually wired the transformer (an identity
+		// transformer would round-trip `messyURL` verbatim).
+		#expect(result?.absoluteString == "myapp://profile?id=123")
 	}
 }

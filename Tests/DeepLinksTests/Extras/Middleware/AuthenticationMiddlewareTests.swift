@@ -16,7 +16,7 @@ struct AuthenticationMiddlewareTests {
 			protectedHosts: ["protected", "private"],
 		)
 
-		let result = try await middleware.intercept(testURL)
+		let result = try await middleware.intercept(url: testURL)
 
 		#expect(result == testURL)
 	}
@@ -30,7 +30,7 @@ struct AuthenticationMiddlewareTests {
 			protectedHosts: ["protected"],
 		)
 
-		let result = try await middleware.intercept(testURL)
+		let result = try await middleware.intercept(url: testURL)
 
 		#expect(result == testURL)
 	}
@@ -45,10 +45,10 @@ struct AuthenticationMiddlewareTests {
 		)
 
 		do {
-			_ = try await middleware.intercept(testURL)
+			_ = try await middleware.intercept(url: testURL)
 			#expect(Bool(false), "Expected unauthorized access error")
 		} catch let error as DeepLinkError {
-			#expect(error == .unauthorizedAccess("protected"))
+			#expect(error == .unauthorizedAccess(testURL))
 		}
 	}
 
@@ -61,7 +61,7 @@ struct AuthenticationMiddlewareTests {
 			protectedHosts: ["protected"],
 		)
 
-		let result = try await middleware.intercept(testURL)
+		let result = try await middleware.intercept(url: testURL)
 
 		#expect(result == testURL)
 	}
@@ -79,10 +79,10 @@ struct AuthenticationMiddlewareTests {
 		)
 
 		do {
-			_ = try await middleware.intercept(testURL)
+			_ = try await middleware.intercept(url: testURL)
 			#expect(Bool(false), "Expected unauthorized access error")
 		} catch let error as DeepLinkError {
-			#expect(error == .unauthorizedAccess("protected"))
+			#expect(error == .unauthorizedAccess(testURL))
 		}
 	}
 
@@ -96,7 +96,7 @@ struct AuthenticationMiddlewareTests {
 			strategy: .strict,
 		)
 
-		let result = try await middleware.intercept(testURL)
+		let result = try await middleware.intercept(url: testURL)
 
 		#expect(result == testURL)
 	}
@@ -111,7 +111,7 @@ struct AuthenticationMiddlewareTests {
 			strategy: .permissive,
 		)
 
-		let result = try await middleware.intercept(testURL)
+		let result = try await middleware.intercept(url: testURL)
 
 		#expect(result == testURL)
 	}
@@ -126,7 +126,7 @@ struct AuthenticationMiddlewareTests {
 			strategy: .permissive,
 		)
 
-		let result = try await middleware.intercept(testURL)
+		let result = try await middleware.intercept(url: testURL)
 
 		#expect(result == testURL)
 	}
@@ -141,7 +141,7 @@ struct AuthenticationMiddlewareTests {
 			strategy: .standard,
 		)
 
-		let result = try await middleware.intercept(testURL)
+		let result = try await middleware.intercept(url: testURL)
 
 		#expect(result == testURL)
 	}
@@ -157,10 +157,10 @@ struct AuthenticationMiddlewareTests {
 		)
 
 		do {
-			_ = try await middleware.intercept(testURL)
+			_ = try await middleware.intercept(url: testURL)
 			#expect(Bool(false), "Expected unauthorized access error")
 		} catch let error as DeepLinkError {
-			#expect(error == .unauthorizedAccess("protected"))
+			#expect(error == .unauthorizedAccess(testURL))
 		}
 	}
 
@@ -174,7 +174,7 @@ struct AuthenticationMiddlewareTests {
 			strategy: .standard,
 		)
 
-		let result = try await middleware.intercept(testURL)
+		let result = try await middleware.intercept(url: testURL)
 
 		#expect(result == testURL)
 	}
@@ -189,7 +189,7 @@ struct AuthenticationMiddlewareTests {
 			strategy: .standard,
 		)
 
-		let result = try await middleware.intercept(testURL)
+		let result = try await middleware.intercept(url: testURL)
 
 		#expect(result == testURL)
 	}
@@ -205,10 +205,10 @@ struct AuthenticationMiddlewareTests {
 		)
 
 		do {
-			_ = try await middleware.intercept(testURL)
+			_ = try await middleware.intercept(url: testURL)
 			#expect(Bool(false), "Expected unauthorized access error")
 		} catch let error as DeepLinkError {
-			#expect(error == .unauthorizedAccess("https"))
+			#expect(error == .unauthorizedAccess(testURL))
 		}
 	}
 
@@ -222,7 +222,7 @@ struct AuthenticationMiddlewareTests {
 			strategy: .schemeBased,
 		)
 
-		let result = try await middleware.intercept(testURL)
+		let result = try await middleware.intercept(url: testURL)
 
 		#expect(result == testURL)
 	}
@@ -237,7 +237,7 @@ struct AuthenticationMiddlewareTests {
 			strategy: .schemeBased,
 		)
 
-		let result = try await middleware.intercept(testURL)
+		let result = try await middleware.intercept(url: testURL)
 
 		#expect(result == testURL)
 	}
@@ -252,7 +252,7 @@ struct AuthenticationMiddlewareTests {
 			strategy: .schemeBased,
 		)
 
-		let result = try await middleware.intercept(testURL)
+		let result = try await middleware.intercept(url: testURL)
 
 		#expect(result == testURL)
 	}
@@ -269,7 +269,7 @@ struct AuthenticationMiddlewareTests {
 			strategy: .standard,
 		)
 
-		let result = try await middleware.intercept(testURL)
+		let result = try await middleware.intercept(url: testURL)
 
 		#expect(result == testURL)
 	}
@@ -285,10 +285,10 @@ struct AuthenticationMiddlewareTests {
 		)
 
 		do {
-			_ = try await middleware.intercept(testURL)
+			_ = try await middleware.intercept(url: testURL)
 			#expect(Bool(false), "Expected unauthorized access error")
 		} catch let error as DeepLinkError {
-			#expect(error == .unauthorizedAccess("anyhost"))
+			#expect(error == .unauthorizedAccess(testURL))
 		}
 	}
 
@@ -302,7 +302,7 @@ struct AuthenticationMiddlewareTests {
 			strategy: .strict,
 		)
 
-		let result = try await middleware.intercept(testURL)
+		let result = try await middleware.intercept(url: testURL)
 
 		#expect(result == testURL)
 	}
@@ -322,7 +322,6 @@ struct AuthenticationMiddlewareTests {
 	func `PermissiveAuthenticationProvider returns consistent authentication status`() {
 		let provider = PermissiveAuthenticationProvider()
 
-		// Test multiple calls to ensure consistency
 		let firstCall = provider.isAuthenticated()
 		let secondCall = provider.isAuthenticated()
 		let thirdCall = provider.isAuthenticated()
@@ -344,7 +343,7 @@ struct AuthenticationMiddlewareTests {
 			strategy: .standard,
 		)
 
-		let result = try await middleware.intercept(testURL)
+		let result = try await middleware.intercept(url: testURL)
 
 		#expect(result == testURL)
 	}
@@ -359,7 +358,7 @@ struct AuthenticationMiddlewareTests {
 			strategy: .strict,
 		)
 
-		let result = try await middleware.intercept(testURL)
+		let result = try await middleware.intercept(url: testURL)
 
 		#expect(result == testURL)
 	}
@@ -374,7 +373,7 @@ struct AuthenticationMiddlewareTests {
 			strategy: .standard,
 		)
 
-		let result = try await middleware.intercept(testURL)
+		let result = try await middleware.intercept(url: testURL)
 
 		#expect(result == testURL)
 	}
@@ -389,7 +388,7 @@ struct AuthenticationMiddlewareTests {
 			strategy: .schemeBased,
 		)
 
-		let result = try await middleware.intercept(testURL)
+		let result = try await middleware.intercept(url: testURL)
 
 		#expect(result == testURL)
 	}
@@ -398,7 +397,6 @@ struct AuthenticationMiddlewareTests {
 	func `PermissiveAuthenticationProvider is thread-safe`() async {
 		let provider = PermissiveAuthenticationProvider()
 
-		// Test concurrent access
 		await withTaskGroup(of: Bool.self) { group in
 			for _ in 0 ..< 10 {
 				group.addTask {
@@ -411,7 +409,6 @@ struct AuthenticationMiddlewareTests {
 				results.append(result)
 			}
 
-			// All results should be true
 			#expect(results.count == 10)
 			#expect(results.allSatisfy { $0 == true })
 		}

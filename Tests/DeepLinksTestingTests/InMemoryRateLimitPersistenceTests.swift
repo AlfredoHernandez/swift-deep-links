@@ -16,6 +16,20 @@ struct InMemoryRateLimitPersistenceTests {
 	}
 
 	@Test
+	func `mutateRequests applies the change and returns the closure result`() async {
+		let sut = InMemoryRateLimitPersistence()
+		await sut.saveRequests([100])
+
+		let count = await sut.mutateRequests { timestamps in
+			timestamps.append(200)
+			return timestamps.count
+		}
+
+		#expect(count == 2)
+		#expect(await sut.loadRequests() == [100, 200])
+	}
+
+	@Test
 	func `saves and loads timestamps`() async {
 		let sut = InMemoryRateLimitPersistence()
 

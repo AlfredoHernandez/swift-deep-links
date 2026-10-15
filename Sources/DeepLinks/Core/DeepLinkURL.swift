@@ -32,6 +32,13 @@ import Foundation
 ///
 /// The initializer throws `DeepLinkError.invalidURL` if the URL cannot be parsed
 /// or if required components (scheme, host) are missing.
+///
+/// ## Duplicate Parameters
+///
+/// By default a repeated key keeps its last value in ``queryParameters`` and
+/// every value in ``allQueryParameters``. Code that reads one view while a
+/// validator reads the other can disagree about the value (parameter
+/// pollution). Pass `rejectDuplicateParameters: true` to reject such URLs.
 public struct DeepLinkURL {
 	/// The original URL
 	public let url: URL
@@ -77,9 +84,12 @@ public struct DeepLinkURL {
 	/// - Parameters:
 	///   - url: The URL to parse
 	///   - maxLength: Maximum allowed URL length in characters. Defaults to ``defaultMaxLength``.
+	///   - rejectDuplicateParameters: When `true`, a query key that appears more than once
+	///     (compared case-sensitively after percent-decoding, including valueless keys such
+	///     as `?flag&flag`) makes the URL invalid. Defaults to `false`.
 	/// - Throws: `DeepLinkError.invalidURL` if the URL is malformed, missing required components,
-	///   or exceeds `maxLength`
-	public init(url: URL, maxLength: Int = Self.defaultMaxLength) throws(DeepLinkError) {
+	///   exceeds `maxLength`, or repeats a query key while `rejectDuplicateParameters` is `true`
+	public init(url: URL, maxLength: Int = Self.defaultMaxLength, rejectDuplicateParameters: Bool = false) throws(DeepLinkError) {
 		guard url.absoluteString.count <= maxLength else {
 			throw .invalidURL(url)
 		}
@@ -88,25 +98,35 @@ public struct DeepLinkURL {
 			throw .invalidURL(url)
 		}
 
+		let queryItems = components.queryItems ?? []
+		if rejectDuplicateParameters, Self.containsDuplicateKey(queryItems) {
+			throw .invalidURL(url)
+		}
+
 		self.url = url
 		self.scheme = scheme
 		self.host = host
 		path = components.path
 
-		// Parse query parameters (single values only - last value wins)
 		var singleParams: [String: String] = [:]
-		for item in components.queryItems ?? [] {
+		for item in queryItems {
 			guard let value = item.value else { continue }
 			singleParams[item.name] = value // Last value wins for duplicates
 		}
 		queryParameters = singleParams
 
-		// Parse all query parameters (supports arrays)
 		var allParams: [String: [String]] = [:]
-		for item in components.queryItems ?? [] {
+		for item in queryItems {
 			guard let value = item.value else { continue }
 			allParams[item.name, default: []].append(value)
 		}
 		allQueryParameters = allParams
+	}
+
+	static func containsDuplicateKey(_ queryItems: [URLQueryItem]) -> Bool {
+		var seen: Set<String> = []
+		return queryItems
+			.filter { !$0.name.isEmpty || $0.value != nil }
+			.contains { !seen.insert($0.name).inserted }
 	}
 }

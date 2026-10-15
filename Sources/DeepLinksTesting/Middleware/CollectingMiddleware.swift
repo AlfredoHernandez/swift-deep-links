@@ -44,8 +44,8 @@ import os
 /// - Note: This middleware always returns the URL unchanged, never blocking or redirecting.
 /// - Complexity: O(1) for recording each URL.
 /// - SeeAlso: `PassthroughMiddleware`, `CollectingHandler`
-public final class CollectingMiddleware: DeepLinkMiddleware, @unchecked Sendable {
-	private let state = OSAllocatedUnfairLock(initialState: [URL]())
+public final class CollectingMiddleware: DeepLinkMiddleware {
+	private let state = OSAllocatedUnfairLock(initialState: [DeepLinkRequest]())
 
 	/// Initializes a new collecting middleware with no recorded URLs.
 	public init() {}
@@ -55,11 +55,17 @@ public final class CollectingMiddleware: DeepLinkMiddleware, @unchecked Sendable
 	/// Access this property to assert which URLs were processed by the middleware pipeline.
 	/// The URLs are stored in the order they were received.
 	public var interceptedURLs: [URL] {
+		state.withLock { $0.map(\.url) }
+	}
+
+	/// All requests that have been intercepted, in order, with their ``DeepLinkContext``.
+	public var interceptedRequests: [DeepLinkRequest] {
 		state.withLock { $0 }
 	}
 
-	public func intercept(_ url: URL) async throws -> URL? {
-		state.withLock { $0.append(url) }
-		return url
+	/// Records `request`, with its context, and passes it through unchanged.
+	public func intercept(_ request: DeepLinkRequest) async throws -> DeepLinkRequest? {
+		state.withLock { $0.append(request) }
+		return request
 	}
 }

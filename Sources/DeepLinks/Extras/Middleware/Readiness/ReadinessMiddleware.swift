@@ -17,7 +17,7 @@ import OSLog
 /// ```swift
 /// let queue = DeepLinkReadinessQueue()
 ///
-/// let coordinator = try await DeepLinkCoordinatorBuilder<AppRoute>()
+/// let coordinator = try DeepLinkCoordinatorBuilder<AppRoute>()
 ///     .routing(routing)
 ///     .handler(handler)
 ///     .middleware(
@@ -26,28 +26,58 @@ import OSLog
 ///     )
 ///     .build()
 ///
-/// // When the app is ready, drain and reprocess:
-/// let pending = queue.markReady()
-/// for url in pending {
-///     await coordinator.handle(url: url)
-/// }
+/// // When the app is ready, drain and reprocess — each URL resumes the
+/// // chain after this middleware, so middleware before it does not fire
+/// // twice and middleware after it evaluates the link at drain time:
+/// await coordinator.markReadyAndDrain(queue: queue)
 /// ```
-public final class ReadinessMiddleware: DeepLinkMiddleware {
+///
+/// If you need the raw queued URLs instead, call ``ReadinessQueue/markReady()``
+/// directly and feed the returned URLs through
+/// ``DeepLinkMiddlewareCoordinator/process(_:startingAfter:)`` with this
+/// middleware as the anchor. Re-feeding them through
+/// ``DeepLinkCoordinator/handle(url:)`` re-runs the whole chain.
+public final class ReadinessMiddleware: DeepLinkMiddleware, ChainGate {
 	private let queue: any ReadinessQueue
-	private let logger = Logger(subsystem: "swift-deep-links", category: "ReadinessMiddleware")
+	private let log: LoggingProvider
+	private let privacy: DeepLinkLogPrivacy
 
 	/// Creates a readiness middleware backed by the given queue.
 	///
-	/// - Parameter queue: The readiness queue that stores URLs until ready
-	public init(queue: any ReadinessQueue) {
-		self.queue = queue
+	/// - Parameters:
+	///   - queue: The readiness queue that stores URLs until ready
+	///   - privacy: How the queued-link log describes the URL. Defaults to ``DeepLinkLogPrivacy/redacted``.
+	public convenience init(queue: any ReadinessQueue, privacy: DeepLinkLogPrivacy = .redacted) {
+		self.init(
+			queue: queue,
+			privacy: privacy,
+			log: .systemLogger(Logger(subsystem: "swift-deep-links", category: "ReadinessMiddleware")),
+		)
 	}
 
-	public func intercept(_ url: URL) async throws -> URL? {
-		guard let passedURL = queue.enqueue(url) else {
-			logger.info("Deep link queued (app not ready): \(url.absoluteString)")
+	init(queue: any ReadinessQueue, privacy: DeepLinkLogPrivacy = .redacted, log: LoggingProvider) {
+		self.queue = queue
+		self.privacy = privacy
+		self.log = log
+	}
+
+	/// Queues `request` until the queue is ready, stopping the chain, or
+	/// passes it through once ready.
+	///
+	/// A queued link is resumed right after this middleware by
+	/// ``DeepLinkCoordinator/markReadyAndDrain(queue:)``; middleware before it
+	/// does not run again.
+	///
+	/// - Returns: `request` when ready, `nil` when queued.
+	public func intercept(_ request: DeepLinkRequest) async throws -> DeepLinkRequest? {
+		guard let passed = queue.enqueue(request) else {
+			log.log(level: .info, "Deep link queued (app not ready): \(privacy.describe(request.url))")
 			return nil
 		}
-		return passedURL
+		return passed
+	}
+
+	func isGating(_ candidate: any ReadinessQueue) -> Bool {
+		(queue as AnyObject) === (candidate as AnyObject)
 	}
 }

@@ -1,0 +1,170 @@
+//
+//  Copyright © 2026 Jesús Alfredo Hernández Alarcón. All rights reserved.
+//
+
+import Foundation
+
+/// Where a deep link came from.
+///
+/// The context is supplied by the entry point that received the link
+/// (``DeepLinkCoordinator/handle(url:context:)``,
+/// ``DeepLinkCoordinator/handle(activity:handoffActivityTypes:sceneID:)``,
+/// `View.onDeepLink(_:)`) and travels with the URL through middleware to the
+/// handler. It is a claim made by your own entry point, not something the
+/// URL proves: a custom scheme can be opened by any app, so use the source
+/// to *restrict* sensitive flows (for example to ``Source/universalLink``),
+/// never to trust a link.
+public struct DeepLinkContext: Sendable, Hashable {
+	/// The channel that delivered a deep link.
+	public enum Source: String, Sendable, Hashable, CaseIterable {
+		/// A custom URL scheme (`myapp://…`), which any app can open.
+		case customScheme
+		/// A Universal Link verified against the app's associated domains.
+		case universalLink
+		/// An `NSUserActivity` continued from another device.
+		case handoff
+		/// A tap on a notification.
+		case notification
+		/// A Spotlight search result.
+		case spotlight
+		/// A Home Screen quick action.
+		case shortcut
+		/// An App Intent or Siri.
+		case intent
+		/// The entry point did not say, or the link was replayed from a custom
+		/// readiness queue or pending-link store that keeps only the URL.
+		case unknown
+	}
+
+	/// A context with an ``Source/unknown`` source and no origin details.
+	public static let unknown = DeepLinkContext()
+
+	/// The channel that delivered the link.
+	public var source: Source
+
+	/// The bundle identifier of the app that opened the link, when the system
+	/// reports it (`UIScene.OpenURLOptions.sourceApplication`).
+	public var sourceApplication: String?
+
+	/// The identifier of the scene that received the link, for routing it
+	/// back to the originating window.
+	public var sceneID: String?
+
+	/// Whether ``SignedLinkMiddleware`` verified this link's signature.
+	///
+	/// Only ``SignedLinkMiddleware`` sets it, for the URL it verified (and
+	/// stripped); entry points and app code cannot, so a ``SignedRouteGuard``
+	/// can trust it. It is bound to that URL: ``DeepLinkRequest/replacingURL(_:)``
+	/// with a different URL clears it, and ``DeepLinkCoordinator`` clears it
+	/// before routing when the request's URL no longer matches, so a
+	/// middleware rewriting the link after verification cannot keep the
+	/// signature for a different destination. It is not persisted by
+	/// ``UserDefaultsPendingLinkStore``; resumed links are verified again.
+	public var isSignatureVerified: Bool {
+		signatureVerifiedURL != nil
+	}
+
+	/// The URL ``SignedLinkMiddleware`` verified, if any.
+	var signatureVerifiedURL: URL?
+
+	/// Whether ``DeepLinkCoordinator/resumePendingLinks(from:)`` replayed this
+	/// link from a pending-link store, rather than an entry point delivering it now.
+	///
+	/// Only the coordinator sets it. A resumed link runs without a fresh user
+	/// action, possibly long after another app or page triggered it, so
+	/// consider confirming it first: `.confirmation(provider:requiredFor: .resumedPendingLinks)`,
+	/// or a ``RouteMatcher`` checking this flag.
+	public internal(set) var isResumedPendingLink = false
+
+	/// Creates a context.
+	///
+	/// - Parameters:
+	///   - source: The delivering channel. Defaults to ``Source/unknown``.
+	///   - sourceApplication: The opening app's bundle identifier, if known.
+	///   - sceneID: The receiving scene's identifier, if known.
+	public init(source: Source = .unknown, sourceApplication: String? = nil, sceneID: String? = nil) {
+		self.source = source
+		self.sourceApplication = sourceApplication
+		self.sceneID = sceneID
+	}
+
+	/// The context for a URL delivered by an "open URL" callback
+	/// (`onOpenURL`, `scene(_:openURLContexts:)`): ``Source/customScheme``
+	/// for custom schemes and ``Source/unknown`` for `http`/`https`.
+	///
+	/// An `http(s)` URL reaching an open-URL callback was not verified against
+	/// the app's associated domains, so it is never claimed as a
+	/// ``Source/universalLink``; only browsing-web user activities are.
+	///
+	/// - Parameters:
+	///   - url: The opened URL.
+	///   - sourceApplication: The opening app's bundle identifier, if known.
+	///   - sceneID: The receiving scene's identifier, if known.
+	/// - Returns: The inferred context.
+	public static func openedURL(_ url: URL, sourceApplication: String? = nil, sceneID: String? = nil) -> DeepLinkContext {
+		let isWeb = ["http", "https"].contains(url.scheme?.lowercased())
+		return DeepLinkContext(
+			source: isWeb ? .unknown : .customScheme,
+			sourceApplication: sourceApplication,
+			sceneID: sceneID,
+		)
+	}
+}
+
+/// A deep link URL together with the ``DeepLinkContext`` it arrived with.
+///
+/// Middleware receives and returns requests; a middleware that rewrites the
+/// URL keeps the context with ``replacingURL(_:)``.
+public struct DeepLinkRequest: Sendable, Hashable {
+	/// The URL being processed.
+	public var url: URL
+
+	/// Where the link came from.
+	public var context: DeepLinkContext
+
+	/// Middleware settlement postponed because a readiness queue held this
+	/// request; not part of the request's identity.
+	var deferral: DeepLinkDeferral?
+
+	/// Creates a request.
+	///
+	/// - Parameters:
+	///   - url: The deep link URL.
+	///   - context: Where it came from. Defaults to ``DeepLinkContext/unknown``.
+	public init(url: URL, context: DeepLinkContext = .unknown) {
+		self.url = url
+		self.context = context
+	}
+
+	/// This request with `url` in place of its URL and the same context.
+	public func replacingURL(_ url: URL) -> DeepLinkRequest {
+		var request = self
+		request.url = url
+		return request.bindingSignatureToURL()
+	}
+
+	/// This request with the signature flag cleared unless it was verified for this URL.
+	func bindingSignatureToURL() -> DeepLinkRequest {
+		guard let verified = context.signatureVerifiedURL, verified != url else { return self }
+		var request = self
+		request.context.signatureVerifiedURL = nil
+		return request
+	}
+}
+
+// MARK: - Equatable & Hashable
+
+public extension DeepLinkRequest {
+	/// Two requests are equal when their URLs and contexts match, including
+	/// ``DeepLinkContext/isSignatureVerified`` and
+	/// ``DeepLinkContext/isResumedPendingLink``; readiness bookkeeping is ignored.
+	static func == (lhs: DeepLinkRequest, rhs: DeepLinkRequest) -> Bool {
+		lhs.url == rhs.url && lhs.context == rhs.context
+	}
+
+	/// Hashes the URL and the context, consistent with `==`.
+	func hash(into hasher: inout Hasher) {
+		hasher.combine(url)
+		hasher.combine(context)
+	}
+}

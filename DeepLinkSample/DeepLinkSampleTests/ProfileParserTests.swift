@@ -21,11 +21,11 @@ struct ProfileParserTests {
 	}
 
 	@Test
-	func `Parse throws unsupportedHost on non-profile host`() throws {
+	func `Parse throws routeNotFound on non-profile host so the next parser runs`() throws {
 		let sut = makeSUT()
 		let url = try #require(URL(string: "deeplink://unknown?userID=1"))
 
-		#expect(throws: DeepLinkError.unsupportedHost("unknown")) {
+		#expect(throws: DeepLinkError.routeNotFound(url)) {
 			try sut.parse(from: url)
 		}
 	}

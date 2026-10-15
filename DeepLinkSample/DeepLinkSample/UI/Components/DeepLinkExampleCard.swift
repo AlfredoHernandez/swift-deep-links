@@ -104,13 +104,13 @@ struct DeepLinkExampleCard: View {
 
 		DeepLinkExampleCard(
 			title: "Profile",
-			url: "deeplink://profile?userId=123&name=John Doe",
+			url: "deeplink://profile?userID=123&name=John Doe",
 			color: .green,
 		)
 
 		DeepLinkExampleCard(
 			title: "Product",
-			url: "deeplink://product?productId=PROD-001&category=Electronics",
+			url: "deeplink://product?productID=PROD-001&category=Electronics",
 			color: .orange,
 		)
 	}

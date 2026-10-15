@@ -171,7 +171,7 @@
 			mainGroup = 38D6AB002E835A030087C691;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				38D6AB392E835AAE0087C691 /* XCLocalSwiftPackageReference "../../swift-deep-link" */,
+				38D6AB392E835AAE0087C691 /* XCLocalSwiftPackageReference ".." */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 38D6AB0A2E835A030087C691 /* Products */;
@@ -487,9 +487,9 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		38D6AB392E835AAE0087C691 /* XCLocalSwiftPackageReference "../../swift-deep-link" */ = {
+		38D6AB392E835AAE0087C691 /* XCLocalSwiftPackageReference ".." */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = "../../swift-deep-link";
+			relativePath = "..";
 		};
 /* End XCLocalSwiftPackageReference section */
 

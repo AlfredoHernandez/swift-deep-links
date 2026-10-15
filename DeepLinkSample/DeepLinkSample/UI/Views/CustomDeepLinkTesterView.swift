@@ -5,29 +5,12 @@
 import DeepLinks
 import SwiftUI
 
-/// A view that provides a testing interface for custom deep links.
-///
-/// This view allows developers to:
-/// - Enter custom deep link URLs manually
-/// - Test the deep link parsing and routing system
-/// - Validate URL formats and parameters
-/// - See immediate results of deep link processing
-///
-/// The tester integrates with the complete deep link infrastructure:
-/// - Uses all available parsers (Information, Profile, Product, Settings, Alert)
-/// - Employs the `DefaultDeepLinkRouting` system
-/// - Connects to the `AppDeepLinkHandler` for navigation
-/// - Provides error handling and user feedback
-///
-/// This is particularly useful for:
-/// - Testing new deep link formats during development
-/// - Debugging parsing issues
-/// - Validating URL parameters
-/// - Demonstrating the deep link system to stakeholders
+/// A text field for opening any deep link through the app's coordinator,
+/// showing why a link was rejected or failed.
 struct CustomDeepLinkTesterView: View {
-	@Environment(NavigationRouter.self) var navigationRouter
+	@Environment(DeepLinkViewModel.self) private var viewModel
 	@State private var customDeepLink = ""
-	@State private var showingCustomLinkAlert = false
+	@State private var failureMessage: String?
 
 	var body: some View {
 		VStack(spacing: 16) {
@@ -42,7 +25,6 @@ struct CustomDeepLinkTesterView: View {
 					.disableAutocorrection(true)
 
 				HStack(spacing: 12) {
-					// Process deep link through complete parsing pipeline
 					Button("Test Deep Link") {
 						testCustomDeepLink()
 					}
@@ -63,44 +45,37 @@ struct CustomDeepLinkTesterView: View {
 					.stroke(Color.blue.opacity(0.3), lineWidth: 1),
 			)
 		}
-		.alert("Deep Link Error", isPresented: $showingCustomLinkAlert) {
+		.alert("Deep Link Error", isPresented: Binding(get: { failureMessage != nil }, set: {
+			if !$0 {
+				failureMessage = nil
+			}
+		})) {
 			Button("OK") {}
 		} message: {
-			Text("Could not process the deep link. Please verify the format is correct.")
+			Text(failureMessage ?? "")
 		}
 	}
 
-	/// Tests a custom deep link URL through the complete parsing and routing system.
-	///
-	/// This method validates the URL format and processes it through the full deep link
-	/// pipeline: parsing → routing → navigation execution. It uses all available parsers
-	/// to handle different URL types and provides comprehensive error handling.
+	/// Opens the typed link through the app's coordinator, so it passes the
+	/// same security checks as a link from another app.
 	private func testCustomDeepLink() {
 		guard let url = URL(string: customDeepLink) else {
-			showingCustomLinkAlert = true
+			failureMessage = "This is not a valid URL."
 			return
 		}
 
 		Task {
-			let parsers: [any DeepLinkParser<AppRoute>] = [
-				InformationParser(),
-				ProfileParser(),
-				ProductParser(),
-				SettingsParser(),
-				AlertParser(),
-			]
-
-			let routing = DefaultDeepLinkRouting<AppRoute>(parsers: parsers)
-			let handler = AppDeepLinkHandler(navigationRouter: navigationRouter)
-			let deepLinkCoordinator = DeepLinkCoordinator(routing: routing, handler: handler)
-
-			await deepLinkCoordinator.handle(url: url)
+			let result = await viewModel.open(url)
+			if result?.wasSuccessful != true {
+				failureMessage = LinkOutcomeText.describe(result)
+			}
 		}
 	}
 }
 
 #Preview {
+	let viewModel = DeepLinkViewModel()
 	CustomDeepLinkTesterView()
-		.environment(NavigationRouter())
+		.environment(viewModel)
 		.padding()
 }

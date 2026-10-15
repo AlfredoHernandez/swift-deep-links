@@ -24,7 +24,17 @@ import OSLog
 /// - Tries each parser in the order provided
 /// - Returns the first successful result immediately
 /// - Logs errors from failed parsers but continues trying
-/// - Throws `DeepLinkError.routeNotFound` if no parser succeeds
+/// - Throws `DeepLinkError.routeNotFound(url)` when no parsers are configured
+/// - Throws `DeepLinkError.parsingFailed(url:underlyingErrors:)` when at
+///   least one parser is configured but every parser threw — the errors
+///   are collected in order so consumers can introspect them. Nested
+///   `DeepLinkError.parsingFailed` thrown by a delegating parser is
+///   flattened: its `underlyingErrors` are spliced into the outer
+///   collection, so callers never see `parsingFailed(parsingFailed(...))`
+/// - Stops at the first ``DeepLinkError/securityViolation(_:)`` or
+///   ``DeepLinkError/blockedURL(_:)`` a parser throws (also when nested in a
+///   delegating parser's `parsingFailed`) and rethrows it, so a laxer later
+///   parser cannot accept a link a stricter one rejected
 /// - Validates the URL structure before attempting to parse
 ///
 /// ## Thread Safety
@@ -34,54 +44,119 @@ import OSLog
 ///
 /// - Parameter Route: The type of route this routing system produces
 public struct DefaultDeepLinkRouting<Route: DeepLinkRoute>: DeepLinkRouting {
-	private let logger = Logger(subsystem: "swift-deep-links", category: "DefaultDeepLinkRouting")
+	private let log: LoggingProvider
+	private let logPrivacy: DeepLinkLogPrivacy
 	private let parsers: [any DeepLinkParser<Route>]
+	private let duplicateParameterLimits: DeepLinkInputLimits?
 
 	/// Creates a new default deep link routing instance.
 	///
-	/// - Parameter parsers: An array of parsers to try in sequence
-	public init(parsers: [any DeepLinkParser<Route>]) {
+	/// - Parameters:
+	///   - parsers: An array of parsers to try in sequence
+	///   - rejectDuplicateParameters: When `true`, a URL that repeats a query key throws
+	///     ``DeepLinkError/securityViolation(_:)`` before any parser runs. Defaults to `false`.
+	///   - logPrivacy: How log messages describe URLs and parser errors.
+	///     Defaults to ``DeepLinkLogPrivacy/redacted``.
+	public init(
+		parsers: [any DeepLinkParser<Route>],
+		rejectDuplicateParameters: Bool = false,
+		logPrivacy: DeepLinkLogPrivacy = .redacted,
+	) {
+		self.init(
+			parsers: parsers,
+			rejectDuplicateParameters: rejectDuplicateParameters,
+			logPrivacy: logPrivacy,
+			log: .systemLogger(Logger(subsystem: "swift-deep-links", category: "DefaultDeepLinkRouting")),
+		)
+	}
+
+	init(
+		parsers: [any DeepLinkParser<Route>],
+		rejectDuplicateParameters: Bool = false,
+		logPrivacy: DeepLinkLogPrivacy = .redacted,
+		log: LoggingProvider,
+	) {
 		self.parsers = parsers
+		duplicateParameterLimits = rejectDuplicateParameters ? DeepLinkInputLimits(rejectDuplicateParameters: true) : nil
+		self.logPrivacy = logPrivacy
+		self.log = log
 	}
 
 	/// Routes a URL by trying multiple parsers until one succeeds.
 	///
-	/// This method attempts to parse the URL using each provided parser in sequence.
-	/// It returns the first successful result and throws an error if no parser
-	/// can handle the URL.
+	/// This method attempts to parse the URL using each provided parser in
+	/// sequence. It returns the first successful result, and otherwise
+	/// surfaces the errors from the parser chain:
+	///
+	/// - If no parsers are configured, throws
+	///   ``DeepLinkError/routeNotFound(_:)``.
+	/// - If a parser throws ``DeepLinkError/securityViolation(_:)`` or
+	///   ``DeepLinkError/blockedURL(_:)``, rethrows it without trying the
+	///   remaining parsers.
+	/// - If at least one parser is configured but every parser threw,
+	///   throws ``DeepLinkError/parsingFailed(url:underlyingErrors:)`` with
+	///   the collected failures in order.
 	///
 	/// - Parameter url: The URL to route
 	/// - Returns: An array of routes from the first successful parser
-	/// - Throws: `DeepLinkError.routeNotFound` if no parser can handle the URL
+	/// - Throws: ``DeepLinkError/routeNotFound(_:)`` when no parsers are
+	///   configured, or ``DeepLinkError/parsingFailed(url:underlyingErrors:)``
+	///   when all parsers threw.
 	public func route(from url: URL) async throws -> [Route] {
-		let deepLinkURL = try DeepLinkURL(url: url)
+		_ = try DeepLinkURL(url: url)
+		try duplicateParameterLimits?.validate(url)
 
 		guard !parsers.isEmpty else {
-			logger.error("No parsers available for URL: \(url.absoluteString)")
-			throw DeepLinkError.routeNotFound(deepLinkURL.host)
+			log.log(level: .error, "No parsers available for URL: \(logPrivacy.describe(url))")
+			throw DeepLinkError.routeNotFound(url)
 		}
 
-		var lastError: Error?
+		var underlyingErrors: [any Error & Sendable] = []
 
 		for parser in parsers {
 			do {
 				let routes = try await parser.parse(from: url)
-				logger.debug("Parser \(String(describing: type(of: parser))) successfully parsed URL: \(url.absoluteString)")
+				log.log(level: .debug, "Parser \(String(describing: type(of: parser))) successfully parsed URL: \(logPrivacy.describe(url))")
 				return routes
+			} catch let error as DeepLinkError where error.stopsRouting {
+				throw error
 			} catch {
-				logger.debug("Parser \(String(describing: type(of: parser))) failed to parse URL: \(url.absoluteString) - Error: \(error.localizedDescription)")
-				lastError = error
+				log.log(
+					level: .debug,
+					"Parser \(String(describing: type(of: parser))) failed to parse URL: \(logPrivacy.describe(url)) - Error: \(logPrivacy.describe(error))",
+				)
+				if let deepLinkError = error as? DeepLinkError,
+				   case let .parsingFailed(_, nestedErrors) = deepLinkError
+				{
+					if let securityError = nestedErrors.lazy.compactMap({ $0 as? DeepLinkError }).first(where: \.stopsRouting) {
+						throw securityError
+					}
+					underlyingErrors.append(contentsOf: nestedErrors)
+				} else {
+					underlyingErrors.append(error)
+				}
 				continue
 			}
 		}
 
 		let parsersCount = parsers.count
-		if let lastError {
-			logger.error("All \(parsersCount) parsers failed for URL: \(url.absoluteString) - Last error: \(lastError.localizedDescription)")
+		if let last = underlyingErrors.last {
+			log.log(level: .error, "All \(parsersCount) parsers failed for URL: \(logPrivacy.describe(url)) - Last error: \(logPrivacy.describe(last))")
 		} else {
-			logger.error("All \(parsersCount) parsers failed for URL: \(url.absoluteString)")
+			log.log(level: .error, "All \(parsersCount) parsers failed for URL: \(logPrivacy.describe(url))")
 		}
 
-		throw DeepLinkError.routeNotFound(deepLinkURL.host)
+		throw DeepLinkError.parsingFailed(url: url, underlyingErrors: underlyingErrors)
+	}
+}
+
+// MARK: - Routing-Stopping Errors
+
+private extension DeepLinkError {
+	var stopsRouting: Bool {
+		switch self {
+		case .securityViolation, .blockedURL: true
+		default: false
+		}
 	}
 }

@@ -11,8 +11,8 @@ struct DeepLinkCoordinatorBuilderTests {
 	// MARK: - Basic Configuration Tests
 
 	@Test
-	func `build creates coordinator with required components`() async throws {
-		_ = try await DeepLinkCoordinatorBuilder<TestRoute>()
+	func `build creates coordinator with required components`() throws {
+		_ = try DeepLinkCoordinatorBuilder<TestRoute>()
 			.routing(DeepLinkRoutingStub<TestRoute>())
 			.handler(DeepLinkHandlerSpy<TestRoute>())
 			.build()
@@ -21,7 +21,7 @@ struct DeepLinkCoordinatorBuilderTests {
 	@Test
 	func `build throws error when routing is missing`() async {
 		await #expect(throws: DeepLinkError.missingRequiredConfiguration("routing")) {
-			try await DeepLinkCoordinatorBuilder<TestRoute>()
+			try DeepLinkCoordinatorBuilder<TestRoute>()
 				.handler(DeepLinkHandlerSpy<TestRoute>())
 				.build()
 		}
@@ -30,7 +30,7 @@ struct DeepLinkCoordinatorBuilderTests {
 	@Test
 	func `build throws error when handler is missing`() async {
 		await #expect(throws: DeepLinkError.missingRequiredConfiguration("handler")) {
-			try await DeepLinkCoordinatorBuilder<TestRoute>()
+			try DeepLinkCoordinatorBuilder<TestRoute>()
 				.routing(DeepLinkRoutingStub<TestRoute>())
 				.build()
 		}
@@ -43,7 +43,7 @@ struct DeepLinkCoordinatorBuilderTests {
 		let routingStub = DeepLinkRoutingStub<TestRoute>()
 		let middlewareSpy = MiddlewareSpy()
 
-		let coordinator = try await DeepLinkCoordinatorBuilder<TestRoute>()
+		let coordinator = try DeepLinkCoordinatorBuilder<TestRoute>()
 			.routing(routingStub)
 			.handler(DeepLinkHandlerSpy<TestRoute>())
 			.middleware(middlewareSpy)
@@ -58,31 +58,12 @@ struct DeepLinkCoordinatorBuilderTests {
 	}
 
 	@Test
-	func `advancedMiddleware adds advanced middleware to coordinator`() async throws {
-		let routingStub = DeepLinkRoutingStub<TestRoute>()
-		let advancedSpy = AdvancedMiddlewareSpy()
-
-		let coordinator = try await DeepLinkCoordinatorBuilder<TestRoute>()
-			.routing(routingStub)
-			.handler(DeepLinkHandlerSpy<TestRoute>())
-			.advancedMiddleware(advancedSpy)
-			.build()
-
-		let url = try #require(URL(string: "test://advanced"))
-		routingStub.routesToReturn = [.route1]
-
-		_ = await coordinator.handle(url: url)
-
-		#expect(advancedSpy.requests.contains(url))
-	}
-
-	@Test
 	func `middleware with variadic adds multiple middleware`() async throws {
 		let routingStub = DeepLinkRoutingStub<TestRoute>()
 		let spy1 = MiddlewareSpy()
 		let spy2 = MiddlewareSpy()
 
-		let coordinator = try await DeepLinkCoordinatorBuilder<TestRoute>()
+		let coordinator = try DeepLinkCoordinatorBuilder<TestRoute>()
 			.routing(routingStub)
 			.handler(DeepLinkHandlerSpy<TestRoute>())
 			.middleware(spy1, spy2)
@@ -103,7 +84,7 @@ struct DeepLinkCoordinatorBuilderTests {
 		let spy1 = MiddlewareSpy()
 		let spy2 = MiddlewareSpy()
 
-		let coordinator = try await DeepLinkCoordinatorBuilder<TestRoute>()
+		let coordinator = try DeepLinkCoordinatorBuilder<TestRoute>()
 			.routing(routingStub)
 			.handler(DeepLinkHandlerSpy<TestRoute>())
 			.middleware([spy1, spy2])
@@ -125,7 +106,7 @@ struct DeepLinkCoordinatorBuilderTests {
 		let routingStub = DeepLinkRoutingStub<TestRoute>()
 		let delegateSpy = CoordinatorDelegateSpy()
 
-		let coordinator = try await DeepLinkCoordinatorBuilder<TestRoute>()
+		let coordinator = try DeepLinkCoordinatorBuilder<TestRoute>()
 			.routing(routingStub)
 			.handler(DeepLinkHandlerSpy<TestRoute>())
 			.delegate(delegateSpy)
@@ -146,7 +127,7 @@ struct DeepLinkCoordinatorBuilderTests {
 		let spy1 = CoordinatorDelegateSpy()
 		let spy2 = CoordinatorDelegateSpy()
 
-		let coordinator = try await DeepLinkCoordinatorBuilder<TestRoute>()
+		let coordinator = try DeepLinkCoordinatorBuilder<TestRoute>()
 			.routing(routingStub)
 			.handler(DeepLinkHandlerSpy<TestRoute>())
 			.delegate(spy1)
@@ -158,8 +139,9 @@ struct DeepLinkCoordinatorBuilderTests {
 
 		_ = await coordinator.handle(url: url)
 
-		try await Task.sleep(for: .milliseconds(100))
-
+		// Delegate callbacks are awaited inside `handle(url:)` via
+		// `notifyDelegateWillProcess` / `notifyDelegateDidProcess`, and the
+		// composite delegate forwards synchronously. No sleep is required.
 		#expect(spy1.willProcessCalls.contains(url))
 		#expect(spy2.willProcessCalls.contains(url))
 		#expect(spy1.didProcessCalls.count == 1)
@@ -167,11 +149,11 @@ struct DeepLinkCoordinatorBuilderTests {
 	}
 
 	@Test
-	func `delegates with array adds multiple delegates`() async throws {
+	func `delegates with array adds multiple delegates`() throws {
 		let spy1 = CoordinatorDelegateSpy()
 		let spy2 = CoordinatorDelegateSpy()
 
-		_ = try await DeepLinkCoordinatorBuilder<TestRoute>()
+		_ = try DeepLinkCoordinatorBuilder<TestRoute>()
 			.routing(DeepLinkRoutingStub<TestRoute>())
 			.handler(DeepLinkHandlerSpy<TestRoute>())
 			.delegates([spy1, spy2])
@@ -188,7 +170,7 @@ struct DeepLinkCoordinatorBuilderTests {
 
 		await customCoordinator.add(middlewareSpy)
 
-		let coordinator = try await DeepLinkCoordinatorBuilder<TestRoute>()
+		let coordinator = try DeepLinkCoordinatorBuilder<TestRoute>()
 			.routing(routingStub)
 			.handler(DeepLinkHandlerSpy<TestRoute>())
 			.middlewareCoordinator(customCoordinator)
@@ -211,7 +193,7 @@ struct DeepLinkCoordinatorBuilderTests {
 		let spy2 = MiddlewareSpy()
 		let delegateSpy = CoordinatorDelegateSpy()
 
-		let coordinator = try await DeepLinkCoordinatorBuilder<TestRoute>()
+		let coordinator = try DeepLinkCoordinatorBuilder<TestRoute>()
 			.routing(routingStub)
 			.handler(DeepLinkHandlerSpy<TestRoute>())
 			.middleware(spy1, spy2)
@@ -232,7 +214,7 @@ struct DeepLinkCoordinatorBuilderTests {
 
 	@Test
 	func `build handles middleware errors gracefully`() async throws {
-		let coordinator = try await DeepLinkCoordinatorBuilder<TestRoute>()
+		let coordinator = try DeepLinkCoordinatorBuilder<TestRoute>()
 			.routing(DeepLinkRoutingStub<TestRoute>())
 			.handler(DeepLinkHandlerSpy<TestRoute>())
 			.middleware(ErrorMiddleware())
@@ -244,6 +226,47 @@ struct DeepLinkCoordinatorBuilderTests {
 		#expect(!result.wasSuccessful)
 		#expect(result.hasErrors)
 	}
+
+	// MARK: - routeExecutionDelay + sleep seam
+
+	@Test
+	func `routeExecutionDelay and sleep propagate from builder to coordinator`() async throws {
+		let routing = DeepLinkRoutingStub<TestRoute>()
+		routing.routesToReturn = [.route1, .route2, .route3]
+		let recorder = SleepRecorder()
+
+		let coordinator = try DeepLinkCoordinatorBuilder<TestRoute>()
+			.routing(routing)
+			.handler(DeepLinkHandlerSpy<TestRoute>())
+			.routeExecutionDelay(.milliseconds(500))
+			.sleep { await recorder.record($0) }
+			.build()
+
+		let url = try #require(URL(string: "test://delay"))
+		_ = await coordinator.handle(url: url)
+
+		let recorded = await recorder.durations
+		#expect(recorded == [.milliseconds(500), .milliseconds(500)])
+	}
+
+	@Test
+	func `builder sleep seam is ignored when routeExecutionDelay defaults to zero`() async throws {
+		let routing = DeepLinkRoutingStub<TestRoute>()
+		routing.routesToReturn = [.route1, .route2]
+		let recorder = SleepRecorder()
+
+		let coordinator = try DeepLinkCoordinatorBuilder<TestRoute>()
+			.routing(routing)
+			.handler(DeepLinkHandlerSpy<TestRoute>())
+			.sleep { await recorder.record($0) }
+			.build()
+
+		let url = try #require(URL(string: "test://no-delay"))
+		_ = await coordinator.handle(url: url)
+
+		let recorded = await recorder.durations
+		#expect(recorded.isEmpty)
+	}
 }
 
 // MARK: - Test Doubles
@@ -251,23 +274,22 @@ struct DeepLinkCoordinatorBuilderTests {
 private final class MiddlewareSpy: DeepLinkMiddleware, @unchecked Sendable {
 	private(set) var requests: [URL] = []
 
-	func intercept(_ url: URL) async throws -> URL? {
-		requests.append(url)
-		return url
-	}
-}
-
-private final class AdvancedMiddlewareSpy: AdvancedDeepLinkMiddleware, @unchecked Sendable {
-	private(set) var requests: [URL] = []
-
-	func intercept(_ url: URL) async -> MiddlewareResult {
-		requests.append(url)
-		return .continue(url)
+	func intercept(_ request: DeepLinkRequest) async throws -> DeepLinkRequest? {
+		requests.append(request.url)
+		return request
 	}
 }
 
 private final class ErrorMiddleware: DeepLinkMiddleware {
-	func intercept(_: URL) async throws -> URL? {
+	func intercept(_: DeepLinkRequest) async throws -> DeepLinkRequest? {
 		throw DeepLinkError.securityViolation("Test security violation")
+	}
+}
+
+private actor SleepRecorder {
+	private(set) var durations: [Duration] = []
+
+	func record(_ duration: Duration) {
+		durations.append(duration)
 	}
 }

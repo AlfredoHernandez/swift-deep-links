@@ -130,9 +130,10 @@ struct DeepLinkCoordinatorIntegrationTests {
 		#expect(handler.handledRoutes.isEmpty)
 	}
 
+	@MainActor
 	@Test
 	func `Handle records lifecycle events on collecting delegate`() async throws {
-		let delegate = CollectingDelegate()
+		let delegate = CollectingDelegate<AppRoute>()
 		let (coordinator, handler) = makeSUT(
 			routing: ImmediateRouting(routes: [.stack(.settings(section: "account"))]),
 			delegate: delegate,
@@ -179,7 +180,7 @@ struct DeepLinkCoordinatorIntegrationTests {
 	private func makeSUT(
 		routing: some DeepLinkRouting<AppRoute> = ImmediateRouting<AppRoute>(routes: []),
 		middlewareCoordinator: DeepLinkMiddlewareCoordinator = DeepLinkMiddlewareCoordinator(),
-		delegate: (any DeepLinkCoordinatorDelegate)? = nil,
+		delegate: (any DeepLinkCoordinatorDelegate<AppRoute>)? = nil,
 	) -> (coordinator: DeepLinkCoordinator<AppRoute>, handler: CollectingHandler<AppRoute>) {
 		let handler = CollectingHandler<AppRoute>()
 		let coordinator = DeepLinkCoordinator(

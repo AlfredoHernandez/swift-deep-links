@@ -107,20 +107,46 @@ struct DeepLinkCoordinatorTests {
 	}
 
 	@Test
-	func `DeepLinkCoordinator handle processes routes with delay between executions`() async throws {
+	func `DeepLinkCoordinator invokes sleep once per inter-route gap with the configured delay`() async throws {
 		let routingStub = DeepLinkRoutingStub<TestRoute>()
 		let handlerSpy = DeepLinkHandlerSpy<TestRoute>()
-		let coordinator = DeepLinkCoordinator(routing: routingStub, handler: handlerSpy)
+		let recorder = DurationRecorder()
+		let coordinator = DeepLinkCoordinator(
+			routing: routingStub,
+			handler: handlerSpy,
+			routeExecutionDelay: .milliseconds(500),
+			sleep: { await recorder.record($0) },
+		)
 		let url = try #require(URL(string: "test://delay"))
-		routingStub.routesToReturn = [.route1, .route2]
+		routingStub.routesToReturn = [.route1, .route2, .route3]
 
 		let result = await coordinator.handle(url: url)
 
 		#expect(result.wasSuccessful)
-		#expect(result.routes == [.route1, .route2])
-		#expect(result.successfulRoutes == 2)
-		#expect(result.executionTime >= 0.5) // Should have at least 500ms delay
-		#expect(handlerSpy.handledRoutes == [.route1, .route2])
+		#expect(result.routes == [.route1, .route2, .route3])
+		#expect(result.successfulRoutes == 3)
+		#expect(handlerSpy.handledRoutes == [.route1, .route2, .route3])
+		let recorded = await recorder.durations
+		#expect(recorded == [.milliseconds(500), .milliseconds(500)])
+	}
+
+	@Test
+	func `DeepLinkCoordinator does not invoke sleep when routeExecutionDelay is zero`() async throws {
+		let routingStub = DeepLinkRoutingStub<TestRoute>()
+		let handlerSpy = DeepLinkHandlerSpy<TestRoute>()
+		let recorder = DurationRecorder()
+		let coordinator = DeepLinkCoordinator(
+			routing: routingStub,
+			handler: handlerSpy,
+			sleep: { await recorder.record($0) },
+		)
+		let url = try #require(URL(string: "test://no-delay"))
+		routingStub.routesToReturn = [.route1, .route2]
+
+		_ = await coordinator.handle(url: url)
+
+		let recorded = await recorder.durations
+		#expect(recorded.isEmpty)
 	}
 
 	@Test
@@ -135,7 +161,6 @@ struct DeepLinkCoordinatorTests {
 		)
 		let url = try #require(URL(string: "test://middleware-stop"))
 
-		// Add middleware that returns nil (stops processing)
 		await middlewareCoordinator.add(StoppingMiddleware())
 
 		let result = await coordinator.handle(url: url)
@@ -214,35 +239,14 @@ struct DeepLinkCoordinatorTests {
 		#expect(result.routes == [.route1])
 		#expect(handlerSpy.handledRoutes == [.route1])
 	}
+}
 
-	@Test
-	func `CoordinatorOf type alias works correctly`() async throws {
-		let routingStub = DeepLinkRoutingStub<TestRoute>()
-		let handlerSpy = DeepLinkHandlerSpy<TestRoute>()
+// MARK: - Test Doubles
 
-		// Using the convenience type alias
-		let coordinator: CoordinatorOf<TestRoute> = DeepLinkCoordinator(
-			routing: routingStub,
-			handler: handlerSpy,
-		)
+private actor DurationRecorder {
+	private(set) var durations: [Duration] = []
 
-		let url = try #require(URL(string: "test://type-alias"))
-		routingStub.routesToReturn = [.route1, .route2]
-
-		let result: ResultOf<TestRoute> = await coordinator.handle(url: url)
-
-		#expect(result.wasSuccessful)
-		#expect(result.routes == [.route1, .route2])
-		#expect(result.successfulRoutes == 2)
-		#expect(handlerSpy.handledRoutes == [.route1, .route2])
-	}
-
-	// MARK: - Test doubles
-
-	/// Middleware that always returns nil to stop processing
-	final class StoppingMiddleware: DeepLinkMiddleware {
-		func intercept(_: URL) async throws -> URL? {
-			nil
-		}
+	func record(_ duration: Duration) {
+		durations.append(duration)
 	}
 }
