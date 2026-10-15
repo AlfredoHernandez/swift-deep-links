@@ -73,6 +73,15 @@ import Foundation
 /// first in the chain so oversized URLs are rejected before logging,
 /// analytics or parsing process them.
 ///
+/// ### Hosts Per Scheme
+/// ```swift
+/// // example.com only as a Universal Link, "home" only as a custom-scheme host
+/// let middleware = SecurityMiddleware(
+///     allowedSchemes: ["https", "myapp"],
+///     allowedHostsByScheme: ["https": ["example.com"], "myapp": ["home"]]
+/// )
+/// ```
+///
 /// ### Per-Source Policy
 /// ```swift
 /// // Payment links only through verified Universal Links
@@ -91,9 +100,7 @@ import Foundation
 /// ## Thread Safety
 /// This middleware is thread-safe and can be used concurrently.
 public final class SecurityMiddleware: DeepLinkMiddleware {
-	private let allowedSchemes: Set<String>
-	private let allowedHosts: Set<String>
-	private let blockedPatterns: [NSRegularExpression]
+	private let policy: SecurityPolicy
 	private let strategy: SecurityStrategy
 	private let limits: DeepLinkInputLimits
 	private let allowedSources: Set<DeepLinkContext.Source>?
@@ -105,6 +112,13 @@ public final class SecurityMiddleware: DeepLinkMiddleware {
 	///   - allowedHosts: Allowed hosts. With the default ``SecurityStrategy/hardened``,
 	///     `http(s)` links require a listed host (empty rejects every web link)
 	///     and custom-scheme hosts are checked only when the set is not empty
+	///   - allowedHostsByScheme: Hosts allowed per scheme, keys compared
+	///     case-insensitively. Checked by ``SecurityStrategy/hardened`` only (other
+	///     strategies ignore it): a scheme with an entry requires a host from that
+	///     entry, and `allowedHosts` does not apply to it; schemes without an entry
+	///     fall back to `allowedHosts`. An empty entry rejects every link of that
+	///     scheme. Use it so a Universal Link domain is not accepted as a
+	///     custom-scheme host, or the other way round. Defaults to empty.
 	///   - blockedPatterns: Array of regex patterns for blocked URLs
 	///   - allowedSources: The ``DeepLinkContext/Source``s accepted, checked
 	///     before anything else; `nil` (the default) accepts every source. A link
@@ -117,14 +131,18 @@ public final class SecurityMiddleware: DeepLinkMiddleware {
 	public init(
 		allowedSchemes: Set<String>,
 		allowedHosts: Set<String> = [],
+		allowedHostsByScheme: [String: Set<String>] = [:],
 		blockedPatterns: [NSRegularExpression] = [],
 		allowedSources: Set<DeepLinkContext.Source>? = nil,
 		strategy: SecurityStrategy = .hardened,
 		limits: DeepLinkInputLimits = .recommended,
 	) {
-		self.allowedSchemes = allowedSchemes
-		self.allowedHosts = allowedHosts
-		self.blockedPatterns = blockedPatterns
+		policy = SecurityPolicy(
+			allowedSchemes: allowedSchemes,
+			allowedHosts: allowedHosts,
+			allowedHostsByScheme: allowedHostsByScheme,
+			blockedPatterns: blockedPatterns,
+		)
 		self.strategy = strategy
 		self.limits = limits
 		self.allowedSources = allowedSources
@@ -135,12 +153,7 @@ public final class SecurityMiddleware: DeepLinkMiddleware {
 			throw DeepLinkError.securityViolation("Source not allowed")
 		}
 		try limits.validate(request.url)
-		let validated = try await strategy.validate(
-			url: request.url,
-			allowedSchemes: allowedSchemes,
-			allowedHosts: allowedHosts,
-			blockedPatterns: blockedPatterns,
-		)
+		let validated = try await strategy.validate(url: request.url, policy: policy)
 		return validated.map(request.replacingURL)
 	}
 }

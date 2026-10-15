@@ -64,15 +64,43 @@ import Foundation
 /// )
 /// ```
 public struct SecurityStrategy: Sendable {
-	private let validateFunction: @Sendable (URL, Set<String>, Set<String>, [NSRegularExpression]) async throws -> URL?
+	private let validateFunction: @Sendable (URL, SecurityPolicy) async throws -> URL?
 
-	init(_ validateFunction: @escaping @Sendable (URL, Set<String>, Set<String>, [NSRegularExpression]) async throws -> URL?) {
+	init(_ validateFunction: @escaping @Sendable (URL, SecurityPolicy) async throws -> URL?) {
 		self.validateFunction = validateFunction
 	}
 
 	/// Executes the security validation strategy.
-	func validate(url: URL, allowedSchemes: Set<String>, allowedHosts: Set<String>, blockedPatterns: [NSRegularExpression]) async throws -> URL? {
-		try await validateFunction(url, allowedSchemes, allowedHosts, blockedPatterns)
+	func validate(url: URL, policy: SecurityPolicy) async throws -> URL? {
+		try await validateFunction(url, policy)
+	}
+}
+
+/// What a ``SecurityMiddleware`` allows, handed to its ``SecurityStrategy``.
+struct SecurityPolicy: Sendable {
+	let allowedSchemes: Set<String>
+	let allowedHosts: Set<String>
+	let allowedHostsByScheme: [String: Set<String>]
+	let blockedPatterns: [NSRegularExpression]
+
+	init(
+		allowedSchemes: Set<String>,
+		allowedHosts: Set<String> = [],
+		allowedHostsByScheme: [String: Set<String>] = [:],
+		blockedPatterns: [NSRegularExpression] = [],
+	) {
+		self.allowedSchemes = allowedSchemes
+		self.allowedHosts = allowedHosts
+		self.allowedHostsByScheme = Dictionary(
+			allowedHostsByScheme.map { ($0.key.lowercased(), $0.value) },
+			uniquingKeysWith: { $0.union($1) },
+		)
+		self.blockedPatterns = blockedPatterns
+	}
+
+	/// The hosts listed for `scheme` in ``allowedHostsByScheme``, or `nil` when it has no entry.
+	func hostsListed(forScheme scheme: String) -> Set<String>? {
+		allowedHostsByScheme[scheme.lowercased()]
 	}
 }
 
@@ -82,7 +110,10 @@ public extension SecurityStrategy {
 	/// Standard security strategy that validates schemes, hosts, and blocked patterns.
 	/// This was the default before 2.0; ``hardened`` is the default now. An
 	/// empty host allow-list accepts every host, including for `http(s)`.
-	static let standard = SecurityStrategy { url, allowedSchemes, allowedHosts, blockedPatterns in
+	static let standard = SecurityStrategy { url, policy in
+		let allowedSchemes = policy.allowedSchemes
+		let allowedHosts = policy.allowedHosts
+		let blockedPatterns = policy.blockedPatterns
 		guard let scheme = url.scheme, allowedSchemes.contains(scheme) else {
 			throw DeepLinkError.securityViolation("Unauthorized scheme")
 		}
@@ -114,6 +145,9 @@ public extension SecurityStrategy {
 	///   case-insensitively, so an empty host allow-list rejects every web link;
 	/// - custom-scheme URLs must have a listed host when the allow-list is not
 	///   empty; with an empty allow-list their host is not checked;
+	/// - a scheme with an entry in `allowedHostsByScheme` requires a host from
+	///   that entry instead, and the allowed hosts do not apply to it (an empty
+	///   entry rejects every link of the scheme);
 	/// - a URL with an authority but an empty host (`myapp:///account`) is
 	///   rejected, so the first path segment cannot stand in for a host;
 	/// - blocked patterns are matched case-insensitively against the raw URL
@@ -133,7 +167,10 @@ public extension SecurityStrategy {
 	///     strategy: .hardened
 	/// )
 	/// ```
-	static let hardened = SecurityStrategy { url, allowedSchemes, allowedHosts, blockedPatterns in
+	static let hardened = SecurityStrategy { url, policy in
+		let allowedSchemes = policy.allowedSchemes
+		let allowedHosts = policy.allowedHosts
+		let blockedPatterns = policy.blockedPatterns
 		let canonicalizer = URLCanonicalizer()
 		let canonicalURL = try canonicalizer.canonicalize(url)
 
@@ -145,12 +182,13 @@ public extension SecurityStrategy {
 		if hasEmptyAuthority(canonicalURL) {
 			throw DeepLinkError.securityViolation("Missing host")
 		}
-		if isWebLink || !allowedHosts.isEmpty {
+		let listedHosts = policy.hostsListed(forScheme: scheme)
+		if isWebLink || listedHosts != nil || !allowedHosts.isEmpty {
 			guard let host = canonicalURL.host(), !host.isEmpty else {
 				throw DeepLinkError.securityViolation("Missing host")
 			}
 
-			guard allowedHosts.containsCaseInsensitive(host) else {
+			guard (listedHosts ?? allowedHosts).containsCaseInsensitive(host) else {
 				throw DeepLinkError.securityViolation("Unauthorized host")
 			}
 		}
@@ -171,7 +209,10 @@ public extension SecurityStrategy {
 	/// Unlike ``standard``, this strategy always requires a host that appears in the
 	/// allowed-host set; URLs without a host (or with a host not on the allowlist) are
 	/// rejected outright.
-	static let strict = SecurityStrategy { url, allowedSchemes, allowedHosts, blockedPatterns in
+	static let strict = SecurityStrategy { url, policy in
+		let allowedSchemes = policy.allowedSchemes
+		let allowedHosts = policy.allowedHosts
+		let blockedPatterns = policy.blockedPatterns
 		guard let scheme = url.scheme, allowedSchemes.contains(scheme) else {
 			throw DeepLinkError.securityViolation("Unauthorized scheme")
 		}
@@ -192,7 +233,9 @@ public extension SecurityStrategy {
 
 	/// Permissive security strategy that only checks schemes.
 	/// Allows all hosts and only blocks explicitly defined patterns.
-	static let permissive = SecurityStrategy { url, allowedSchemes, _, blockedPatterns in
+	static let permissive = SecurityStrategy { url, policy in
+		let allowedSchemes = policy.allowedSchemes
+		let blockedPatterns = policy.blockedPatterns
 		guard let scheme = url.scheme, allowedSchemes.contains(scheme) else {
 			throw DeepLinkError.securityViolation("Unauthorized scheme")
 		}
@@ -209,7 +252,8 @@ public extension SecurityStrategy {
 
 	/// Scheme-only security strategy.
 	/// Only validates URL schemes, ignores hosts and patterns.
-	static let schemeOnly = SecurityStrategy { url, allowedSchemes, _, _ in
+	static let schemeOnly = SecurityStrategy { url, policy in
+		let allowedSchemes = policy.allowedSchemes
 		guard let scheme = url.scheme, allowedSchemes.contains(scheme) else {
 			throw DeepLinkError.securityViolation("Unauthorized scheme")
 		}
@@ -219,7 +263,8 @@ public extension SecurityStrategy {
 
 	/// Host-only security strategy.
 	/// Only validates hosts, ignores schemes and patterns.
-	static let hostOnly = SecurityStrategy { url, _, allowedHosts, _ in
+	static let hostOnly = SecurityStrategy { url, policy in
+		let allowedHosts = policy.allowedHosts
 		guard !allowedHosts.isEmpty else {
 			return url
 		}
@@ -233,7 +278,8 @@ public extension SecurityStrategy {
 
 	/// Pattern-only security strategy.
 	/// Only checks blocked patterns, ignores schemes and hosts.
-	static let patternOnly = SecurityStrategy { url, _, _, blockedPatterns in
+	static let patternOnly = SecurityStrategy { url, policy in
+		let blockedPatterns = policy.blockedPatterns
 		let urlString = url.absoluteString
 		for pattern in blockedPatterns {
 			if pattern.firstMatch(in: urlString, range: NSRange(urlString.startIndex..., in: urlString)) != nil {
@@ -246,7 +292,9 @@ public extension SecurityStrategy {
 
 	/// Whitelist security strategy.
 	/// Only allows URLs that match specific patterns (opposite of blacklist).
-	static let whitelist = SecurityStrategy { url, allowedSchemes, allowedHosts, _ in
+	static let whitelist = SecurityStrategy { url, policy in
+		let allowedSchemes = policy.allowedSchemes
+		let allowedHosts = policy.allowedHosts
 		guard let scheme = url.scheme, allowedSchemes.contains(scheme) else {
 			throw DeepLinkError.securityViolation("Unauthorized scheme")
 		}

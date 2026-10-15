@@ -144,6 +144,8 @@ public extension DeepLinkMiddleware where Self == SecurityMiddleware {
 	///   - allowedHosts: Allowed hosts. With the default ``SecurityStrategy/hardened``,
 	///     `http(s)` links require a listed host (empty rejects every web link)
 	///     and custom-scheme hosts are checked only when the set is not empty
+	///   - allowedHostsByScheme: Hosts allowed per scheme, checked by ``SecurityStrategy/hardened``;
+	///     an entry replaces `allowedHosts` for its scheme and an empty entry rejects the scheme
 	///   - blockedPatterns: Array of regex patterns for blocked URLs
 	///   - allowedSources: Accepted link sources; `nil` (default) accepts every source
 	///   - strategy: The security validation strategy (default: .hardened)
@@ -152,6 +154,7 @@ public extension DeepLinkMiddleware where Self == SecurityMiddleware {
 	static func security(
 		allowedSchemes: Set<String>,
 		allowedHosts: Set<String> = [],
+		allowedHostsByScheme: [String: Set<String>] = [:],
 		blockedPatterns: [NSRegularExpression] = [],
 		allowedSources: Set<DeepLinkContext.Source>? = nil,
 		strategy: SecurityStrategy = .hardened,
@@ -160,6 +163,7 @@ public extension DeepLinkMiddleware where Self == SecurityMiddleware {
 		SecurityMiddleware(
 			allowedSchemes: allowedSchemes,
 			allowedHosts: allowedHosts,
+			allowedHostsByScheme: allowedHostsByScheme,
 			blockedPatterns: blockedPatterns,
 			allowedSources: allowedSources,
 			strategy: strategy,

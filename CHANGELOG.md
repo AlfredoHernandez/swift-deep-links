@@ -391,6 +391,12 @@ middleware order and a hardening checklist.
   middleware before `.signedLinks(...)`; the middleware now also verifies any link
   that carries a signature, not only those its URL rule selects (an invalid
   signature is rejected either way).
+- **Hosts per scheme.** `SecurityMiddleware(allowedHostsByScheme:)` /
+  `.security(allowedHostsByScheme:)` (checked by `.hardened`) lists allowed
+  hosts per scheme, so a Universal Link domain is not accepted as a
+  custom-scheme host or the other way round. An entry replaces
+  `allowedHosts` for its scheme; schemes without one fall back to
+  `allowedHosts`; an empty entry rejects the scheme.
 - **Route- and matcher-level authentication.** `AuthenticatedHandler` /
   `handler.requiringAuthentication(for:provider:)` rejects protected parsed
   routes for a signed-out user (`unauthorizedAccess` with the routed URL),

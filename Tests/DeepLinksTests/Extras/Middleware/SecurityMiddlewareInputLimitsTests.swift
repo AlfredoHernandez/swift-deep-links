@@ -84,7 +84,7 @@ private final class SecurityStrategySpy: Sendable {
 	}
 
 	var strategy: SecurityStrategy {
-		SecurityStrategy { [state] url, _, _, _ in
+		SecurityStrategy { [state] url, _ in
 			state.withLock { $0.append(url) }
 			return url
 		}

@@ -334,7 +334,7 @@ Each middleware call is wrapped in an `os_signpost` interval named `Middleware` 
 All middleware can be created using static factory methods on `DeepLinkMiddleware`:
 
 ```swift
-.security(allowedSchemes:allowedHosts:blockedPatterns:allowedSources:strategy:limits:)
+.security(allowedSchemes:allowedHosts:allowedHostsByScheme:blockedPatterns:allowedSources:strategy:limits:)
 .rateLimit(maxRequests:timeWindow:persistence:strategy:)
 .authentication(provider:protectedHosts:strategy:pendingLinks:)
 .authentication(provider:requiredFor:pendingLinks:)
@@ -358,7 +358,7 @@ All middleware can be created using static factory methods on `DeepLinkMiddlewar
 | `AnalyticsStrategy` | `.standard`, `.detailed`, `.minimal`, `.redacted(_:using:)`, `.unredacted(_:)` |
 | `URLTransformationStrategy` | `.standard`, `.conditional`, `.safe`, `.aggressive`, `.selective`, `.passthrough`, `.validation` |
 
-`SecurityStrategy.hardened` is the default strategy of `SecurityMiddleware` and `.security(...)` since 2.0. It canonicalizes the URL with `URLCanonicalizer`, compares schemes and hosts case-insensitively, and matches `blockedPatterns` case-insensitively against the raw URL and every percent-decoded form. `http(s)` links require a host on `allowedHosts`, so an empty `allowedHosts` rejects every web link; custom-scheme links must have a listed host only when `allowedHosts` is not empty. A URL with an authority but an empty host (`myapp:///account`) is rejected with `securityViolation("Missing host")`. It passes the canonical URL (lower-cased scheme, percent-decoded host without a trailing dot) down the chain; a host that decodes to a delimiter is rejected with `securityViolation("Malformed host")`. Pass `strategy: .standard` for the 1.x behavior.
+`SecurityStrategy.hardened` is the default strategy of `SecurityMiddleware` and `.security(...)` since 2.0. It canonicalizes the URL with `URLCanonicalizer`, compares schemes and hosts case-insensitively, and matches `blockedPatterns` case-insensitively against the raw URL and every percent-decoded form. `http(s)` links require a host on `allowedHosts`, so an empty `allowedHosts` rejects every web link; custom-scheme links must have a listed host only when `allowedHosts` is not empty. `allowedHostsByScheme` (checked by `.hardened` only) lists hosts per scheme, keys compared case-insensitively: a scheme with an entry requires a host from it and ignores `allowedHosts`, other schemes fall back to `allowedHosts`, and an empty entry rejects every link of its scheme. A URL with an authority but an empty host (`myapp:///account`) is rejected with `securityViolation("Missing host")`. It passes the canonical URL (lower-cased scheme, percent-decoded host without a trailing dot) down the chain; a host that decodes to a delimiter is rejected with `securityViolation("Malformed host")`. Pass `strategy: .standard` for the 1.x behavior.
 
 Built-in `LoggingFormat`s and `AnalyticsStrategy`s see a `URLRedactor`-redacted URL by default (2.0). `.redacted(_:using:)` swaps in a custom redactor; `.unredacted(_:)` logs and tracks full URLs.
 
