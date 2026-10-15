@@ -256,7 +256,15 @@ URL afterwards clears it, so run URL transformations **before**
 Since 2.0, framework logs, analytics, error descriptions and notifications
 redact tokens, codes, emails, JWTs and userinfo. Use
 `error.redactedDescription` in your own logs, keep `.unredacted` / `.full` to
-debug builds, and keep secrets out of path segments, which are never redacted.
+debug builds, and keep secrets out of path segments, which are not redacted by
+default. If a link format puts one there, redact it explicitly:
+
+```swift
+let redactor = URLRedactor(pathRedaction: .templates(["/invite/:code", "/reset/:token"]))
+.logging(format: .redacted(.singleLine, using: redactor))
+.analytics(provider: analytics, strategy: .redacted(.standard, using: redactor))
+.confirmation(provider: alerts, redactor: redactor)
+```
 
 ## 8. Multi-window apps
 

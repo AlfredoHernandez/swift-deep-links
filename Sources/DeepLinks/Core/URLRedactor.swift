@@ -27,7 +27,9 @@ import Foundation
 /// - userinfo.
 ///
 /// Scheme, host, plain path segments and other parameters are kept, so a
-/// secret used as a path segment (`/reset/<token>`) is not redacted.
+/// secret used as a path segment (`/reset/<token>`) is not redacted unless
+/// you opt in with ``pathRedaction`` (``PathRedaction/templates(_:)`` or
+/// ``PathRedaction/tokenLikeSegments(minimumLength:)``).
 ///
 /// ## Example
 ///
@@ -58,6 +60,9 @@ public struct URLRedactor: Sendable {
 	/// The text that replaces each redacted value.
 	public let placeholder: String
 
+	/// Which path segments are redacted; ``PathRedaction/none`` by default.
+	public let pathRedaction: PathRedaction
+
 	private let containedKeys: [String]
 
 	/// Creates a redactor.
@@ -67,9 +72,16 @@ public struct URLRedactor: Sendable {
 	///     replace ``defaultSensitiveKeys``; pass `URLRedactor.defaultSensitiveKeys.union([...])`
 	///     to extend the defaults.
 	///   - placeholder: The text that replaces each redacted value.
-	public init(sensitiveKeys: Set<String> = Self.defaultSensitiveKeys, placeholder: String = Self.defaultPlaceholder) {
+	///   - pathRedaction: Which path segments to redact. Defaults to
+	///     ``PathRedaction/none``, which keeps paths; see ``PathRedaction``.
+	public init(
+		sensitiveKeys: Set<String> = Self.defaultSensitiveKeys,
+		placeholder: String = Self.defaultPlaceholder,
+		pathRedaction: PathRedaction = .none,
+	) {
 		self.sensitiveKeys = Set(sensitiveKeys.map { $0.lowercased() })
 		self.placeholder = placeholder
+		self.pathRedaction = pathRedaction
 		containedKeys = self.sensitiveKeys.filter { $0.count >= Self.minimumContainedKeyLength }.sorted()
 	}
 
@@ -158,7 +170,10 @@ private extension URLRedactor {
 			components.percentEncodedUser = encodedPlaceholder()
 			components.percentEncodedPassword = nil
 		}
-		components.percentEncodedPath = redactingMatrixParameters(in: components.percentEncodedPath, nestingBudget: nestingBudget)
+		components.percentEncodedPath = redactingPathSegments(
+			in: redactingMatrixParameters(in: components.percentEncodedPath, nestingBudget: nestingBudget),
+			hostSegment: Self.hostSegment(of: components),
+		)
 		components.percentEncodedQuery = components.percentEncodedQuery.map { redactingPairs(in: $0, separator: "&", nestingBudget: nestingBudget) }
 		components.percentEncodedFragment = components.percentEncodedFragment.map { redactingPairs(in: $0, separator: "&", nestingBudget: nestingBudget) }
 
@@ -205,6 +220,16 @@ private extension URLRedactor {
 		return redacted == nested ? nil : redacted.absoluteString
 	}
 
+	/// A custom-scheme host, which ``PathRedaction/templates(_:)`` treats as the first segment.
+	static func hostSegment(of components: URLComponents) -> String? {
+		guard let scheme = components.scheme?.lowercased(), !["http", "https"].contains(scheme),
+		      let host = components.host, !host.isEmpty
+		else { return nil }
+		return host
+	}
+}
+
+extension URLRedactor {
 	func encodedPlaceholder() -> String {
 		placeholder.addingPercentEncoding(withAllowedCharacters: Self.pairValueAllowed) ?? Self.defaultPlaceholder
 	}

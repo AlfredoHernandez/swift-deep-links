@@ -402,6 +402,13 @@ middleware order and a hardening checklist.
   middleware before `.signedLinks(...)`; the middleware now also verifies any link
   that carries a signature, not only those its URL rule selects (an invalid
   signature is rejected either way).
+- **Opt-in path redaction.** `URLRedactor(pathRedaction:)` redacts path
+  segments by template (`.templates(["/invite/:code"])`, custom-scheme hosts
+  counting as the first segment), by token shape (`.tokenLikeSegments()`), by
+  predicate (`.segments(where:)`) or any combination (`.anyOf`). It applies
+  everywhere a redactor is accepted (log privacy, logging formats, analytics
+  strategies, confirmation prompts, notification errors, error descriptions).
+  The default, `.none`, keeps paths as before.
 - **Signed-link keys.** `SignedLinkMiddleware(verifier:)` /
   `.signedLinks(verifier:)` accept any `SignedLinkVerifier`; the new
   `Ed25519PublicKeyring` verifies Ed25519 (RFC 8032) signatures, so the app

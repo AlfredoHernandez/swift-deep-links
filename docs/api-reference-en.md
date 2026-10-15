@@ -246,7 +246,7 @@ public enum DeepLinkError: Error, Sendable, Equatable, LocalizedError {
 }
 ```
 
-> **Framework log sites redact by default (2.0).** Every built-in site that logs, prints or tracks URLs or error text goes through `DeepLinkLogPrivacy`, `.redacted` by default: `DefaultDeepLinkRouting` and `DeepLinkCoordinator` logs, `ReadinessMiddleware`'s queued-link log, `DeepLinkLoggingDelegate`, `DeepLinkAnalyticsDelegate` (URL envelope and `error_description(s)`), `DefaultAnalyticsProvider` (sensitive parameter names and embedded URLs), `LoggingProvider.console`, the built-in `LoggingFormat`s and `AnalyticsStrategy`s, and `DeepLinkNotificationDelegate` (`errorDetail: .redacted`). Pass `.unredacted` only while debugging. Redaction covers query, fragment and matrix parameters, userinfo and token-shaped values; plain path segments (`/reset/<token>`) are not redacted, so keep secrets out of paths or log through your own redactor.
+> **Framework log sites redact by default (2.0).** Every built-in site that logs, prints or tracks URLs or error text goes through `DeepLinkLogPrivacy`, `.redacted` by default: `DefaultDeepLinkRouting` and `DeepLinkCoordinator` logs, `ReadinessMiddleware`'s queued-link log, `DeepLinkLoggingDelegate`, `DeepLinkAnalyticsDelegate` (URL envelope and `error_description(s)`), `DefaultAnalyticsProvider` (sensitive parameter names and embedded URLs), `LoggingProvider.console`, the built-in `LoggingFormat`s and `AnalyticsStrategy`s, and `DeepLinkNotificationDelegate` (`errorDetail: .redacted`). Pass `.unredacted` only while debugging. Redaction covers query, fragment and matrix parameters, userinfo and token-shaped values; plain path segments (`/reset/<token>`) are not redacted by default, so keep secrets out of paths or pass a redactor with `pathRedaction`.
 
 ```swift
 public struct DeepLinkLogPrivacy: Sendable {
@@ -280,13 +280,24 @@ LoggingProvider.console(privacy: .unredacted)
 public struct URLRedactor: Sendable {
     public static let defaultSensitiveKeys: Set<String>  // token, code, password, email, key, secret, otp, auth, session, ...
     public static let defaultPlaceholder: String         // "REDACTED"
-    public init(sensitiveKeys: Set<String> = defaultSensitiveKeys, placeholder: String = defaultPlaceholder)
+    public init(sensitiveKeys: Set<String> = defaultSensitiveKeys, placeholder: String = defaultPlaceholder,
+                pathRedaction: PathRedaction = .none)
     public func isSensitive(parameterName: String) -> Bool
     public func redact(_ url: URL) -> URL
+
+    public struct PathRedaction: Sendable {
+        public static let none: PathRedaction
+        public static func tokenLikeSegments(minimumLength: Int = 16) -> PathRedaction
+        public static func templates(_ templates: Set<String>) -> PathRedaction  // "/invite/:code"
+        public static func segments(where predicate: @escaping @Sendable (String) -> Bool) -> PathRedaction
+        public static func anyOf(_ redactions: PathRedaction...) -> PathRedaction
+    }
 }
 ```
 
-A parameter is sensitive when its decoded name, compared case-insensitively, equals a key, has a word (split at punctuation, camel case, acronyms and letter/digit boundaries) equal to a key or its plural, or contains a key of `minimumContainedKeyLength` (5) or more characters: `access_token`, `accesstoken`, `APIKey`, `SESSIONID`, `code1`, `keys` and `e-mail` match; `keyword`, `barcode` and `state` do not. `redact(_:)` replaces the values of sensitive query, fragment and path matrix (`;jsessionid=`) parameters, any JWT-shaped value whatever its name, sensitive values inside a parameter whose value is itself a URL (recursively), and userinfo. Plain path segments are not redacted. A URL that cannot be decomposed becomes `about:blank`.
+`pathRedaction` (opt-in) also replaces path segments: `.templates(["/invite/:code"])` redacts the `:` segments of paths matching a template (same segment count, other segments equal case-insensitively, a custom-scheme host counting as the first segment), and `.tokenLikeSegments()` redacts segments of 16+ characters from `A-Z a-z 0-9 - _ . ~ =` that switch between letters and digits at least twice (hex, base64url, UUIDs). Pass the redactor wherever redaction is configurable: `DeepLinkLogPrivacy.redacted(using:)`, `LoggingFormat.redacted(_:using:)`, `AnalyticsStrategy.redacted(_:using:)`, `ConfirmationMiddleware(redactor:)`, `DeepLinkNotificationErrorDetail.redacted(using:)` and `redactedDescription(using:)`. Pending-link stores keep full URLs (they must replay them), so do not persist path secrets in `UserDefaultsPendingLinkStore`.
+
+A parameter is sensitive when its decoded name, compared case-insensitively, equals a key, has a word (split at punctuation, camel case, acronyms and letter/digit boundaries) equal to a key or its plural, or contains a key of `minimumContainedKeyLength` (5) or more characters: `access_token`, `accesstoken`, `APIKey`, `SESSIONID`, `code1`, `keys` and `e-mail` match; `keyword`, `barcode` and `state` do not. `redact(_:)` replaces the values of sensitive query, fragment and path matrix (`;jsessionid=`) parameters, any JWT-shaped value whatever its name, sensitive values inside a parameter whose value is itself a URL (recursively), and userinfo. Plain path segments are kept unless `pathRedaction` selects them. A URL that cannot be decomposed becomes `about:blank`.
 
 > **Equality is structural, not recursive.** The manual `Equatable` conformance never reads `localizedDescription`, so it is locale-independent. `parsingFailed` compares the URL and the *number* of underlying errors; `handlerError` compares the message and whether an underlying error is present. The `any Error & Sendable` payloads themselves are not compared, so unwrap them when a test needs to assert on their contents.
 

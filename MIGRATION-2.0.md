@@ -294,7 +294,9 @@ DeepLinkCoordinatorBuilder<AppRoute>()....logPrivacy(.unredacted)
 ```
 
 Dashboards keyed on full URLs will see `REDACTED` values. Plain path segments
-are never redacted: keep secrets out of paths.
+are not redacted by default: keep secrets out of paths, or opt in with
+`URLRedactor(pathRedaction: .templates(["/invite/:code"]))` (or
+`.tokenLikeSegments()`) and pass that redactor to `.redacted(using:)`.
 
 ## 7. Rate-limit persistence
 
