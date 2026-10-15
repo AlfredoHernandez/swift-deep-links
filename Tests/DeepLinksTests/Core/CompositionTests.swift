@@ -101,7 +101,7 @@ struct CompositionTests {
 			.middleware([
 				.logging(),
 				.analytics(provider: provider),
-				.rateLimit(maxRequests: 10, timeWindow: 60),
+				.rateLimit(maxRequests: 10, timeWindow: 60, persistence: InMemoryRateLimitPersistence()),
 			])
 			.build()
 
