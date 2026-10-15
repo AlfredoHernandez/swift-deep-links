@@ -27,7 +27,8 @@ import Foundation
 /// - `.schemeOnly`: Only validates URL schemes
 /// - `.hostOnly`: Only validates hosts
 /// - `.patternOnly`: Only checks blocked patterns
-/// - `.whitelist`: Only allows URLs matching specific patterns
+/// - `.whitelist`: An allow-list of schemes and hosts plus a path-format check;
+///   despite its name it does not match patterns (see ``whitelist``)
 /// - `.hardened`: Canonicalizes the URL, then validates schemes, a required host,
 ///   and blocked patterns case-insensitively against decoded forms (recommended)
 ///
@@ -68,31 +69,58 @@ import Foundation
 ///     strategy: .patternOnly
 /// )
 /// ```
+///
+/// ### Custom Strategies
+///
+/// Create your own strategy with ``init(_:)``. It receives each link and the
+/// middleware's ``SecurityPolicy``, and returns the URL to continue with,
+/// `nil` to stop the link quietly, or throws to reject it. Wrap a built-in
+/// strategy to add a rule without losing its checks:
+///
+/// ```swift
+/// let noAdmin = SecurityStrategy { url, policy in
+///     guard !url.path().hasPrefix("/admin") else {
+///         throw DeepLinkError.securityViolation("Admin links are not allowed")
+///     }
+///     return try await SecurityStrategy.hardened.validate(url: url, policy: policy)
+/// }
+/// let middleware = SecurityMiddleware(allowedSchemes: ["https"], allowedHosts: ["example.com"], strategy: noAdmin)
+/// ```
 public struct SecurityStrategy: Sendable {
 	private let validateFunction: @Sendable (URL, SecurityPolicy) async throws -> URL?
 
-	init(_ validateFunction: @escaping @Sendable (URL, SecurityPolicy) async throws -> URL?) {
-		self.validateFunction = validateFunction
+	/// Creates a strategy that validates each link with `validate`.
+	///
+	/// - Parameter validate: Receives the link's URL and the middleware's
+	///   policy; returns the URL to continue with (possibly rewritten), `nil`
+	///   to stop the link without an error, or throws to reject it.
+	public init(_ validate: @escaping @Sendable (_ url: URL, _ policy: SecurityPolicy) async throws -> URL?) {
+		validateFunction = validate
 	}
 
-	/// Executes the security validation strategy.
-	func validate(url: URL, policy: SecurityPolicy) async throws -> URL? {
+	/// Runs the strategy on `url`, so a custom strategy can delegate to a built-in one.
+	///
+	/// - Returns: The URL to continue with, or `nil` to stop the link.
+	/// - Throws: The error the strategy rejects the link with.
+	public func validate(url: URL, policy: SecurityPolicy) async throws -> URL? {
 		try await validateFunction(url, policy)
 	}
 }
 
 /// What a ``SecurityMiddleware`` allows, handed to its ``SecurityStrategy``.
 ///
-/// Built once per middleware: allow-lists are normalized (lower-cased, hosts
-/// without a trailing dot) and blocked patterns recompiled case-insensitively
-/// here, not on every link.
-struct SecurityPolicy: Sendable {
+/// Built once per middleware: allow-lists are normalized (schemes
+/// lower-cased, hosts lower-cased without a trailing dot) and blocked
+/// patterns recompiled case-insensitively here, not on every link.
+public struct SecurityPolicy: Sendable {
 	let normalizedSchemes: Set<String>
 	let normalizedHosts: Set<String>
 	let caseInsensitiveBlockedPatterns: Result<[NSRegularExpression], DeepLinkError>
 	private let normalizedHostsByScheme: [String: Set<String>]
 
-	init(
+	/// Creates a policy, normalizing the allow-lists and recompiling the
+	/// patterns case-insensitively; useful for unit-testing a custom strategy.
+	public init(
 		allowedSchemes: Set<String>,
 		allowedHosts: Set<String> = [],
 		allowedHostsByScheme: [String: Set<String>] = [:],
@@ -116,6 +144,32 @@ struct SecurityPolicy: Sendable {
 	/// The normalized hosts listed for `scheme` in `allowedHostsByScheme`, or `nil` when it has no entry.
 	func normalizedHosts(forScheme scheme: String) -> Set<String>? {
 		normalizedHostsByScheme[scheme.lowercased()]
+	}
+
+	/// The allowed schemes, lower-cased.
+	public var allowedSchemes: Set<String> {
+		normalizedSchemes
+	}
+
+	/// The hosts allowed for every scheme, lower-cased and without a trailing
+	/// dot; empty when the middleware lists none.
+	public var allowedHosts: Set<String> {
+		normalizedHosts
+	}
+
+	/// The normalized hosts allowed for `scheme`, compared case-insensitively,
+	/// or `nil` when the middleware lists no hosts for that scheme.
+	public func allowedHosts(forScheme scheme: String) -> Set<String>? {
+		normalizedHosts(forScheme: scheme)
+	}
+
+	/// The blocked patterns, recompiled to match case-insensitively.
+	///
+	/// - Throws: ``DeepLinkError/securityViolation(_:)`` with a
+	///   ``SecurityViolationReason/invalidConfiguration`` reason when a pattern
+	///   cannot be recompiled, so a strategy fails closed.
+	public func blockedPatterns() throws(DeepLinkError) -> [NSRegularExpression] {
+		try caseInsensitiveBlockedPatterns.get()
 	}
 
 	private static func normalized(_ hosts: Set<String>) -> Set<String> {
@@ -244,8 +298,12 @@ public extension SecurityStrategy {
 		return url
 	}
 
-	/// Whitelist security strategy.
-	/// Only allows URLs that match specific patterns (opposite of blacklist).
+	/// Allow-list strategy: requires an allowed scheme, an allowed host when
+	/// hosts are listed, and a path that is empty or starts with `/`.
+	///
+	/// The name is historical: it does not match or require patterns, and it
+	/// ignores `blockedPatterns`. Prefer ``hardened``, which also enforces the
+	/// allow-lists and checks blocked patterns against every decoded form.
 	static let whitelist = SecurityStrategy { url, policy in
 		try requireScheme(of: url, in: policy)
 		if !policy.normalizedHosts.isEmpty {

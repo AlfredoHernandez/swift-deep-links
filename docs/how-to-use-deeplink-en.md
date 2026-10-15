@@ -380,7 +380,7 @@ Each middleware supports swappable strategies:
 
 | Middleware | Strategies |
 |-----------|-----------|
-| **Security** | `.standard`, `.strict`, `.permissive`, `.schemeOnly`, `.hostOnly`, `.patternOnly`, `.whitelist` |
+| **Security** | `.standard`, `.strict`, `.permissive`, `.schemeOnly`, `.hostOnly`, `.patternOnly`, `.whitelist` (an allow-list, not pattern matching), or a custom `SecurityStrategy { url, policy in ... }` |
 | **Rate Limit** | `.slidingWindow`, `.fixedWindow`, `.tokenBucket(capacity:refillRate:)`, `.permissive` |
 | **Authentication** | `.standard`, `.strict`, `.permissive`, `.schemeBased` |
 | **Logging** | `.singleLine`, `.json`, `.minimal`, `.detailed` |
