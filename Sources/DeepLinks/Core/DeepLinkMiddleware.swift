@@ -123,7 +123,9 @@ public enum DeepLinkOutcome: Sendable {
 	/// whatever expiry it has (a nonce reservation's time to live).
 	case deferred
 
-	/// A middleware or the router threw, so no handler ran.
+	/// A middleware or the router threw, or built-in route guards
+	/// (``ConfirmingHandler``, ``AuthenticatedHandler``, ``SignedRouteGuard``)
+	/// declined every route before its handler ran, so nothing executed.
 	case failed(any Error)
 
 	/// Routing succeeded and the handlers ran, but at least one threw.

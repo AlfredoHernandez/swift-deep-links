@@ -45,6 +45,7 @@ public struct SignedRouteGuard<Route: DeepLinkRoute>: DeepLinkHandler {
 
 	public func handle(_ route: Route, context: DeepLinkContext) async throws {
 		if matcher.matches(route, context: context), !context.isSignatureVerified {
+			DeepLinkRun.declineRoute()
 			throw DeepLinkError.securityViolation(Self.unsignedRouteReason)
 		}
 		try await wrapped.handle(route, context: context)

@@ -312,7 +312,7 @@ private extension DeepLinkCoordinator {
 				executionResult: executionResult,
 				startTime: startTime,
 			)
-			return (result, executionResult.errors.first.map(DeepLinkOutcome.handlerFailed) ?? .succeeded)
+			return (result, executionResult.outcome)
 		} catch {
 			return await (handleProcessingError(url: request.url, error: error, startTime: startTime), .failed(error))
 		}
@@ -335,14 +335,19 @@ private extension DeepLinkCoordinator {
 	func executeRoutes(_ routes: [Route], context: DeepLinkContext) async -> RouteExecutionResult {
 		var successfulRoutes = 0
 		var failedRoutes = 0
+		var declinedRoutes = 0
 		var errors: [any Error] = []
 
 		for (index, route) in routes.enumerated() {
+			let decline = RouteDecline()
 			do {
-				try await handler.handle(route, context: context)
+				try await DeepLinkRun.$routeDecline.withValue(decline) {
+					try await handler.handle(route, context: context)
+				}
 				successfulRoutes += 1
 			} catch {
 				failedRoutes += 1
+				declinedRoutes += decline.isDeclined ? 1 : 0
 				errors.append(error)
 				log.log(level: .error, "Error handling route \(route.id): \(logPrivacy.describe(error))")
 			}
@@ -355,6 +360,7 @@ private extension DeepLinkCoordinator {
 		return RouteExecutionResult(
 			successfulRoutes: successfulRoutes,
 			failedRoutes: failedRoutes,
+			declinedRoutes: declinedRoutes,
 			errors: errors,
 		)
 	}
@@ -445,7 +451,18 @@ private extension DeepLinkCoordinator {
 private struct RouteExecutionResult {
 	let successfulRoutes: Int
 	let failedRoutes: Int
+	let declinedRoutes: Int
 	let errors: [any Error]
+
+	/// ``DeepLinkOutcome/failed(_:)`` when route guards declined every route
+	/// before any handler ran, so nothing executed (a signed link's nonce is
+	/// released, as when ``ConfirmationMiddleware`` denies it);
+	/// ``DeepLinkOutcome/handlerFailed(_:)`` when anything else failed.
+	var outcome: DeepLinkOutcome {
+		guard let firstError = errors.first else { return .succeeded }
+		let nothingExecuted = successfulRoutes == 0 && declinedRoutes == failedRoutes
+		return nothingExecuted ? .failed(firstError) : .handlerFailed(firstError)
+	}
 }
 
 // MARK: - Delegate Notifications

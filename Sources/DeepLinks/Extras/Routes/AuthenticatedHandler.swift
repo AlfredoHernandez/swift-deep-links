@@ -43,6 +43,7 @@ public struct AuthenticatedHandler<Route: DeepLinkRoute>: DeepLinkHandler {
 
 	public func handle(_ route: Route, context: DeepLinkContext) async throws {
 		if matcher.matches(route, context: context), !provider.isAuthenticated() {
+			DeepLinkRun.declineRoute()
 			throw DeepLinkError.unauthorizedAccess(DeepLinkRun.routedURL ?? URL(string: "about:blank")!)
 		}
 		try await wrapped.handle(route, context: context)

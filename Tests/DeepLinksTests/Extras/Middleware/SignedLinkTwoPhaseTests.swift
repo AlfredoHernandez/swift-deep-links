@@ -78,6 +78,48 @@ struct SignedLinkTwoPhaseTests {
 	}
 
 	@Test
+	func `a route confirmation the user denies releases the nonce, like the confirmation middleware`() async throws {
+		let routedURL = try #require(URL(string: "https://example.com/reset"))
+		let answer = ConfirmationAnswer()
+		let sut = Pipeline(handler: CollectingHandler<TestRoute>().confirming(.all) { _, _ in answer.approves })
+
+		#expect(await sut.open(sut.link).firstDeepLinkError == .confirmationDenied(routedURL))
+		answer.approves = true
+
+		#expect(await sut.open(sut.link).wasSuccessful)
+	}
+
+	@Test
+	func `a route guard declining a signed-out user releases the nonce for the resumed link`() async throws {
+		let routedURL = try #require(URL(string: "https://example.com/reset"))
+		let auth = ToggleAuthentication()
+		let sut = Pipeline(handler: CollectingHandler<TestRoute>().requiringAuthentication(for: .all, provider: auth))
+
+		#expect(await sut.open(sut.link).firstDeepLinkError == .unauthorizedAccess(routedURL))
+		auth.isSignedIn = true
+
+		#expect(await sut.open(sut.link).wasSuccessful)
+	}
+
+	@Test
+	func `a denial after another route ran still spends the nonce`() async {
+		let handler = CollectingHandler<TestRoute>().confirming(.routes { $0 == .route2 }) { _, _ in false }
+		let sut = Pipeline(parser: ImmediateParser(routes: [TestRoute.route1, .route2]), handler: handler)
+
+		#expect(await sut.open(sut.link).successfulRoutes == 1)
+		#expect(await sut.open(sut.link).firstDeepLinkError == .securityViolation(SignedLinkMiddleware.reusedNonceReason))
+	}
+
+	@Test
+	func `a handler throwing a denial error itself still spends the nonce`() async throws {
+		let blank = try #require(URL(string: "about:blank"))
+		let sut = Pipeline(handler: ThrowingRouteHandler(error: DeepLinkError.confirmationDenied(blank)))
+
+		#expect(await !sut.open(sut.link).wasSuccessful)
+		#expect(await sut.open(sut.link).firstDeepLinkError == .securityViolation(SignedLinkMiddleware.reusedNonceReason))
+	}
+
+	@Test
 	func `a link with one failing route among several spends its nonce`() async {
 		let handler = FailingOnRoute2Handler()
 		let sut = Pipeline(parser: ImmediateParser(routes: [TestRoute.route1, .route2]), handler: handler)
@@ -299,6 +341,23 @@ private struct Pipeline: Sendable {
 
 	func open(_ url: URL) async -> DeepLinkResult<TestRoute> {
 		await coordinator.handle(url: url, context: DeepLinkContext(source: .universalLink))
+	}
+}
+
+private final class ConfirmationAnswer: Sendable {
+	private let state = OSAllocatedUnfairLock(initialState: false)
+
+	var approves: Bool {
+		get { state.withLock { $0 } }
+		set { state.withLock { $0 = newValue } }
+	}
+}
+
+private struct ThrowingRouteHandler: DeepLinkHandler {
+	let error: any Error & Sendable
+
+	func handle(_: TestRoute) async throws {
+		throw error
 	}
 }
 

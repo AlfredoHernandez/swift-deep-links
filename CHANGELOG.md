@@ -433,6 +433,12 @@ middleware order and a hardening checklist.
   links whose expiry is too far ahead (`lifetimeTooLongReason`). The
   `keys:` initializer is now a `convenience` init. Documented that HMAC keys
   on a device are extractable and nonce stores are per install.
+- **Declined route guards release signed-link nonces.** When
+  `ConfirmingHandler` (user denied or timed out), `AuthenticatedHandler` or
+  `SignedRouteGuard` declines every route before its handler runs, the
+  outcome is `.failed` instead of `.handlerFailed`, so `SignedLinkMiddleware`
+  releases the nonce as it does for `ConfirmationMiddleware`, and the user
+  can retry. A handler that throws on its own still spends it.
 - **Hosts per scheme.** `SecurityMiddleware(allowedHostsByScheme:)` /
   `.security(allowedHostsByScheme:)` (checked by `.hardened`) lists allowed
   hosts per scheme, so a Universal Link domain is not accepted as a

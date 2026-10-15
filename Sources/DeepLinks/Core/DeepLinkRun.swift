@@ -19,6 +19,17 @@ enum DeepLinkRun {
 	/// middleware (signature parameters already stripped).
 	@TaskLocal static var routedURL: URL?
 
+	/// Set by ``DeepLinkCoordinator`` around each route's handler; built-in
+	/// route guards mark it when they decline the route before the wrapped
+	/// handler runs, so the coordinator can tell "nothing executed" apart from
+	/// a handler that failed after it may have acted.
+	@TaskLocal static var routeDecline: RouteDecline?
+
+	/// Records that the current route was declined before its handler ran.
+	static func declineRoute() {
+		routeDecline?.markDeclined()
+	}
+
 	/// Runs `body` as a standalone call, not part of the enclosing
 	/// coordinator pass, so middleware called from a handler (for example
 	/// ``DeepLinkMiddlewareCoordinator/process(_:)-(DeepLinkRequest)``) cannot
@@ -30,10 +41,25 @@ enum DeepLinkRun {
 		try await $id.withValue(nil) {
 			try await $arrival.withValue(nil) {
 				try await $routedURL.withValue(nil) {
-					try await body()
+					try await $routeDecline.withValue(nil) {
+						try await body()
+					}
 				}
 			}
 		}
+	}
+}
+
+/// Whether a route guard declined the route it was handling.
+final class RouteDecline: Sendable {
+	private let declined = OSAllocatedUnfairLock(initialState: false)
+
+	var isDeclined: Bool {
+		declined.withLock { $0 }
+	}
+
+	func markDeclined() {
+		declined.withLock { $0 = true }
 	}
 }
 

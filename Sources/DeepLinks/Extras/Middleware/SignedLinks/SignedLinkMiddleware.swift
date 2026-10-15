@@ -75,7 +75,9 @@ import os
 /// ``didFinish(_:outcome:)``: **committed** once a handler ran (including
 /// ``DeepLinkOutcome/handlerFailed(_:)``: a handler may have acted before it
 /// threw, or another route succeeded); **released** when a later middleware
-/// or the router stopped or failed it before any handler ran, or a
+/// or the router stopped or failed it before any handler ran, a route guard
+/// (``ConfirmingHandler`` denied, ``AuthenticatedHandler``) declined every
+/// route before it ran, or a
 /// ``DeepLinkReadinessQueue`` evicted or reset it. A link queued by readiness
 /// keeps its reservation until it drains and is settled with that pass's
 /// outcome, so the user can retry and a link saved by
