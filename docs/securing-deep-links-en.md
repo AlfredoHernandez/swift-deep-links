@@ -23,7 +23,8 @@ Every entry point tags the link with a `DeepLinkContext`:
 | `handle(searchableItemActivity:)` | `.spotlight` |
 | `handle(shortcutItem:)` | `.shortcut` |
 | `handle(url:)` | `.unknown` |
-| readiness drains, pending-link resumes | the source the link arrived with |
+| readiness drains, `InMemoryPendingLinkStore` resumes | the source the link arrived with |
+| `UserDefaultsPendingLinkStore` resumes | `.unknown` (the stored source is editable on the device) |
 
 The source is a claim your own entry point makes, not proof. Use it to
 *restrict* flows, never to trust a link:

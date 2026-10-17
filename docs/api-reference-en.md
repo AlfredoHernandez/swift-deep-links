@@ -89,7 +89,7 @@ public struct DeepLinkContext: Sendable, Hashable {
 }
 ```
 
-The context is a claim made by your entry point, not proof: any app can open a custom scheme. Use it to restrict sensitive flows (`.security(..., allowedSources: [.universalLink])`), never to trust a link. `openedURL(_:)` maps custom schemes to `.customScheme` and `http(s)` to `.unknown`, because an open-URL callback does not prove associated-domain verification; only browsing-web activities (`handle(activity:)`, `onDeepLink`) are `.universalLink`. Links replayed by `markReadyAndDrain(queue:)` and `resumePendingLinks(from:)` keep the context they arrived with (custom queues and stores that implement only the URL requirements replay with `.unknown`).
+The context is a claim made by your entry point, not proof: any app can open a custom scheme. Use it to restrict sensitive flows (`.security(..., allowedSources: [.universalLink])`), never to trust a link. `openedURL(_:)` maps custom schemes to `.customScheme` and `http(s)` to `.unknown`, because an open-URL callback does not prove associated-domain verification; only browsing-web activities (`handle(activity:)`, `onDeepLink`) are `.universalLink`. Links replayed by `markReadyAndDrain(queue:)` and by `resumePendingLinks(from:)` with an `InMemoryPendingLinkStore` keep the context they arrived with; `UserDefaultsPendingLinkStore` resumes them as `.unknown` with only their scene (anyone with access to the app container can edit what it stores), and custom queues and stores that implement only the URL requirements replay with `.unknown`.
 
 ## Core Types
 
@@ -654,7 +654,7 @@ public extension DeepLinkCoordinator {
 }
 ```
 
-`AuthenticationMiddleware` saves the link as it entered the chain, with its context, and `resumePendingLinks(from:)` replays it with that context through the whole chain. `UserDefaultsPendingLinkStore` persists the context as versioned JSON (`source`, `sourceApplication`, `sceneID`; plain text in `UserDefaults`, like the URL) but never the signature-verified flag, so a resumed link is verified again; links saved by 1.x or with an unknown source load as `.unknown`.
+`AuthenticationMiddleware` saves the link as it entered the chain, with its context, and `resumePendingLinks(from:)` replays it with that context through the whole chain. `UserDefaultsPendingLinkStore` persists the context as versioned JSON (`source`, `sourceApplication`, `sceneID`; plain text in `UserDefaults`, like the URL) but never the signature-verified flag, so a resumed link is verified again. Since 2.0.1 it does not trust what it reads back: anyone with access to the app container can edit `UserDefaults`, so resumed links carry `.unknown` and no source application, keeping only `sceneID`. Source rules (`allowedSources`, `DeepLinkMatcher.sources(_:)`) therefore treat them as unknown; use `InMemoryPendingLinkStore` when such a rule must accept resumed links.
 
 `AuthenticationStrategy.standard` matches `protectedHosts` like `DeepLinkMatcher.hosts(_:)`: case-insensitively, after percent-decoding, ignoring a trailing dot, and reading the first path segment of a hostless custom-scheme link (`myapp:///account/x`, `myapp:/account`, `myapp:account/x`) as its host. `AuthenticationMiddleware(authProvider:requiredFor:pendingLinks:pendingSources:)` / `.authentication(provider:requiredFor:pendingLinks:pendingSources:)` takes any `DeepLinkMatcher` instead (for example `.paths(["/admin"])`). Route rules (`requiringAuthentication(for:provider:)`) are the strongest.
 

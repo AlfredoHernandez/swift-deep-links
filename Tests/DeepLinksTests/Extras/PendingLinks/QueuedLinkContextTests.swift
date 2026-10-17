@@ -58,7 +58,7 @@ struct QueuedLinkContextTests {
 	// MARK: - Pending Links
 
 	@Test(arguments: [false, true])
-	func `a resumed link reaches the handler with the context it arrived with`(persisted: Bool) async throws {
+	func `a resumed link reaches the handler with the context its store vouches for`(persisted: Bool) async throws {
 		let store: any PendingLinkStore = persisted ? try UserDefaultsPendingLinkStore(userDefaults: makeDefaults(), key: "pending") : InMemoryPendingLinkStore()
 		let auth = SwitchableAuthentication()
 		let handler = CollectingHandler<TestRoute>()
@@ -71,20 +71,20 @@ struct QueuedLinkContextTests {
 		auth.isSignedIn = true
 		_ = await coordinator.resumePendingLinks(from: store)
 
-		var resumed = context
+		var resumed = persisted ? DeepLinkContext(sceneID: context.sceneID) : context
 		resumed.isResumedPendingLink = true
 		#expect(handler.handledContexts == [resumed])
 	}
 
 	@Test
-	func `the UserDefaults store keeps the context across relaunches`() async throws {
+	func `the UserDefaults store keeps only the scene across relaunches`() async throws {
 		let suiteName = makeSuiteName()
 		try await UserDefaultsPendingLinkStore(userDefaults: #require(UserDefaults(suiteName: suiteName)), key: "pending")
 			.save(DeepLinkRequest(url: url("myapp://a"), context: context))
 
 		let relaunched = try UserDefaultsPendingLinkStore(userDefaults: #require(UserDefaults(suiteName: suiteName)), key: "pending")
 
-		#expect(await relaunched.takeAllRequests() == [DeepLinkRequest(url: url("myapp://a"), context: context)])
+		#expect(await relaunched.takeAllRequests() == [DeepLinkRequest(url: url("myapp://a"), context: DeepLinkContext(sceneID: "scene-A"))])
 	}
 
 	@Test
@@ -97,7 +97,22 @@ struct QueuedLinkContextTests {
 
 		let restored = try await UserDefaultsPendingLinkStore(userDefaults: #require(UserDefaults(suiteName: suiteName)), key: "pending").takeAllRequests()
 
-		#expect(restored.map(\.context) == [context])
+		#expect(restored.map(\.context) == [DeepLinkContext(sceneID: "scene-A")])
+	}
+
+	@Test
+	func `the UserDefaults store does not trust a planted source`() async throws {
+		let suiteName = makeSuiteName()
+		let planted = #"[{"url":"myapp:\/\/pay","savedAt":1700000000,"context":{"version":1,"source":"universalLink","sourceApplication":"com.apple.mobilesafari","sceneID":"scene-B"}}]"#
+		UserDefaults(suiteName: suiteName)?.set(Data(planted.utf8), forKey: "pending")
+
+		let restored = try await UserDefaultsPendingLinkStore(
+			userDefaults: #require(UserDefaults(suiteName: suiteName)),
+			key: "pending",
+			dateProvider: ManualDateProvider().dateProvider,
+		).takeAllRequests()
+
+		#expect(restored == [DeepLinkRequest(url: url("myapp://pay"), context: DeepLinkContext(source: .unknown, sceneID: "scene-B"))])
 	}
 
 	@Test
