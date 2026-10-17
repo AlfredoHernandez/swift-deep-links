@@ -692,7 +692,7 @@ public final class DeepLinkReadinessQueue: ReadinessQueue, Sendable {
     public init(maxQueueSize: Int? = defaultMaxQueueSize, onEvict: (@Sendable (URL) -> Void)? = nil)  // size clamped to min 1; nil is unbounded
     public var isReady: Bool { get }
     public func enqueue(_ url: URL) -> URL?
-    public func markReady() -> [URL]       // idempotent; drains the queue
+    public func markReady() -> [URL]       // idempotent; drains the queue (prefer markReadyAndDrain)
     public var pendingCount: Int { get }
     public var pendingURLs: [URL] { get }  // snapshot without draining
     public func reset()                    // re-gates, discards pending
@@ -705,9 +705,15 @@ public final class DeepLinkReadinessQueue: ReadinessQueue, Sendable {
 > `onEvict` to observe the oldest links dropped to make room; it runs after the
 > queue lock is released, on the enqueuing thread.
 
-> Prefer `pendingURLs` over `markReady()` when you only need to inspect the queue.
-> Calling `markReady()` drains the queue — dropping the returned URLs loses them
-> permanently.
+> **Drain with `coordinator.markReadyAndDrain(queue:)`, not `markReady()`.**
+> `markReady()` returns the URLs as the readiness gate received them, after the
+> middleware before it ran (a signed link has already lost its signature
+> parameters), and leaves what that middleware holds unsettled (a signed link's
+> nonce stays reserved until it lapses). Feeding them to `handle(url:)` runs
+> the whole chain again on the rewritten URL: signed links fail as unsigned,
+> replay protection can drop them, the rate limit counts them twice and their
+> source is lost. Prefer `pendingURLs` when you only need to inspect the queue;
+> calling `markReady()` drains it, and dropping the returned URLs loses them.
 
 ### Coordinator helper
 

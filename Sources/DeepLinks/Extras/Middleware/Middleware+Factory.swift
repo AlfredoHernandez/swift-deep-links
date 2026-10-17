@@ -302,11 +302,8 @@ public extension DeepLinkMiddleware where Self == ReadinessMiddleware {
 	/// // In the middleware stack
 	/// .readiness(queue: queue)
 	///
-	/// // When ready, drain and reprocess
-	/// let pending = queue.markReady()
-	/// for url in pending {
-	///     await coordinator.handle(url: url)
-	/// }
+	/// // When ready, drain: each link resumes right after this middleware
+	/// await coordinator.markReadyAndDrain(queue: queue)
 	/// ```
 	///
 	/// - Parameters:

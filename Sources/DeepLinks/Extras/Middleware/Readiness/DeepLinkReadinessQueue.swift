@@ -8,8 +8,9 @@ import os
 /// A queue that stores deep link URLs until a readiness condition is met.
 ///
 /// When deep links arrive before the app is ready, they are stored
-/// in an internal queue. Once ``markReady()`` is called, the queued
-/// URLs are returned for reprocessing through the coordinator.
+/// in an internal queue. Once the app can navigate, drain it with
+/// ``DeepLinkCoordinator/markReadyAndDrain(queue:)``, which resumes each link
+/// right after the ``ReadinessMiddleware`` that queued it.
 ///
 /// ## Usage
 ///
@@ -20,11 +21,12 @@ import os
 /// .readiness(queue: queue)
 ///
 /// // When the app is ready (e.g., initial UI settled)
-/// let pending = queue.markReady()
-/// for url in pending {
-///     await coordinator.handle(url: url)
-/// }
+/// await coordinator.markReadyAndDrain(queue: queue)
 /// ```
+///
+/// Do not drain it with ``markReady()`` and ``DeepLinkCoordinator/handle(url:)``:
+/// the URLs it returns were already rewritten by the middleware before the
+/// gate, so they run the whole chain a second time (see ``markReady()``).
 ///
 /// ## Queue Size Limit
 ///
@@ -117,8 +119,17 @@ public final class DeepLinkReadinessQueue: ReadinessQueue, Sendable {
 	}
 
 	/// Marks the queue ready and returns the queued URLs, oldest first,
-	/// emptying the queue. Calling it again returns an empty array. Prefer
-	/// ``DeepLinkCoordinator/markReadyAndDrain(queue:)``, which also routes them.
+	/// emptying the queue. Calling it again returns an empty array.
+	///
+	/// - Important: Prefer ``DeepLinkCoordinator/markReadyAndDrain(queue:)``.
+	///   The URLs are the ones the readiness gate received, **after** the
+	///   middleware before it ran (a signed link already has its signature
+	///   parameters removed), and what that middleware holds for them is not
+	///   settled (a signed link's nonce stays reserved until it lapses). Passing
+	///   them to ``DeepLinkCoordinator/handle(url:)`` runs the whole chain again
+	///   on the rewritten URL: signed links then fail as unsigned, replay
+	///   protection can drop them as repeats, the rate limit counts them twice,
+	///   and their source is lost.
 	public func markReady() -> [URL] {
 		markReadyReturningRequests().map(\.url)
 	}
