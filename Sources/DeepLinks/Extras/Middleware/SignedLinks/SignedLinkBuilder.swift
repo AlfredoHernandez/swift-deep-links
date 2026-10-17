@@ -28,6 +28,7 @@ public struct SignedLinkBuilder: Sendable {
 	private let signer: any SignedLinkSigner
 	private let keyID: String?
 	private let parameters: SignedLinkParameters
+	private let rejectDuplicateParameters: Bool
 
 	/// Creates a builder.
 	///
@@ -38,8 +39,21 @@ public struct SignedLinkBuilder: Sendable {
 	///   - keyID: The key's id, added as the key-id parameter so the verifier
 	///     can pick the key during rotation. `nil` (default) adds none.
 	///   - parameters: The query parameter names. Defaults to ``SignedLinkParameters/default``.
-	public init(key: SymmetricKey, keyID: String? = nil, parameters: SignedLinkParameters = .default) {
-		self.init(signer: HMACSignedLinkSigner(key: key), keyID: keyID, parameters: parameters)
+	///   - rejectDuplicateParameters: Whether ``sign(_:expiresAt:nonce:)`` refuses
+	///     a link repeating a query parameter name. Defaults to `true`, matching
+	///     ``SignedLinkMiddleware``, which rejects such links.
+	public init(
+		key: SymmetricKey,
+		keyID: String? = nil,
+		parameters: SignedLinkParameters = .default,
+		rejectDuplicateParameters: Bool = true,
+	) {
+		self.init(
+			signer: HMACSignedLinkSigner(key: key),
+			keyID: keyID,
+			parameters: parameters,
+			rejectDuplicateParameters: rejectDuplicateParameters,
+		)
 	}
 
 	/// Creates a builder signing with any ``SignedLinkSigner``, such as an ``Ed25519LinkSigner``.
@@ -48,10 +62,18 @@ public struct SignedLinkBuilder: Sendable {
 	///   - signer: Produces the signature of the canonical form.
 	///   - keyID: The key's id, added as the key-id parameter. `nil` (default) adds none.
 	///   - parameters: The query parameter names. Defaults to ``SignedLinkParameters/default``.
-	public init(signer: any SignedLinkSigner, keyID: String? = nil, parameters: SignedLinkParameters = .default) {
+	///   - rejectDuplicateParameters: Whether ``sign(_:expiresAt:nonce:)`` refuses
+	///     a link repeating a query parameter name. Defaults to `true`.
+	public init(
+		signer: any SignedLinkSigner,
+		keyID: String? = nil,
+		parameters: SignedLinkParameters = .default,
+		rejectDuplicateParameters: Bool = true,
+	) {
 		self.signer = signer
 		self.keyID = keyID
 		self.parameters = parameters
+		self.rejectDuplicateParameters = rejectDuplicateParameters
 	}
 
 	/// Returns `url` with the key id, expiry, nonce and signature appended, in that order.
@@ -62,13 +84,17 @@ public struct SignedLinkBuilder: Sendable {
 	///   - nonce: A unique, unguessable value making the link single-use when
 	///     the verifier has a ``NonceStore``.
 	/// - Returns: The signed link.
-	/// - Throws: ``DeepLinkError/invalidURL(_:)`` when `url` cannot be decomposed
-	///   or already carries one of the signed-link parameters;
+	/// - Throws: ``DeepLinkError/invalidURL(_:)`` when `url` cannot be decomposed,
+	///   already carries one of the signed-link parameters, or repeats a query
+	///   parameter name (decoded) while `rejectDuplicateParameters` is `true`;
 	///   ``DeepLinkError/securityViolation(_:)`` when the signer cannot sign (an HMAC key that is too short).
 	public func sign(_ url: URL, expiresAt: Date? = nil, nonce: String? = nil) throws(DeepLinkError) -> URL {
 		guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false),
 		      !(components.percentEncodedQueryItems ?? []).contains(where: { parameters.all.contains(SignedLinkCanonicalForm.decodedName(of: $0)) })
 		else { throw DeepLinkError.invalidURL(url) }
+		if rejectDuplicateParameters, SignedLinkCanonicalForm.repeatsParameterName(in: url) {
+			throw DeepLinkError.invalidURL(url)
+		}
 
 		let added = [
 			keyID.map { (parameters.keyID, $0) },

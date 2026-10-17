@@ -55,7 +55,8 @@ import os
 ///
 /// ## Checks, in order
 ///
-/// 1. Exactly one signature, and at most one key id, expiry and nonce.
+/// 1. Exactly one signature, and at most one key id, expiry and nonce; with
+///    `rejectDuplicateParameters` (the default), no other repeated parameter name either.
 /// 2. The signature verifies (compared in constant time) with the key the
 ///    provider returns for the link's key id.
 /// 3. The expiry (whole seconds since 1970) has not passed, extended by
@@ -139,6 +140,8 @@ public final class SignedLinkMiddleware: DeepLinkMiddleware {
 	public static let lifetimeTooLongReason = SecurityViolationMessage.lifetimeTooLong
 	/// An HMAC key is shorter than ``minimumKeyByteCount`` bytes.
 	public static let weakKeyReason = SecurityViolationMessage.weakKey
+	/// The link repeats a query parameter name.
+	public static let duplicateParameterReason = SecurityViolationMessage.duplicateParameter
 	/// The signer could not produce a signature.
 	public static let signingFailedReason = SecurityViolationMessage.signingFailed
 	/// The shortest HMAC-SHA256 key accepted, in bytes (256 bits).
@@ -153,6 +156,7 @@ public final class SignedLinkMiddleware: DeepLinkMiddleware {
 	private let nonceStore: (any NonceStore)?
 	private let reusedNonce: ReusedNonceResponse
 	private let stripsSignatureParameters: Bool
+	private let rejectDuplicateParameters: Bool
 	private let dateProvider: @Sendable () -> Date
 	private let settlements = OSAllocatedUnfairLock(initialState: NonceSettlements())
 
@@ -176,6 +180,12 @@ public final class SignedLinkMiddleware: DeepLinkMiddleware {
 	///   - reusedNonce: Whether a reused nonce is rejected (default) or dropped quietly.
 	///   - stripsSignatureParameters: Whether verified links continue without the
 	///     signature, key id, expiry and nonce parameters. Defaults to `true`.
+	///   - rejectDuplicateParameters: Whether a link repeating a query parameter
+	///     name (decoded) is rejected with ``duplicateParameterReason`` before its
+	///     signature is checked. Defaults to `true`: the canonical form sorts the
+	///     query, so `?user=1&user=2` and `?user=2&user=1` share a signature while
+	///     ``DeepLinkURL`` reads the last value. Pass `false` only when every
+	///     reader of repeated parameters reads all of their values in order.
 	///   - dateProvider: Supplies the current time; inject a manual clock in tests.
 	public convenience init(
 		keys: any SigningKeyProvider,
@@ -187,6 +197,7 @@ public final class SignedLinkMiddleware: DeepLinkMiddleware {
 		nonceStore: (any NonceStore)? = nil,
 		reusedNonce: ReusedNonceResponse = .reject,
 		stripsSignatureParameters: Bool = true,
+		rejectDuplicateParameters: Bool = true,
 		dateProvider: @Sendable @escaping () -> Date = Date.init,
 	) {
 		self.init(
@@ -199,6 +210,7 @@ public final class SignedLinkMiddleware: DeepLinkMiddleware {
 			nonceStore: nonceStore,
 			reusedNonce: reusedNonce,
 			stripsSignatureParameters: stripsSignatureParameters,
+			rejectDuplicateParameters: rejectDuplicateParameters,
 			dateProvider: dateProvider,
 		)
 	}
@@ -207,7 +219,7 @@ public final class SignedLinkMiddleware: DeepLinkMiddleware {
 	/// such as an ``Ed25519PublicKeyring``.
 	///
 	/// The other parameters are those of
-	/// ``init(keys:requiredFor:parameters:requiresExpiry:leeway:maximumLifetime:nonceStore:reusedNonce:stripsSignatureParameters:dateProvider:)``.
+	/// ``init(keys:requiredFor:parameters:requiresExpiry:leeway:maximumLifetime:nonceStore:reusedNonce:stripsSignatureParameters:rejectDuplicateParameters:dateProvider:)``.
 	public init(
 		verifier: any SignedLinkVerifier,
 		requiredFor matcher: DeepLinkMatcher = .all,
@@ -218,6 +230,7 @@ public final class SignedLinkMiddleware: DeepLinkMiddleware {
 		nonceStore: (any NonceStore)? = nil,
 		reusedNonce: ReusedNonceResponse = .reject,
 		stripsSignatureParameters: Bool = true,
+		rejectDuplicateParameters: Bool = true,
 		dateProvider: @Sendable @escaping () -> Date = Date.init,
 	) {
 		self.verifier = verifier
@@ -229,6 +242,7 @@ public final class SignedLinkMiddleware: DeepLinkMiddleware {
 		self.nonceStore = nonceStore
 		self.reusedNonce = reusedNonce
 		self.stripsSignatureParameters = stripsSignatureParameters
+		self.rejectDuplicateParameters = rejectDuplicateParameters
 		self.dateProvider = dateProvider
 	}
 
@@ -247,7 +261,7 @@ public final class SignedLinkMiddleware: DeepLinkMiddleware {
 	///
 	/// - Returns: `nil` for a reused nonce with ``ReusedNonceResponse/drop``.
 	/// - Throws: ``DeepLinkError/securityViolation(_:)`` for a missing or
-	///   invalid signature, a missing, expired or too distant expiry, a missing
+	///   invalid signature, a repeated query parameter name, a missing, expired or too distant expiry, a missing
 	///   nonce, or a reused one with ``ReusedNonceResponse/reject``.
 	public func intercept(_ request: DeepLinkRequest) async throws -> DeepLinkRequest? {
 		guard matcher.matches(request) || carriesSignature(request.url) else {
@@ -255,6 +269,9 @@ public final class SignedLinkMiddleware: DeepLinkMiddleware {
 		}
 
 		let fields = try SignedLinkFields(url: request.url, parameters: parameters)
+		if rejectDuplicateParameters, SignedLinkCanonicalForm.repeatsParameterName(in: request.url) {
+			throw DeepLinkError.securityViolation(Self.duplicateParameterReason)
+		}
 		try await verifySignature(of: fields, in: request.url)
 		let validUntil = try validatedExpiry(fields.expiry)
 		guard try await consumeNonce(fields.nonce, validUntil: validUntil) else { return nil }
