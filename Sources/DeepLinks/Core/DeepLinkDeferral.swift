@@ -12,6 +12,10 @@ import os
 /// with the drained pass's outcome, or with DeepLinkOutcome/stopped when
 /// the queue evicts or resets the link. Settlement runs under the original
 /// pass's identifier so middleware can find what it held for the link.
+///
+/// A link queued again by a later gate after draining carries a new deferral
+/// chained to the earlier one, so settling the last gate's deferral also
+/// settles every middleware the link passed before the earlier gates.
 final class DeepLinkDeferral: Sendable {
 	private let runID: UUID?
 
@@ -19,12 +23,19 @@ final class DeepLinkDeferral: Sendable {
 	/// drained pass saves pending links with their signature intact.
 	let arrival: DeepLinkRequest?
 	private let visited: [(middleware: any DeepLinkMiddleware, request: DeepLinkRequest)]
+	private let previous: DeepLinkDeferral?
 	private let isSettled = OSAllocatedUnfairLock(initialState: false)
 
-	init(runID: UUID?, arrival: DeepLinkRequest?, visited: [(middleware: any DeepLinkMiddleware, request: DeepLinkRequest)]) {
+	init(
+		runID: UUID?,
+		arrival: DeepLinkRequest?,
+		visited: [(middleware: any DeepLinkMiddleware, request: DeepLinkRequest)],
+		previous: DeepLinkDeferral? = nil,
+	) {
 		self.runID = runID
 		self.arrival = arrival
 		self.visited = visited
+		self.previous = previous
 	}
 
 	func settle(with outcome: DeepLinkOutcome) async {
@@ -38,6 +49,7 @@ final class DeepLinkDeferral: Sendable {
 				await visit.middleware.didFinish(visit.request, outcome: outcome)
 			}
 		}
+		await previous?.settle(with: outcome)
 	}
 
 	/// Settles as DeepLinkOutcome/stopped without blocking the caller,
