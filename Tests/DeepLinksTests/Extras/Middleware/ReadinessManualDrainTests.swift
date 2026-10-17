@@ -19,9 +19,11 @@ struct ReadinessManualDrainTests {
 		let coordinator = makeCoordinator(queue: queue)
 		let link = try SignedLinkBuilder(key: key).sign(#require(URL(string: "https://example.com/reset?user=42")))
 
+		let unsigned = try #require(URL(string: "https://example.com/reset?user=42"))
+
 		_ = await coordinator.handle(url: link)
 
-		#expect(try queue.markReady() == [#require(URL(string: "https://example.com/reset?user=42"))])
+		#expect(queue.markReady() == [unsigned])
 	}
 
 	@Test

@@ -50,9 +50,11 @@ struct SignedLinkParameterNamesTests {
 			.sign(#require(URL(string: "https://example.com/reset?user=42")), expiresAt: clock.now + 60)
 		let sut = SignedLinkMiddleware(keys: SigningKeyring(key: key), parameters: .legacy, dateProvider: clock.dateProvider)
 
+		let unsigned = try #require(URL(string: "https://example.com/reset?user=42"))
+
 		let result = try await sut.intercept(DeepLinkRequest(url: signed))
 
-		#expect(try result?.url == #require(URL(string: "https://example.com/reset?user=42")))
+		#expect(result?.url == unsigned)
 		#expect(result?.context.isSignatureVerified == true)
 	}
 
