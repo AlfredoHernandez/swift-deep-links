@@ -22,6 +22,10 @@ import Foundation
 ///   form (`%E2%80%AE` right-to-left override, `%E2%80%8B` zero-width space,
 ///   `%E2%80%A8`), which also rejects the zero-width joiner inside emoji sequences,
 /// - has a `..` path segment in any percent-decoded form (`%2e%2e`, `%252e%252e`, `..%5C`),
+///   read like ``DeepLinkMatcher`` reads paths: `\\` separates segments and `;`
+///   parameters are ignored (`/a/..;/admin`, `/.%2e;x/`),
+/// - has a path segment made only of dots that includes a fullwidth or
+///   ideographic full stop (`．．`, `.．`, `。`), which normalizing servers read as dots,
 /// - has percent-encoding that does not decode to valid UTF-8 (`%C0%AE`), or
 ///   is nested more than ``maximumDecodingPasses`` levels deep.
 ///
@@ -113,7 +117,13 @@ private extension URLCanonicalizer {
 
 	func containsDotDotSegment(_ path: String) -> Bool {
 		path.split(omittingEmptySubsequences: false, whereSeparator: URLText.isPathSeparator)
-			.contains("..")
+			.map(URLText.segmentName)
+			.contains(where: isTraversalSegment)
+	}
+
+	func isTraversalSegment(_ name: Substring) -> Bool {
+		guard !name.isEmpty, name.allSatisfy(URLText.isDotLike) else { return false }
+		return name == ".." || name.contains { $0 != "." }
 	}
 
 	func canonicalSchemeAndHost(of url: URL) throws(DeepLinkError) -> URL {

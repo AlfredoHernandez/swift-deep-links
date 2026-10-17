@@ -86,6 +86,20 @@ struct DeepLinkMatcherTests {
 		#expect(DeepLinkMatcher.paths(["/admin"]).matches(DeepLinkRequest(url: fuzzCase.url)))
 	}
 
+	@Test(arguments: [
+		"https://example.com/a/%EF%BC%8E%EF%BC%8E/admin",
+		"https://example.com/a/%E3%80%82%E3%80%82/admin",
+		"https://example.com/a/%EF%BD%A1.;x/admin",
+	])
+	func `paths read segments of fullwidth or ideographic dots as dot segments`(link: String) {
+		#expect(DeepLinkMatcher.paths(["/admin"]).matches(request(link)))
+	}
+
+	@Test
+	func `paths keep fullwidth dots inside a segment literal`() {
+		#expect(!DeepLinkMatcher.paths(["/admin"]).matches(request("https://example.com/a%EF%BC%8E%EF%BC%8Eb/admin")))
+	}
+
 	@Test
 	func `paths evaluate the whole hostile corpus without crashing`() {
 		let sut = DeepLinkMatcher.paths(["/reset"])

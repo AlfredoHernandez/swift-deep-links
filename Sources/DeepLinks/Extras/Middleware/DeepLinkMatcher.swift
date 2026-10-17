@@ -149,13 +149,14 @@ extension DeepLinkMatcher {
 	}
 
 	/// Collapses empty segments, treats `\\` as a separator, drops `;`
-	/// parameters and invisible or control characters, resolves `.`/`..`,
+	/// parameters and invisible or control characters, reads segments of
+	/// fullwidth or ideographic full stops as dots, resolves `.`/`..`,
 	/// forces a leading `/` and lower-cases, so every spelling a lenient parser
 	/// might accept reduces to the same path.
 	static func normalizedPath(_ path: String) -> String {
 		let visible = String(String.UnicodeScalarView(path.unicodeScalars.filter { !URLText.isInvisible($0) }))
 		let segments = visible.split(whereSeparator: URLText.isPathSeparator)
-			.map { $0.prefix { $0 != ";" } }
+			.map { URLText.foldingDotLikeSegment(URLText.segmentName($0)) }
 			.filter { !$0.isEmpty }
 		return ("/" + URLText.resolvingDotSegments(segments).joined(separator: "/")).lowercased()
 	}
