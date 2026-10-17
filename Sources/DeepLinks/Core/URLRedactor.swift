@@ -44,7 +44,7 @@ public struct URLRedactor: Sendable {
 	public static let defaultSensitiveKeys: Set<String> = [
 		"token", "jwt", "bearer", "code", "otp", "pin", "nonce", "ticket",
 		"password", "passwd", "pwd", "passcode", "secret", "key", "apikey", "credential", "credentials",
-		"auth", "authorization", "session", "sid", "jsessionid", "cookie", "signature", "sig",
+		"auth", "authorization", "session", "sid", "jsessionid", "cookie", "signature", "sig", "dlsig",
 		"email", "mail", "phone", "ssn",
 	]
 

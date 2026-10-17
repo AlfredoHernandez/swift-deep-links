@@ -22,7 +22,7 @@ import Foundation
 ///     expiresAt: .now.addingTimeInterval(900),
 ///     nonce: UUID().uuidString
 /// )
-/// // https://example.com/reset?user=42&kid=2026-10&exp=…&nonce=…&sig=…
+/// // https://example.com/reset?user=42&dlkid=2026-10&dlexp=…&dlnonce=…&dlsig=…
 /// ```
 public struct SignedLinkBuilder: Sendable {
 	private let signer: any SignedLinkSigner

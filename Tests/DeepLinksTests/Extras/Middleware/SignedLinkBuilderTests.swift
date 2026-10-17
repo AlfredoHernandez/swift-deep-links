@@ -32,7 +32,7 @@ struct SignedLinkBuilderTests {
 	func `canonical form excludes only the signature parameter`() throws {
 		let link = try #require(URL(string: "myapp://reset?kid=k&exp=10&nonce=n&sig=abc"))
 
-		#expect(SignedLinkCanonicalForm.string(of: link, parameters: .default) == "DLSIG1\nmyapp\nreset\n\n\nexp=10&kid=k&nonce=n\n")
+		#expect(SignedLinkCanonicalForm.string(of: link, parameters: .legacy) == "DLSIG1\nmyapp\nreset\n\n\nexp=10&kid=k&nonce=n\n")
 	}
 
 	@Test
@@ -47,11 +47,26 @@ struct SignedLinkBuilderTests {
 
 		let signed = try SignedLinkBuilder(key: key).sign(link)
 
-		#expect(signed.absoluteString == "myapp://reset?user=42&sig=\(expected)")
+		#expect(signed.absoluteString == "myapp://reset?user=42&dlsig=\(expected)")
 	}
 
 	@Test
 	func `signature matches the pinned reference vector`() throws {
+		let key = SymmetricKey(data: Data(repeating: 1, count: 32))
+		let link = try #require(URL(string: "https://example.com/reset?user=42"))
+
+		let signed = try SignedLinkBuilder(key: key, keyID: "2026", parameters: .legacy).sign(
+			link,
+			expiresAt: Date(timeIntervalSince1970: 1_700_000_060),
+			nonce: "n-1",
+		)
+
+		#expect(signed.absoluteString
+			== "https://example.com/reset?user=42&kid=2026&exp=1700000060&nonce=n-1&sig=1OAKGbiJ5WvCYwvoLez3vNDV8PDLx1PRzNZeIwKsXEc")
+	}
+
+	@Test
+	func `signature with the default names matches the pinned reference vector`() throws {
 		let key = SymmetricKey(data: Data(repeating: 1, count: 32))
 		let link = try #require(URL(string: "https://example.com/reset?user=42"))
 
@@ -62,7 +77,7 @@ struct SignedLinkBuilderTests {
 		)
 
 		#expect(signed.absoluteString
-			== "https://example.com/reset?user=42&kid=2026&exp=1700000060&nonce=n-1&sig=1OAKGbiJ5WvCYwvoLez3vNDV8PDLx1PRzNZeIwKsXEc")
+			== "https://example.com/reset?user=42&dlkid=2026&dlexp=1700000060&dlnonce=n-1&dlsig=AvCYMaOV1AUs784hy5N_L5_RpyNrfGMFWp2OfvC_gB4")
 	}
 
 	@Test
@@ -76,10 +91,10 @@ struct SignedLinkBuilderTests {
 			nonce: "a b",
 		)
 
-		#expect(signed.absoluteString.hasPrefix("myapp://reset?user=42&kid=2026&exp=1700000060&nonce=a%20b&sig="))
+		#expect(signed.absoluteString.hasPrefix("myapp://reset?user=42&dlkid=2026&dlexp=1700000060&dlnonce=a%20b&dlsig="))
 	}
 
-	@Test(arguments: ["sig", "exp", "kid", "nonce"])
+	@Test(arguments: ["dlsig", "dlexp", "dlkid", "dlnonce"])
 	func `builder rejects URLs that already carry a reserved parameter`(name: String) throws {
 		let key = SymmetricKey(data: Data(repeating: 1, count: 32))
 		let link = try #require(URL(string: "myapp://reset?\(name)=1"))
