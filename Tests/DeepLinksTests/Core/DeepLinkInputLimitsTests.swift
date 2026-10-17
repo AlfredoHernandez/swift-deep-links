@@ -139,7 +139,13 @@ struct DeepLinkInputLimitsTests {
 	func `rejectingDuplicateParameters keeps every other limit`(rejects: Bool) {
 		let limits = DeepLinkInputLimits.recommended.rejectingDuplicateParameters(rejects)
 
-		#expect(limits == DeepLinkInputLimits(maxURLLength: 8192, maxQueryParameterCount: 50, maxParameterValueLength: 1024, rejectDuplicateParameters: rejects))
+		let recommended = DeepLinkInputLimits.recommended
+		#expect(limits == DeepLinkInputLimits(
+			maxURLLength: recommended.maxURLLength,
+			maxQueryParameterCount: recommended.maxQueryParameterCount,
+			maxParameterValueLength: recommended.maxParameterValueLength,
+			rejectDuplicateParameters: rejects,
+		))
 	}
 
 	private func makeURL(queryCount: Int, valueLength: Int) throws -> URL {
