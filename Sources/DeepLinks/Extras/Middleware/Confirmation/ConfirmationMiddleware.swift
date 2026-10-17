@@ -3,7 +3,6 @@
 //
 
 import Foundation
-import os
 
 /// Middleware that asks the user to confirm sensitive deep links, such as
 /// payments, deletions or account changes, before they continue.
@@ -52,14 +51,14 @@ public final class ConfirmationMiddleware: DeepLinkMiddleware {
 		SecurityViolationMessage.tooManyPendingPrompts
 	}
 
-	let maxPendingPrompts: Int
 	private let provider: any DeepLinkConfirmationProvider
 	private let matcher: DeepLinkMatcher
 	private let redactor: URLRedactor
-	private let timeout: Duration?
-	private let sleep: @Sendable (Duration) async throws -> Void
-	private let gate = AsyncSerialGate()
-	private let pendingPrompts = OSAllocatedUnfairLock(initialState: 0)
+	private let queue: ConfirmationQueue
+
+	var maxPendingPrompts: Int {
+		queue.maxPendingPrompts
+	}
 
 	/// Creates a confirmation middleware.
 	///
@@ -85,9 +84,7 @@ public final class ConfirmationMiddleware: DeepLinkMiddleware {
 		self.provider = provider
 		self.matcher = matcher
 		self.redactor = redactor
-		self.timeout = timeout
-		self.maxPendingPrompts = max(1, maxPendingPrompts)
-		self.sleep = sleep
+		queue = ConfirmationQueue(timeout: timeout, maxPendingPrompts: maxPendingPrompts, sleep: sleep)
 	}
 
 	/// Asks the provider about links the matcher selects and passes the rest through.
@@ -103,37 +100,20 @@ public final class ConfirmationMiddleware: DeepLinkMiddleware {
 	///   ``tooManyPendingPromptsReason`` when `maxPendingPrompts` links already wait.
 	public func intercept(_ request: DeepLinkRequest) async throws -> DeepLinkRequest? {
 		guard matcher.matches(request) else { return request }
-		guard reservePendingSlot() else {
+		let prompt = DeepLinkConfirmationRequest(url: redactor.redact(request.url), context: request.context)
+		switch await queue.decide({ [provider] in await provider.confirm(prompt) }) {
+		case .approved:
+			break
+
+		case .denied:
+			throw DeepLinkError.confirmationDenied(request.url)
+
+		case .cancelledBeforePrompt:
+			throw CancellationError()
+
+		case .overCapacity:
 			throw DeepLinkError.securityViolation(Self.tooManyPendingPromptsReason)
 		}
-		defer { releasePendingSlot() }
-
-		let prompt = DeepLinkConfirmationRequest(url: redactor.redact(request.url), context: request.context)
-		let decision = await ConfirmationRace.decide(timeout: timeout, sleep: sleep, inTurnOf: gate) { [provider] in
-			await provider.confirm(prompt)
-		}
-		guard let approved = decision else {
-			throw CancellationError()
-		}
-		guard approved else {
-			throw DeepLinkError.confirmationDenied(request.url)
-		}
 		return request
-	}
-}
-
-// MARK: - Pending Prompts
-
-private extension ConfirmationMiddleware {
-	func reservePendingSlot() -> Bool {
-		pendingPrompts.withLock { count in
-			guard count < maxPendingPrompts else { return false }
-			count += 1
-			return true
-		}
-	}
-
-	func releasePendingSlot() {
-		pendingPrompts.withLock { $0 -= 1 }
 	}
 }

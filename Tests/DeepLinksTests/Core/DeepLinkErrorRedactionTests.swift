@@ -30,10 +30,27 @@ struct DeepLinkErrorRedactionTests {
 	}
 
 	@Test
-	func `errorDescription keeps the full URL`() {
+	func `unredactedDescription keeps the full URL`() {
 		let error = DeepLinkError.invalidURL(Self.sensitiveURL)
 
-		#expect(error.errorDescription == "Invalid URL: \(Self.sensitiveURL.absoluteString)")
+		#expect(error.unredactedDescription == "Invalid URL: \(Self.sensitiveURL.absoluteString)")
+	}
+
+	@Test
+	func `errorDescription and localizedDescription are redacted by default`() {
+		let error = DeepLinkError.invalidURL(Self.sensitiveURL)
+
+		#expect(error.errorDescription == error.redactedDescription)
+		#expect(error.localizedDescription == error.redactedDescription)
+		#expect(error.errorDescription?.contains("REDACTED") == true)
+		#expect(error.errorDescription != error.unredactedDescription)
+	}
+
+	@Test
+	func `unredactedDescription keeps nested framework errors whole`() {
+		let error = DeepLinkError.handlerError(message: "failed", underlyingError: DeepLinkError.invalidURL(Self.sensitiveURL))
+
+		#expect(error.unredactedDescription == "Handler error: failed: Invalid URL: \(Self.sensitiveURL.absoluteString)")
 	}
 
 	@Test

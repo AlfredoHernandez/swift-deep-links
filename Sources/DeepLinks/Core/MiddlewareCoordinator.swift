@@ -246,7 +246,12 @@ private extension DeepLinkMiddlewareCoordinator {
 			let isGate = defersAtGates && middleware is any ChainGate
 			var input = current
 			if isGate {
-				input.deferral = DeepLinkDeferral(runID: DeepLinkRun.id, arrival: DeepLinkRun.arrival, visited: run.visited)
+				input.deferral = DeepLinkDeferral(
+					runID: DeepLinkRun.id,
+					arrival: DeepLinkRun.arrival,
+					visited: run.visited,
+					previous: current.deferral,
+				)
 			}
 			do {
 				guard var next = try await intercept(input, with: middleware) else {

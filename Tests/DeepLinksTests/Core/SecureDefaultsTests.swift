@@ -111,7 +111,7 @@ struct SecureDefaultsTests {
 		let sut = DeepLinkLogPrivacy.unredacted
 
 		#expect(sut.describe(Self.sensitiveURL) == Self.sensitiveURL.absoluteString)
-		#expect(sut.describe(Self.sensitiveError) == Self.sensitiveError.localizedDescription)
+		#expect(sut.describe(Self.sensitiveError) == Self.sensitiveError.unredactedDescription)
 		#expect(sut.redactingURLs(in: Self.sensitiveURL.absoluteString) == Self.sensitiveURL.absoluteString)
 	}
 

@@ -17,6 +17,13 @@ import Foundation
 /// wins even if `confirm` ignores cancellation; dismiss your prompt when its
 /// task is cancelled.
 ///
+/// Prompts follow ``ConfirmationMiddleware``'s rules: they are shown one at a
+/// time in arrival order, the timeout (60 seconds by default) counts from
+/// arrival, and at most `maxPendingPrompts` routes (2 by default) wait or
+/// prompt at once; a route beyond that throws
+/// `securityViolation(ConfirmationMiddleware.tooManyPendingPromptsReason)`
+/// without a prompt. Copies of a handler share the same prompt queue.
+///
 /// ```swift
 /// .handler(
 ///     AppHandler().confirming(.routes { if case .payment = $0 { true } else { false } }) { route, _ in
@@ -25,49 +32,73 @@ import Foundation
 /// )
 /// ```
 public struct ConfirmingHandler<Route: DeepLinkRoute>: DeepLinkHandler {
+	/// The time a route may wait for an answer, prompt queue included, unless you pass another `timeout`.
+	public static var defaultTimeout: Duration {
+		ConfirmationMiddleware.defaultTimeout
+	}
+
+	/// How many routes may wait or prompt at once unless you pass another `maxPendingPrompts`.
+	public static var defaultMaxPendingPrompts: Int {
+		ConfirmationMiddleware.defaultMaxPendingPrompts
+	}
+
 	private let wrapped: any DeepLinkHandler<Route>
 	private let matcher: RouteMatcher<Route>
-	private let timeout: Duration?
-	private let sleep: @Sendable (Duration) async throws -> Void
+	private let queue: ConfirmationQueue
 	private let confirm: @Sendable (Route, DeepLinkContext) async -> Bool
+
+	var maxPendingPrompts: Int {
+		queue.maxPendingPrompts
+	}
 
 	/// Creates a confirming handler.
 	///
 	/// - Parameters:
 	///   - handler: The handler that runs approved routes.
 	///   - matcher: The routes that need confirmation.
-	///   - timeout: How long to wait for an answer before denying; `nil` (default) waits indefinitely.
-	///     For signed links, keep it below the nonce store's reservation time to live.
+	///   - timeout: How long a route waits for an answer, counted from its arrival
+	///     (the wait for earlier prompts included), before it is denied. Defaults to
+	///     ``defaultTimeout``; `nil` waits indefinitely. For signed links, keep it
+	///     below the nonce store's reservation time to live.
+	///   - maxPendingPrompts: How many routes may wait or prompt at once; more are
+	///     rejected without a prompt. Defaults to ``defaultMaxPendingPrompts``; values below 1 count as 1.
 	///   - sleep: Waits for the timeout; inject a controllable sleep in tests.
 	///   - confirm: Asks the user; returns `true` to run the route.
 	public init(
 		_ handler: any DeepLinkHandler<Route>,
 		requiredFor matcher: RouteMatcher<Route>,
-		timeout: Duration? = nil,
+		timeout: Duration? = ConfirmationMiddleware.defaultTimeout,
+		maxPendingPrompts: Int = ConfirmationMiddleware.defaultMaxPendingPrompts,
 		sleep: @Sendable @escaping (Duration) async throws -> Void = { try await Task.sleep(for: $0) },
 		confirm: @Sendable @escaping (Route, DeepLinkContext) async -> Bool,
 	) {
 		wrapped = handler
 		self.matcher = matcher
-		self.timeout = timeout
-		self.sleep = sleep
+		queue = ConfirmationQueue(timeout: timeout, maxPendingPrompts: maxPendingPrompts, sleep: sleep)
 		self.confirm = confirm
 	}
 
 	/// Asks `confirm` about routes the matcher selects, then runs approved ones.
 	///
-	/// An unanswered prompt is denied when `timeout` elapses. A declined route
-	/// releases a signed link's nonce.
+	/// An unanswered prompt is denied when `timeout` elapses, and a route whose
+	/// task is cancelled before its prompt is shown is denied without one. A
+	/// declined or rejected route releases a signed link's nonce.
 	///
 	/// - Throws: ``DeepLinkError/confirmationDenied(_:)`` with the routed URL,
-	///   or whatever the wrapped handler throws.
+	///   ``DeepLinkError/securityViolation(_:)`` with
+	///   ``ConfirmationMiddleware/tooManyPendingPromptsReason`` when
+	///   `maxPendingPrompts` routes already wait, or whatever the wrapped handler throws.
 	public func handle(_ route: Route, context: DeepLinkContext) async throws {
 		if matcher.matches(route, context: context) {
-			let approved = await ConfirmationRace.decide(timeout: timeout, sleep: sleep) { [confirm] in
-				await confirm(route, context)
-			}
-			guard approved else {
+			switch await queue.decide({ [confirm] in await confirm(route, context) }) {
+			case .approved:
+				break
+
+			case .denied, .cancelledBeforePrompt:
 				throw DeepLinkRun.declineRoute(with: .confirmationDenied(DeepLinkRun.routedURL ?? URL(string: "about:blank")!))
+
+			case .overCapacity:
+				throw DeepLinkRun.declineRoute(with: .securityViolation(ConfirmationMiddleware.tooManyPendingPromptsReason))
 			}
 		}
 		try await wrapped.handle(route, context: context)
@@ -85,9 +116,10 @@ public extension DeepLinkHandler {
 	/// This handler behind a ``ConfirmingHandler`` for the routes `matcher` selects.
 	func confirming(
 		_ matcher: RouteMatcher<Route>,
-		timeout: Duration? = nil,
+		timeout: Duration? = ConfirmationMiddleware.defaultTimeout,
+		maxPendingPrompts: Int = ConfirmationMiddleware.defaultMaxPendingPrompts,
 		confirm: @Sendable @escaping (Route, DeepLinkContext) async -> Bool,
 	) -> ConfirmingHandler<Route> {
-		ConfirmingHandler(self, requiredFor: matcher, timeout: timeout, confirm: confirm)
+		ConfirmingHandler(self, requiredFor: matcher, timeout: timeout, maxPendingPrompts: maxPendingPrompts, confirm: confirm)
 	}
 }

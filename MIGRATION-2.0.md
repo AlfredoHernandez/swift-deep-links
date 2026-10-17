@@ -202,8 +202,9 @@ default:
 `handlerError` by message and whether an underlying error exists. Unwrap the
 payloads to compare them in depth.
 
-**Descriptions.** `errorDescription` still embeds full URLs. Use
-`redactedDescription` for logs, analytics and UI:
+**Descriptions.** In 2.0.0 `errorDescription` still embeds full URLs; since
+2.0.1 it returns `redactedDescription`, and `unredactedDescription` keeps the
+full text for debugging. Use `redactedDescription` for logs, analytics and UI:
 
 ```swift
 // 1.x
@@ -491,9 +492,11 @@ let checked = try await security.intercept(DeepLinkRequest(url: url, context: co
 ```
 
 **Draining a readiness queue by hand runs the whole chain.** 1.x drained with
-`queue.markReady()` and `handle(url:)`; that still works, but every link runs
-the stages before the readiness gate a second time (rate limiting counts it twice)
-and loses its source. 2.0 adds `markReadyAndDrain(queue:)`, which resumes each
+`queue.markReady()` and `handle(url:)`. Do not keep that pattern: the returned
+URLs were already rewritten by the stages before the readiness gate (a signed
+link has lost its signature parameters, so it now fails as unsigned), every
+link runs those stages a second time (rate limiting counts it twice, replay
+protection can drop it) and it loses its source. 2.0 adds `markReadyAndDrain(queue:)`, which resumes each
 link right after the `ReadinessMiddleware` that queued it, with the context
 it arrived with:
 

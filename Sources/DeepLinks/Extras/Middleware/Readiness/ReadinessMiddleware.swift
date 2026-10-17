@@ -32,11 +32,13 @@ import OSLog
 /// await coordinator.markReadyAndDrain(queue: queue)
 /// ```
 ///
-/// If you need the raw queued URLs instead, call ``ReadinessQueue/markReady()``
-/// directly and feed the returned URLs through
-/// ``DeepLinkMiddlewareCoordinator/process(_:startingAfter:)`` with this
-/// middleware as the anchor. Re-feeding them through
-/// ``DeepLinkCoordinator/handle(url:)`` re-runs the whole chain.
+/// If you drive a ``DeepLinkMiddlewareCoordinator`` without a coordinator,
+/// call ``ReadinessQueue/markReadyReturningRequests()`` and feed each request
+/// through ``DeepLinkMiddlewareCoordinator/process(_:startingAfter:)`` with this
+/// middleware as the anchor. Never feed ``ReadinessQueue/markReady()`` URLs to
+/// ``DeepLinkCoordinator/handle(url:)``: they were already rewritten by the
+/// middleware before this one (signature parameters removed), so the whole
+/// chain runs again on them and signed links fail as unsigned.
 public final class ReadinessMiddleware: DeepLinkMiddleware, ChainGate {
 	private let queue: any ReadinessQueue
 	private let log: LoggingProvider

@@ -55,8 +55,8 @@ struct URLTextDifferentialTests {
 	}
 
 	@Test(arguments: DifferentialInput.all)
-	func `matcher path normalization is unchanged`(_ input: DifferentialInput) {
-		for form in URLText.strictDecodedForms(of: input.text) ?? [input.text] {
+	func `matcher path normalization is unchanged apart from folded dot-like segments`(_ input: DifferentialInput) {
+		for form in URLText.strictDecodedForms(of: input.text) ?? [input.text] where !form.contains(where: { $0 != "." && URLText.isDotLike($0) }) {
 			#expect(DeepLinkMatcher.normalizedPath(form) == Legacy.matcherNormalizedPath(form))
 		}
 	}

@@ -40,6 +40,14 @@ public enum DeepLinkDiagnosticWarning: Sendable, Hashable, CustomStringConvertib
 	/// be opened any number of times until it expires.
 	case signedLinksWithoutNonceStore
 
+	/// A ``SignedLinkMiddleware`` verifies with an HMAC key, which ships in the
+	/// app and, once extracted from any device, mints valid links for every install.
+	case signedLinksWithSymmetricKey
+
+	/// A ``SignedLinkMiddleware`` has `maximumLifetime: nil`, so a link minted
+	/// with a far-future expiry (or with a leaked key) works indefinitely.
+	case signedLinksWithoutMaximumLifetime
+
 	/// A readable explanation; probe URLs are passed through ``URLRedactor``.
 	public var description: String {
 		switch self {
@@ -69,6 +77,12 @@ public enum DeepLinkDiagnosticWarning: Sendable, Hashable, CustomStringConvertib
 
 		case .signedLinksWithoutNonceStore:
 			"Signed links have no nonce store; each signed link can be reused until it expires. Pass a nonceStore (InMemoryNonceStore or UserDefaultsNonceStore)."
+
+		case .signedLinksWithSymmetricKey:
+			"Signed links are verified with an HMAC key stored in the app; anyone who extracts it can forge links. Ship public keys in an Ed25519PublicKeyring and sign on your server."
+
+		case .signedLinksWithoutMaximumLifetime:
+			"Signed links have no maximumLifetime; a link with a far-future expiry stays valid indefinitely. Pass a maximumLifetime (default seven days)."
 		}
 	}
 }

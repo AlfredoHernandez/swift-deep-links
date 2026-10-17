@@ -86,6 +86,27 @@ enum URLText {
 		segment == "." || segment == ".."
 	}
 
+	/// `.`, or a full stop that Unicode normalization (NFKC, IDNA) folds into
+	/// `.`: fullwidth `．` (U+FF0E), ideographic `。` (U+3002) and halfwidth
+	/// ideographic `｡` (U+FF61). A server or web view that normalizes the path
+	/// would read `．．` as `..`.
+	static func isDotLike(_ character: Character) -> Bool {
+		character == "." || character == "\u{FF0E}" || character == "\u{3002}" || character == "\u{FF61}"
+	}
+
+	/// The segment before any `;` parameters (`..;x` is `..` to servers that
+	/// strip matrix parameters).
+	static func segmentName(_ segment: Substring) -> Substring {
+		segment.prefix { $0 != ";" }
+	}
+
+	/// `segment` spelled with ASCII dots when it consists only of dot-like
+	/// characters, so `．．` reads as `..`; any other segment unchanged.
+	static func foldingDotLikeSegment(_ segment: Substring) -> Substring {
+		guard !segment.isEmpty, segment.allSatisfy(isDotLike) else { return segment }
+		return Substring(String(repeating: ".", count: segment.count))
+	}
+
 	/// `segments` with `.` removed and each `..` removing the segment before
 	/// it (RFC 3986 §5.2.4); a `..` with nothing before it is dropped.
 	static func resolvingDotSegments(_ segments: some Sequence<Substring>) -> [Substring] {

@@ -23,7 +23,8 @@ Every entry point tags the link with a `DeepLinkContext`:
 | `handle(searchableItemActivity:)` | `.spotlight` |
 | `handle(shortcutItem:)` | `.shortcut` |
 | `handle(url:)` | `.unknown` |
-| readiness drains, pending-link resumes | the source the link arrived with |
+| readiness drains, `InMemoryPendingLinkStore` resumes | the source the link arrived with |
+| `UserDefaultsPendingLinkStore` resumes | `.unknown` (the stored source is editable on the device) |
 
 The source is a claim your own entry point makes, not proof. Use it to
 *restrict* flows, never to trust a link:
@@ -55,9 +56,10 @@ let coordinator = try DeepLinkCoordinatorBuilder<AppRoute>()
         .rateLimit(maxRequests: 20, timeWindow: 60, strategy: .tokenBucket(capacity: 5, refillRate: 0.5)),
         .replayProtection(window: 2),
         .signedLinks(
-            keys: SigningKeyring(keys: ["2026-10": currentKey, "2026-04": previousKey]),
+            verifier: Ed25519PublicKeyring(keys: ["2026-10": currentPublicKey, "2026-04": previousPublicKey]),
             requiredFor: .paths(["/reset", "/invite"]),   // also covers myapp://reset and myapp://invite
-            nonceStore: InMemoryNonceStore()
+            maximumLifetime: 7 * 24 * 60 * 60,           // the default; reject links minted further ahead
+            nonceStore: UserDefaultsNonceStore()
         ),
         .authentication(provider: auth, protectedHosts: ["account"], pendingLinks: pendingLinks),
         .readiness(queue: readinessQueue),
@@ -68,9 +70,9 @@ let coordinator = try DeepLinkCoordinatorBuilder<AppRoute>()
 ```
 
 The builder's `secureDefaults(allowedSchemes:allowedHosts:allowedHostsByScheme:...)`
-adds the first three stages (`.hardened` security with `limits: .recommended`,
-30 links per minute, a 2-second replay window) in front of the chain in one
-call; register the rest with `.middleware(...)`.
+adds the first three stages (`.hardened` security with `limits: .recommended`
+and repeated query parameters rejected, 30 links per minute, a 2-second replay
+window) in front of the chain in one call; register the rest with `.middleware(...)`.
 
 Why this order:
 
@@ -101,25 +103,34 @@ Why this order:
 ## 3. Sign sensitive links
 
 Password resets, invitations and payment confirmations should be signed by
-your server. `SignedLinkMiddleware` verifies an HMAC-SHA256 signature over a
-canonical form of the URL (scheme, host, port, path, sorted query without the
-signature, fragment), plus an expiry and an optional single-use nonce.
+your server. `SignedLinkMiddleware` verifies an Ed25519 (or HMAC-SHA256)
+signature over a canonical form of the URL (scheme, host, port, path, sorted
+query without the signature, fragment), plus an expiry and an optional
+single-use nonce.
 
 ```swift
-// Server (Swift) or tests
-let link = try SignedLinkBuilder(key: currentKey, keyID: "2026-10").sign(
+// Server (Swift) or tests: the private key never ships in the app
+let link = try SignedLinkBuilder(signer: Ed25519LinkSigner(privateKey: privateKey), keyID: "2026-10").sign(
     URL(string: "https://example.com/reset?user=42")!,
     expiresAt: .now.addingTimeInterval(15 * 60),
     nonce: UUID().uuidString
 )
+// https://example.com/reset?user=42&dlkid=2026-10&dlexp=…&dlnonce=…&dlsig=…
 
-// App
+// App: public keys only
 .signedLinks(
-    keys: SigningKeyring(keys: ["2026-10": currentKey]),
+    verifier: Ed25519PublicKeyring(keys: ["2026-10": publicKey]),
     requiredFor: .paths(["/reset"]),
-    nonceStore: InMemoryNonceStore()
+    maximumLifetime: 60 * 60,
+    nonceStore: UserDefaultsNonceStore()
 )
 ```
+
+> **2.0.1 parameter names.** Signed links now use `dlsig`, `dlexp`, `dlnonce`
+> and `dlkid`, so an app parameter called `sig` is never mistaken for a
+> signature. Links minted by 2.0.0 carry `sig`, `exp`, `nonce` and `kid`: pass
+> `parameters: .legacy` to `.signedLinks(...)` (and to `SignedLinkBuilder` on a
+> Swift server) until those links have expired, then drop it on both sides.
 
 > **Cover every URL shape that reaches the same screen.** `myapp://reset?user=42`
 > has host `reset` and an empty path, so a rule that only looked at the path
@@ -132,7 +143,8 @@ let link = try SignedLinkBuilder(key: currentKey, keyID: "2026-10").sign(
 > are rejected.
 
 - Keys: an HMAC key on the device can be extracted and then forges links
-  for every install. Prefer Ed25519: ship only public keys
+  for every install (`DeepLinkDiagnostics.checkMiddleware(_:)` warns about
+  HMAC keyrings). Prefer Ed25519: ship only public keys
   (`.signedLinks(verifier: Ed25519PublicKeyring(keys: ["2026-10": publicKey]))`)
   and sign on the server (`SignedLinkBuilder(signer: Ed25519LinkSigner(privateKey:))`).
   HMAC keys must be at least 256 random bits (shorter keys are refused),
@@ -140,9 +152,10 @@ let link = try SignedLinkBuilder(key: currentKey, keyID: "2026-10").sign(
   in the binary in plain sight. Rotate by adding
   the new key id, signing with it, and removing the old key once its links
   have expired.
-- Expiry: keep lifetimes short (minutes for resets, days for invitations),
-  and pass `maximumLifetime:` so a link minted with a far-future `exp` is
-  rejected. Nonce stores are per install: a link is single-use on each
+- Expiry: keep lifetimes short (minutes for resets, days for invitations).
+  `maximumLifetime` rejects a link minted with a far-future `exp`; it defaults
+  to seven days since 2.0.1, so lower it to your longest real lifetime and
+  pass `nil` only on purpose (diagnostics report it). Nonce stores are per install: a link is single-use on each
   device, not globally, until it expires.
 - Nonces are two-phase: `SignedLinkMiddleware` reserves the nonce once the
   signature verifies, and the coordinator spends it once a handler runs (even
@@ -165,6 +178,14 @@ let link = try SignedLinkBuilder(key: currentKey, keyID: "2026-10").sign(
   interrupted link can be retried).
 - Userinfo (`user:pass@`) is not signed; `.hardened` security in front
   rejects it.
+- Repeated parameters are rejected (2.0.1): the canonical form sorts the
+  query, so `?user=1&user=2` and `?user=2&user=1` would share a signature while
+  `DeepLinkURL` reads the last value. `SignedLinkBuilder` refuses to sign such
+  a link and the middleware rejects it with `duplicateParameterReason`; opt out
+  with `rejectDuplicateParameters: false` on both only if every reader takes
+  all values in order.
+- Readiness gates: a link held by one or several `.readiness(...)` gates keeps
+  its nonce reserved until the last gate drains it, then it is settled once.
 - Notification payloads, Spotlight identifiers and quick actions that open a
   signed path must carry the signed URL (mint it on the server, or sign it
   when you index the item); they are verified like any other link.
@@ -184,7 +205,9 @@ answer within `timeout` (60 seconds by default, counted from the link's
 arrival, so time spent behind another prompt counts). Treat that error as a
 user choice, not an attack. A burst of links cannot stack dialogs: at most
 `maxPendingPrompts` (default 2) links wait or prompt at once, and the rest are
-rejected with `securityViolation` without a prompt. On
+rejected with `securityViolation` without a prompt. Route-level
+`.confirming(...)` follows the same rules since 2.0.1 (60-second default
+timeout, at most two routes waiting). On
 timeout the link is denied at once, even if your provider ignores
 cancellation, but dismiss the prompt in the cancellation handler so it does
 not linger.
@@ -252,9 +275,10 @@ URL afterwards clears it, so run URL transformations **before**
   decoded once, restricted to unreserved characters, and `.`/`..` segments are
   rejected.
 - `PathPatternMatch.int` accepts only canonical non-negative integers.
-- Reject duplicate parameters (`DeepLinkInputLimits(rejectDuplicateParameters: true)`
-  or `DeepLinkURL(rejectDuplicateParameters:)`) so middleware and parsers never
-  disagree about a value.
+- Reject duplicate parameters (`secureDefaults` does since 2.0.1; otherwise
+  `DeepLinkInputLimits(rejectDuplicateParameters: true)` or
+  `DeepLinkURL(rejectDuplicateParameters:)`) so middleware, signatures and
+  parsers never disagree about a value.
 - Throw `routeNotFound` for links that are not yours; `securityViolation` and
   `blockedURL` stop routing so a laxer parser cannot accept what a stricter
   one rejected.
@@ -263,7 +287,8 @@ URL afterwards clears it, so run URL transformations **before**
 
 Since 2.0, framework logs, analytics, error descriptions and notifications
 redact tokens, codes, emails, JWTs and userinfo. Use
-`error.redactedDescription` in your own logs, keep `.unredacted` / `.full` to
+`error.redactedDescription` (or `localizedDescription`, redacted too since
+2.0.1) in your own logs, `error.unredactedDescription` only while debugging, keep `.unredacted` / `.full` to
 debug builds, and keep secrets out of path segments, which are not redacted by
 default. If a link format puts one there, redact it explicitly:
 

@@ -6,36 +6,11 @@ import Foundation
 import os
 
 enum ConfirmationRace {
-	/// Races `ask` against `timeout` in unstructured tasks, so the first
-	/// outcome returns even when `ask` ignores cancellation. A timeout, or
-	/// cancelling the calling task, decides `false`; the loser is cancelled.
-	static func decide(
-		timeout: Duration?,
-		sleep: @Sendable @escaping (Duration) async throws -> Void,
-		ask: @Sendable @escaping () async -> Bool,
-	) async -> Bool {
-		guard let timeout else { return await ask() }
-
-		let decision = FirstDecision()
-		let promptTask = Task { await decision.resolve(ask()) }
-		let timerTask = Task {
-			try? await sleep(timeout)
-			decision.resolve(false)
-		}
-		defer {
-			promptTask.cancel()
-			timerTask.cancel()
-		}
-		return await withTaskCancellationHandler {
-			await decision.value
-		} onCancel: {
-			decision.resolve(false)
-		}
-	}
-
-	/// Like ``decide(timeout:sleep:ask:)``, but `ask` runs only in its turn
-	/// at `gate`, and the timeout counts from now, so it covers the wait for
-	/// earlier turns. The gate is released as soon as the decision is made,
+	/// Races `ask`, run only in its turn at `gate`, against `timeout` in
+	/// unstructured tasks, so the first outcome returns even when `ask` ignores
+	/// cancellation. A timeout, or cancelling the calling task, decides `false`;
+	/// the loser is cancelled. The timeout counts from now, so it covers the
+	/// wait for earlier turns. The gate is released as soon as the decision is made,
 	/// even when `ask` ignores cancellation.
 	///
 	/// - Returns: The decision, or `nil` when the calling task was cancelled before `ask` ran.

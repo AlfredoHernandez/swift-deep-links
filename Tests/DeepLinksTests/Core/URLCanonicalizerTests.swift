@@ -90,6 +90,18 @@ struct URLCanonicalizerTests {
 		"myapp://home/a/%2e%2e%2fadmin",
 		"myapp://home/a/..%5Cadmin",
 		"myapp://home/%252e%252e/%25zz",
+		"myapp://home/a/..;/admin",
+		"myapp://home/.%2e;x/admin",
+		"myapp://home/a/..;jsessionid=1/admin",
+		"myapp://home/a/%2e%2e%3B/admin",
+		"myapp://home/a%5C..;x%5Cadmin",
+		"myapp://home/a/%EF%BC%8E%EF%BC%8E/admin",
+		"myapp://home/a/.%EF%BC%8E/admin",
+		"myapp://home/a/%EF%BC%8E/admin",
+		"myapp://home/a/%E3%80%82%E3%80%82/admin",
+		"myapp://home/a/%EF%BD%A1%EF%BD%A1/admin",
+		"myapp://home/a/%25EF%25BC%258E%25EF%25BC%258E/admin",
+		"myapp://home/a/%EF%BC%8E%EF%BC%8E;x/admin",
 	])
 	func `canonicalize rejects dot-dot path segments in raw and encoded forms`(rawURL: String) throws {
 		let url = try #require(URL(string: rawURL))
@@ -104,6 +116,10 @@ struct URLCanonicalizerTests {
 		"myapp://home/.hidden",
 		"myapp://home/./a",
 		"myapp://home/a?next=../b",
+		"myapp://home/a;v=1/b",
+		"myapp://home/.;x/b",
+		"myapp://home/v1%EF%BC%8E2",
+		"myapp://home/a?next=%EF%BC%8E%EF%BC%8E/b",
 	])
 	func `canonicalize accepts dots that are not dot-dot path segments`(rawURL: String) throws {
 		let url = try #require(URL(string: rawURL))

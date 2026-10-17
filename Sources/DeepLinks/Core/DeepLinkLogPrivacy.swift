@@ -17,7 +17,8 @@ public struct DeepLinkLogPrivacy: Sendable {
 	/// Redacts with the default ``URLRedactor``.
 	public static let redacted = DeepLinkLogPrivacy(redactor: URLRedactor())
 
-	/// Emits full URLs and `localizedDescription` text. For debugging only.
+	/// Emits full URLs, ``DeepLinkError/unredactedDescription`` for framework
+	/// errors and `localizedDescription` for others. For debugging only.
 	public static let unredacted = DeepLinkLogPrivacy(redactor: nil)
 
 	let redactor: URLRedactor?
@@ -41,10 +42,10 @@ public struct DeepLinkLogPrivacy: Sendable {
 	}
 
 	/// A description of `error` safe for logs: ``DeepLinkError/redactedDescription(using:)``
-	/// for framework errors and the type name for any other error; the
-	/// `localizedDescription` when unredacted.
+	/// for framework errors and the type name for any other error; when
+	/// unredacted, ``DeepLinkError/unredactedDescription`` or `localizedDescription`.
 	public func describe(_ error: any Error) -> String {
-		guard let redactor else { return error.localizedDescription }
+		guard let redactor else { return DeepLinkError.unredactedDescription(of: error) }
 		return DeepLinkError.redactedDescription(of: error, using: redactor)
 	}
 

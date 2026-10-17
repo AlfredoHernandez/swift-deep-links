@@ -70,6 +70,9 @@ private extension URLFuzzCorpus {
 				"double encoded dot-dot": "\(base)/a/%252e%252e/admin",
 				"encoded slash after dot-dot": "\(base)/a/..%2Fadmin",
 				"encoded backslash after dot-dot": "\(base)/a/..%5Cadmin",
+				"dot-dot with a matrix parameter": "\(base)/a/..;/admin",
+				"encoded dot-dot with a matrix parameter": "\(base)/.%2e;x/admin",
+				"fullwidth dot-dot": "\(base)/a/%EF%BC%8E%EF%BC%8E/admin",
 			]
 
 		case .encoding:

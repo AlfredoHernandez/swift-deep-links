@@ -111,8 +111,14 @@ public enum DeepLinkError: Error, Sendable, LocalizedError {
 	/// confirmation prompt in time (see ``ConfirmationMiddleware``).
 	case confirmationDenied(URL)
 
-	/// Provides a human-readable description of the error.
-	public var errorDescription: String? {
+	/// The error's description with every URL and value it carries, unredacted.
+	///
+	/// Deep links can carry tokens, codes and e-mail addresses, so keep this to
+	/// debugging; ``errorDescription`` (and therefore `localizedDescription`)
+	/// is ``redactedDescription``. Underlying errors are described with their
+	/// own ``unredactedDescription`` when they are ``DeepLinkError``, and with
+	/// `localizedDescription` otherwise.
+	public var unredactedDescription: String {
 		switch self {
 		case let .invalidURL(url):
 			"Invalid URL: \(url.absoluteString)"
@@ -137,12 +143,12 @@ public enum DeepLinkError: Error, Sendable, LocalizedError {
 				"Parsing failed for URL: \(url.absoluteString)"
 			} else {
 				"Parsing failed for URL: \(url.absoluteString); "
-					+ underlyingErrors.map(\.localizedDescription).joined(separator: "; ")
+					+ underlyingErrors.map(Self.unredactedDescription(of:)).joined(separator: "; ")
 			}
 
 		case let .handlerError(message, underlyingError):
 			if let underlyingError {
-				"Handler error: \(message): \(underlyingError.localizedDescription)"
+				"Handler error: \(message): \(Self.unredactedDescription(of: underlyingError))"
 			} else {
 				"Handler error: \(message)"
 			}
@@ -166,14 +172,23 @@ public enum DeepLinkError: Error, Sendable, LocalizedError {
 			"Confirmation denied for URL: \(url.absoluteString)"
 		}
 	}
+
+	/// The ``redactedDescription``, so `localizedDescription` in logs and
+	/// alerts never leaks what the link carried. `String(describing:)` and
+	/// `"\(error)"` still print the case with its payload; log
+	/// ``redactedDescription`` explicitly. Read ``unredactedDescription`` while debugging.
+	public var errorDescription: String? {
+		redactedDescription
+	}
 }
 
 // MARK: - Redaction
 
 public extension DeepLinkError {
-	/// A description safe to log, send to analytics or show to the user.
+	/// A description safe to log, send to analytics or show to the user; also
+	/// returned by ``errorDescription``.
 	///
-	/// Same text as ``errorDescription`` with every carried URL, and every
+	/// Same text as ``unredactedDescription`` with every carried URL, and every
 	/// `scheme://` URL embedded in a free-form message, host or reason, passed
 	/// through a default ``URLRedactor``; the value in
 	/// ``invalidParameterValue(name:value:)`` always replaced; and underlying
@@ -232,11 +247,15 @@ private extension DeepLinkError {
 
 private extension DeepLinkError {
 	var plainDescription: String {
-		errorDescription ?? ""
+		unredactedDescription
 	}
 }
 
 extension DeepLinkError {
+	static func unredactedDescription(of error: any Error) -> String {
+		(error as? DeepLinkError)?.unredactedDescription ?? error.localizedDescription
+	}
+
 	static func redactedDescription(of error: any Error, using redactor: URLRedactor) -> String {
 		(error as? DeepLinkError)?.redactedDescription(using: redactor) ?? String(describing: type(of: error))
 	}

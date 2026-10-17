@@ -12,43 +12,43 @@ struct DeepLinkErrorTests {
 	// MARK: - errorDescription
 
 	@Test(arguments: errorDescriptionCases)
-	func `errorDescription renders the expected message per case`(scenario: ErrorDescriptionScenario) {
-		#expect(scenario.error.errorDescription == scenario.expected)
+	func `unredactedDescription renders the expected message per case`(scenario: ErrorDescriptionScenario) {
+		#expect(scenario.error.unredactedDescription == scenario.expected)
 	}
 
 	@Test
-	func `errorDescription for parsingFailed joins underlying descriptions`() {
+	func `unredactedDescription for parsingFailed joins underlying descriptions`() {
 		let url = Self.sampleURL
 		let error = DeepLinkError.parsingFailed(url: url, underlyingErrors: [
 			DeepLinkError.missingRequiredParameter("userId"),
 			DeepLinkError.unsupportedHost("settings"),
 		])
 
-		#expect(error.errorDescription == "Parsing failed for URL: \(url.absoluteString); "
+		#expect(error.unredactedDescription == "Parsing failed for URL: \(url.absoluteString); "
 			+ "Missing required parameter: userId; Unsupported URL host: settings")
 	}
 
 	@Test
-	func `errorDescription for parsingFailed with no underlying errors omits the separator`() {
+	func `unredactedDescription for parsingFailed with no underlying errors omits the separator`() {
 		let url = Self.sampleURL
 		let error = DeepLinkError.parsingFailed(url: url, underlyingErrors: [])
 
-		#expect(error.errorDescription == "Parsing failed for URL: \(url.absoluteString)")
+		#expect(error.unredactedDescription == "Parsing failed for URL: \(url.absoluteString)")
 	}
 
 	@Test
-	func `errorDescription for handlerError appends the underlying cause when present`() {
+	func `unredactedDescription for handlerError appends the underlying cause when present`() {
 		let underlying = DeepLinkError.invalidURL(Self.sampleURL)
 		let error = DeepLinkError.handlerError(message: "route failed", underlyingError: underlying)
 
-		#expect(error.errorDescription == "Handler error: route failed: Invalid URL: \(Self.sampleURL.absoluteString)")
+		#expect(error.unredactedDescription == "Handler error: route failed: Invalid URL: \(Self.sampleURL.absoluteString)")
 	}
 
 	@Test
-	func `errorDescription for handlerError without an underlying cause stays minimal`() {
+	func `unredactedDescription for handlerError without an underlying cause stays minimal`() {
 		let error = DeepLinkError.handlerError(message: "route failed", underlyingError: nil)
 
-		#expect(error.errorDescription == "Handler error: route failed")
+		#expect(error.unredactedDescription == "Handler error: route failed")
 	}
 
 	// MARK: - Equatable

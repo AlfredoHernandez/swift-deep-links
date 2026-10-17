@@ -114,7 +114,7 @@ struct SignedLinkMiddlewareTests {
 	@Test(arguments: ["!!!", "", "a b"])
 	func `malformed signature is rejected`(signature: String) async throws {
 		let (sut, _) = makeSUT()
-		let link = try #require(URLComponents(string: "https://example.com/reset")).with(query: [("sig", signature)])
+		let link = try #require(URLComponents(string: "https://example.com/reset")).with(query: [("dlsig", signature)])
 
 		await #expect(throws: DeepLinkError.securityViolation(SignedLinkMiddleware.invalidSignatureReason)) {
 			try await sut.intercept(DeepLinkRequest(url: link))
@@ -125,8 +125,8 @@ struct SignedLinkMiddlewareTests {
 	func `duplicate signature parameter is rejected`() async throws {
 		let (sut, _) = makeSUT()
 		let signed = try sign("https://example.com/reset")
-		let signature = try #require(queryValue("sig", in: signed))
-		let duplicated = url(signed.absoluteString + "&sig=\(signature)")
+		let signature = try #require(queryValue("dlsig", in: signed))
+		let duplicated = url(signed.absoluteString + "&dlsig=\(signature)")
 
 		await #expect(throws: DeepLinkError.securityViolation(SignedLinkMiddleware.invalidSignatureReason)) {
 			try await sut.intercept(DeepLinkRequest(url: duplicated))
@@ -137,7 +137,7 @@ struct SignedLinkMiddlewareTests {
 	func `duplicate expiry parameter is rejected`() async throws {
 		let (sut, clock) = makeSUT()
 		let signed = try SignedLinkBuilder(key: key).sign(url("https://example.com/reset"), expiresAt: clock.now + 60)
-		let duplicated = url(signed.absoluteString + "&exp=1")
+		let duplicated = url(signed.absoluteString + "&dlexp=1")
 
 		await #expect(throws: DeepLinkError.securityViolation(SignedLinkMiddleware.invalidSignatureReason)) {
 			try await sut.intercept(DeepLinkRequest(url: duplicated))
@@ -148,7 +148,7 @@ struct SignedLinkMiddlewareTests {
 	func `failure reasons never contain the signature`() async throws {
 		let (sut, _) = makeSUT()
 		let tampered = try sign("https://example.com/reset?user=42").absoluteString.replacingOccurrences(of: "42", with: "43")
-		let signature = try #require(queryValue("sig", in: url(tampered)))
+		let signature = try #require(queryValue("dlsig", in: url(tampered)))
 
 		let error = await #expect(throws: DeepLinkError.self) {
 			try await sut.intercept(DeepLinkRequest(url: url(tampered)))
@@ -207,7 +207,7 @@ struct SignedLinkMiddlewareTests {
 		let keyring = SigningKeyring(keys: ["default": key, "other": otherKey], defaultKeyID: "default")
 		let (sut, _) = makeSUT(keys: keyring)
 		let link = try SignedLinkBuilder(key: otherKey, keyID: "other").sign(url("https://example.com/reset"))
-		let stripped = link.absoluteString.replacingOccurrences(of: "kid=other&", with: "")
+		let stripped = link.absoluteString.replacingOccurrences(of: "dlkid=other&", with: "")
 
 		await #expect(throws: DeepLinkError.securityViolation(SignedLinkMiddleware.invalidSignatureReason)) {
 			try await sut.intercept(DeepLinkRequest(url: url(stripped)))
@@ -272,9 +272,9 @@ struct SignedLinkMiddlewareTests {
 	@Test
 	func `malformed expiry is rejected even when signed`() async throws {
 		let (sut, _) = makeSUT()
-		let unsigned = try #require(URLComponents(string: "https://example.com/reset")).with(query: [("exp", "soon")])
+		let unsigned = try #require(URLComponents(string: "https://example.com/reset")).with(query: [("dlexp", "soon")])
 		let signature = try Base64URL.encoded(HMACSignedLinkSigner(key: key).signature(of: SignedLinkCanonicalForm.message(of: unsigned, parameters: .default)))
-		let link = try #require(URLComponents(url: unsigned, resolvingAgainstBaseURL: false)).with(query: [("exp", "soon"), ("sig", signature)])
+		let link = try #require(URLComponents(url: unsigned, resolvingAgainstBaseURL: false)).with(query: [("dlexp", "soon"), ("dlsig", signature)])
 
 		await #expect(throws: DeepLinkError.securityViolation(SignedLinkMiddleware.invalidExpiryReason)) {
 			try await sut.intercept(DeepLinkRequest(url: link))
@@ -396,6 +396,7 @@ struct SignedLinkMiddlewareTests {
 			keys: SigningKeyring(key: key),
 			requiredFor: .hosts(["example.com"]),
 			requiresExpiry: false,
+			maximumLifetime: nil,
 			dateProvider: clock.dateProvider,
 		)
 
@@ -414,6 +415,7 @@ private func makeSUT(
 	keys: any SigningKeyProvider = SigningKeyring(key: key),
 	requiredFor matcher: DeepLinkMatcher = .all,
 	requiresExpiry: Bool = false,
+	maximumLifetime: TimeInterval? = nil,
 	leeway: TimeInterval = 0,
 	nonceStore: (any NonceStore)? = nil,
 	stripsSignatureParameters: Bool = true,
@@ -424,6 +426,7 @@ private func makeSUT(
 		requiredFor: matcher,
 		requiresExpiry: requiresExpiry,
 		leeway: leeway,
+		maximumLifetime: maximumLifetime,
 		nonceStore: nonceStore,
 		stripsSignatureParameters: stripsSignatureParameters,
 		dateProvider: clock.dateProvider,

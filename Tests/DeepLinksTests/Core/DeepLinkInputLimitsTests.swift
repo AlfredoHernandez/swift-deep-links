@@ -135,6 +135,19 @@ struct DeepLinkInputLimitsTests {
 		_ = try URLCanonicalizer().canonicalize(url)
 	}
 
+	@Test(arguments: [true, false])
+	func `rejectingDuplicateParameters keeps every other limit`(rejects: Bool) {
+		let limits = DeepLinkInputLimits.recommended.rejectingDuplicateParameters(rejects)
+
+		let recommended = DeepLinkInputLimits.recommended
+		#expect(limits == DeepLinkInputLimits(
+			maxURLLength: recommended.maxURLLength,
+			maxQueryParameterCount: recommended.maxQueryParameterCount,
+			maxParameterValueLength: recommended.maxParameterValueLength,
+			rejectDuplicateParameters: rejects,
+		))
+	}
+
 	private func makeURL(queryCount: Int, valueLength: Int) throws -> URL {
 		let value = String(repeating: "v", count: valueLength)
 		let query = (0 ..< queryCount).map { "p\($0)=\(value)" }.joined(separator: "&")

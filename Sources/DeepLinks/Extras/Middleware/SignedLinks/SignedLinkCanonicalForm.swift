@@ -52,6 +52,16 @@ enum SignedLinkCanonicalForm {
 		URLText.decodedOnce(item.name)
 	}
 
+	/// Whether two query items share a decoded name. The canonical form sorts
+	/// items while ``DeepLinkURL`` keeps the last value, so reordering a
+	/// repeated name would keep the signature but change what the app reads.
+	static func repeatsParameterName(in url: URL) -> Bool {
+		var seen: Set<String> = []
+		return (URLComponents(url: url, resolvingAgainstBaseURL: false)?.percentEncodedQueryItems ?? [])
+			.filter { !$0.name.isEmpty || $0.value != nil }
+			.contains { !seen.insert(decodedName(of: $0)).inserted }
+	}
+
 	private static func rendered(_ item: URLQueryItem) -> String {
 		let name = PercentEncodingNormalizer.normalized(item.name)
 		return item.value.map { "\(name)=\(PercentEncodingNormalizer.normalized($0))" } ?? name

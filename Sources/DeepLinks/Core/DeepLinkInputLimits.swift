@@ -69,6 +69,16 @@ public struct DeepLinkInputLimits: Sendable, Equatable {
 		self.rejectDuplicateParameters = rejectDuplicateParameters
 	}
 
+	/// These limits with `rejectDuplicateParameters` replaced.
+	func rejectingDuplicateParameters(_ rejects: Bool) -> DeepLinkInputLimits {
+		DeepLinkInputLimits(
+			maxURLLength: maxURLLength,
+			maxQueryParameterCount: maxQueryParameterCount,
+			maxParameterValueLength: maxParameterValueLength,
+			rejectDuplicateParameters: rejects,
+		)
+	}
+
 	/// Checks `url` against every configured limit, cheapest first.
 	///
 	/// The length check runs before the query is parsed, so an oversized URL

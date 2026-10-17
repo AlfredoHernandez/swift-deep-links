@@ -28,7 +28,7 @@ struct SignedLinkKeysTests {
 	@Test
 	func `Ed25519 middleware verifies the pinned reference link and strips its parameters`() async throws {
 		let clock = ManualDateProvider(now: Date(timeIntervalSince1970: 1_700_000_000))
-		let sut = SignedLinkMiddleware(verifier: Ed25519PublicKeyring(keys: ["2026": Self.publicKey]), dateProvider: clock.dateProvider)
+		let sut = SignedLinkMiddleware(verifier: Ed25519PublicKeyring(keys: ["2026": Self.publicKey]), parameters: .legacy, dateProvider: clock.dateProvider)
 		let link = try #require(URL(string: "https://example.com/reset?user=42&kid=2026&exp=1700000060&nonce=n-1&sig=\(Self.pinnedSignature)"))
 
 		let verified = try await sut.intercept(DeepLinkRequest(url: link))
@@ -53,7 +53,7 @@ struct SignedLinkKeysTests {
 
 	@Test
 	func `Ed25519 keyring rejects HMAC links and unknown key ids`() async throws {
-		let sut = SignedLinkMiddleware(verifier: Ed25519PublicKeyring(keys: ["2026": Self.publicKey]), requiresExpiry: false)
+		let sut = SignedLinkMiddleware(verifier: Ed25519PublicKeyring(keys: ["2026": Self.publicKey]), requiresExpiry: false, maximumLifetime: nil)
 		let hmacSigned = try SignedLinkBuilder(key: SymmetricKey(size: .bits256), keyID: "2026").sign(#require(URL(string: "myapp://reset")))
 		let otherKeyID = try SignedLinkBuilder(signer: Ed25519LinkSigner(privateKey: Self.privateKey), keyID: "old").sign(#require(URL(string: "myapp://reset")))
 
@@ -77,8 +77,8 @@ struct SignedLinkKeysTests {
 
 	@Test
 	func `middleware refuses to verify with HMAC keys shorter than 256 bits`() async throws {
-		let sut = SignedLinkMiddleware(keys: SigningKeyring(key: SymmetricKey(data: Data(repeating: 1, count: 31))), requiresExpiry: false)
-		let link = try #require(URL(string: "myapp://reset?sig=AAAA"))
+		let sut = SignedLinkMiddleware(keys: SigningKeyring(key: SymmetricKey(data: Data(repeating: 1, count: 31))), requiresExpiry: false, maximumLifetime: nil)
+		let link = try #require(URL(string: "myapp://reset?dlsig=AAAA"))
 
 		await #expect(throws: DeepLinkError.securityViolation(SignedLinkMiddleware.weakKeyReason)) {
 			try await sut.intercept(DeepLinkRequest(url: link))

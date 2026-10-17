@@ -22,7 +22,7 @@ struct URLFuzzCorpusTests {
 
 	@Test
 	func `the default corpus keeps every case`() {
-		#expect(URLFuzzCorpus.hostile().count == 33)
+		#expect(URLFuzzCorpus.hostile().count == 36)
 	}
 
 	@Test

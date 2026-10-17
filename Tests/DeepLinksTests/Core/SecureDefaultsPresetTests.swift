@@ -24,6 +24,7 @@ struct SecureDefaultsPresetTests {
 		("myapp://home/a/%2e%2e/admin", .pathTraversal),
 		("https://evil.com/home", .unauthorizedHost),
 		("myapp://home?q=" + String(repeating: "a", count: 2000), .inputLimitExceeded),
+		("myapp://home?user=1&user=2", .duplicateParameter),
 	])
 	func `preset rejects links the hardened strategy and recommended limits reject`(
 		string: String,
@@ -41,6 +42,15 @@ struct SecureDefaultsPresetTests {
 		let sut = try makeSUT()
 
 		let result = try await sut.handle(url: #require(URL(string: "https://example.com/home")))
+
+		#expect(result.wasSuccessful)
+	}
+
+	@Test
+	func `preset accepts repeated parameters when duplicate rejection is turned off`() async throws {
+		let sut = try makeSUT(rejectDuplicateParameters: false)
+
+		let result = try await sut.handle(url: #require(URL(string: "myapp://home?tag=a&tag=b")))
 
 		#expect(result.wasSuccessful)
 	}
@@ -230,6 +240,7 @@ struct SecureDefaultsPresetTests {
 
 	private func makeSUT(
 		allowedSources: Set<DeepLinkContext.Source>? = nil,
+		rejectDuplicateParameters: Bool = true,
 		maxRequests: Int = 30,
 		replayWindow: TimeInterval = 2,
 	) throws -> DeepLinkCoordinator<TestRoute> {
@@ -240,6 +251,7 @@ struct SecureDefaultsPresetTests {
 				allowedSchemes: ["myapp", "https"],
 				allowedHostsByScheme: ["https": ["example.com"]],
 				allowedSources: allowedSources,
+				rejectDuplicateParameters: rejectDuplicateParameters,
 				maxRequests: maxRequests,
 				rateLimitPersistence: persistence,
 				replayWindow: replayWindow,

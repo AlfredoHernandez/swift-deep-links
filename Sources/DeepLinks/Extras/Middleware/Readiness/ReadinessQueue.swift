@@ -22,6 +22,16 @@ public protocol ReadinessQueue: ReadinessCondition {
 
 	/// Signals readiness and returns all pending URLs for reprocessing.
 	///
+	/// - Important: Prefer ``DeepLinkCoordinator/markReadyAndDrain(queue:)``.
+	///   The URLs are the ones the readiness gate received, **after** the
+	///   middleware before it ran (a signed link already has its signature
+	///   parameters removed), and what that middleware holds for them is not
+	///   settled (a signed link's nonce stays reserved until it lapses). Passing
+	///   them to ``DeepLinkCoordinator/handle(url:)`` runs the whole chain again
+	///   on the rewritten URL: signed links then fail as unsigned, replay
+	///   protection can drop them as repeats, the rate limit counts them twice,
+	///   and their source is lost.
+	///
 	/// - Returns: The URLs that were queued before readiness was signaled
 	func markReady() -> [URL]
 

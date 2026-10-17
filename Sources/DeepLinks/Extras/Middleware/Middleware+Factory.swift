@@ -302,11 +302,8 @@ public extension DeepLinkMiddleware where Self == ReadinessMiddleware {
 	/// // In the middleware stack
 	/// .readiness(queue: queue)
 	///
-	/// // When ready, drain and reprocess
-	/// let pending = queue.markReady()
-	/// for url in pending {
-	///     await coordinator.handle(url: url)
-	/// }
+	/// // When ready, drain: each link resumes right after this middleware
+	/// await coordinator.markReadyAndDrain(queue: queue)
 	/// ```
 	///
 	/// - Parameters:
@@ -326,7 +323,7 @@ public extension DeepLinkMiddleware where Self == ReadinessMiddleware {
 public extension DeepLinkMiddleware where Self == SignedLinkMiddleware {
 	/// Creates a middleware requiring an HMAC-SHA256 signature on the links `matcher` selects.
 	///
-	/// See ``SignedLinkMiddleware/init(keys:requiredFor:parameters:requiresExpiry:leeway:maximumLifetime:nonceStore:reusedNonce:stripsSignatureParameters:dateProvider:)``
+	/// See ``SignedLinkMiddleware/init(keys:requiredFor:parameters:requiresExpiry:leeway:maximumLifetime:nonceStore:reusedNonce:stripsSignatureParameters:rejectDuplicateParameters:dateProvider:)``
 	/// for the parameters.
 	static func signedLinks(
 		keys: any SigningKeyProvider,
@@ -334,10 +331,11 @@ public extension DeepLinkMiddleware where Self == SignedLinkMiddleware {
 		parameters: SignedLinkParameters = .default,
 		requiresExpiry: Bool = true,
 		leeway: TimeInterval = 0,
-		maximumLifetime: TimeInterval? = nil,
+		maximumLifetime: TimeInterval? = SignedLinkMiddleware.defaultMaximumLifetime,
 		nonceStore: (any NonceStore)? = nil,
 		reusedNonce: SignedLinkMiddleware.ReusedNonceResponse = .reject,
 		stripsSignatureParameters: Bool = true,
+		rejectDuplicateParameters: Bool = true,
 		dateProvider: @Sendable @escaping () -> Date = Date.init,
 	) -> SignedLinkMiddleware {
 		SignedLinkMiddleware(
@@ -350,6 +348,7 @@ public extension DeepLinkMiddleware where Self == SignedLinkMiddleware {
 			nonceStore: nonceStore,
 			reusedNonce: reusedNonce,
 			stripsSignatureParameters: stripsSignatureParameters,
+			rejectDuplicateParameters: rejectDuplicateParameters,
 			dateProvider: dateProvider,
 		)
 	}
@@ -357,7 +356,7 @@ public extension DeepLinkMiddleware where Self == SignedLinkMiddleware {
 	/// Creates a middleware requiring a signature checked by `verifier`, such as
 	/// an ``Ed25519PublicKeyring``, on the links `matcher` selects.
 	///
-	/// See ``SignedLinkMiddleware/init(verifier:requiredFor:parameters:requiresExpiry:leeway:maximumLifetime:nonceStore:reusedNonce:stripsSignatureParameters:dateProvider:)``
+	/// See ``SignedLinkMiddleware/init(verifier:requiredFor:parameters:requiresExpiry:leeway:maximumLifetime:nonceStore:reusedNonce:stripsSignatureParameters:rejectDuplicateParameters:dateProvider:)``
 	/// for the parameters.
 	static func signedLinks(
 		verifier: any SignedLinkVerifier,
@@ -365,10 +364,11 @@ public extension DeepLinkMiddleware where Self == SignedLinkMiddleware {
 		parameters: SignedLinkParameters = .default,
 		requiresExpiry: Bool = true,
 		leeway: TimeInterval = 0,
-		maximumLifetime: TimeInterval? = nil,
+		maximumLifetime: TimeInterval? = SignedLinkMiddleware.defaultMaximumLifetime,
 		nonceStore: (any NonceStore)? = nil,
 		reusedNonce: SignedLinkMiddleware.ReusedNonceResponse = .reject,
 		stripsSignatureParameters: Bool = true,
+		rejectDuplicateParameters: Bool = true,
 		dateProvider: @Sendable @escaping () -> Date = Date.init,
 	) -> SignedLinkMiddleware {
 		SignedLinkMiddleware(
@@ -381,6 +381,7 @@ public extension DeepLinkMiddleware where Self == SignedLinkMiddleware {
 			nonceStore: nonceStore,
 			reusedNonce: reusedNonce,
 			stripsSignatureParameters: stripsSignatureParameters,
+			rejectDuplicateParameters: rejectDuplicateParameters,
 			dateProvider: dateProvider,
 		)
 	}

@@ -39,9 +39,10 @@ public struct DeepLinkNotificationErrorDetail: Sendable {
 		self.describe = describe
 	}
 
-	/// Shows the error's `localizedDescription`, including any URL it carries.
+	/// Shows ``DeepLinkError/unredactedDescription`` for framework errors and
+	/// `localizedDescription` for others, including any URL they carry.
 	public static let full = DeepLinkNotificationErrorDetail { error in
-		error?.localizedDescription ?? "Unknown error"
+		error.map(DeepLinkError.unredactedDescription(of:)) ?? "Unknown error"
 	}
 
 	/// Shows ``DeepLinkError/redactedDescription`` for framework errors and

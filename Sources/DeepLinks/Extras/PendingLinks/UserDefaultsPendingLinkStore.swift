@@ -15,6 +15,14 @@ import Foundation
 /// and the source application reveals which app opened the link. Use
 /// ``InMemoryPendingLinkStore`` for such links, or keep them out of the
 /// protected set; ``removeAll()`` clears everything.
+///
+/// Anyone with access to the app container can edit `UserDefaults`, so the
+/// stored source and source application are not trusted: resumed links come
+/// back with ``DeepLinkContext/Source/unknown`` and no source application,
+/// keeping only the scene identifier, which merely picks a window. Rules
+/// restricting sources (`allowedSources`, ``DeepLinkMatcher/sources(_:)``) then
+/// treat a resumed link as unknown; use ``InMemoryPendingLinkStore``, which
+/// keeps the whole context, when such a rule must accept resumed links.
 public actor UserDefaultsPendingLinkStore: PendingLinkStore {
 	private let userDefaults: UserDefaults
 	private let key: String
@@ -65,11 +73,14 @@ public actor UserDefaultsPendingLinkStore: PendingLinkStore {
 	}
 
 	/// Returns the links saved less than `expiry` seconds ago, oldest first,
-	/// and removes the stored entry. Links stored in an older format, or with a source
-	/// this version does not know, come back with ``DeepLinkContext/unknown``.
+	/// and removes the stored entry. Each link comes back with
+	/// ``DeepLinkContext/Source/unknown`` and only its stored scene identifier,
+	/// whatever source the stored data claims.
 	public func takeAllRequests() async -> [DeepLinkRequest] {
 		defer { removeAll() }
-		return policy.unexpired(storedLinks(), at: now).map(\.request)
+		return policy.unexpired(storedLinks(), at: now).map { link in
+			DeepLinkRequest(url: link.url, context: DeepLinkContext(source: .unknown, sceneID: link.context?.sceneID))
+		}
 	}
 
 	/// Removes the stored entry; call it on sign-out.

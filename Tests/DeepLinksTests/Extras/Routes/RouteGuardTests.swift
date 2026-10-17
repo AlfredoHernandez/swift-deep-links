@@ -96,7 +96,7 @@ struct RouteGuardTests {
 			routing: DefaultDeepLinkRouting(parsers: [ImmediateParser(routes: [TestRoute.route1])]),
 			handler: handler.requiringSignature(for: .all),
 			middlewareCoordinator: DeepLinkMiddlewareCoordinator(middleware: [
-				SignedLinkMiddleware(keys: SigningKeyring(key: key), requiresExpiry: false),
+				SignedLinkMiddleware(keys: SigningKeyring(key: key), requiresExpiry: false, maximumLifetime: nil),
 				ReadinessMiddleware(queue: queue),
 			]),
 		)
@@ -115,7 +115,7 @@ struct RouteGuardTests {
 			routing: DefaultDeepLinkRouting(parsers: [ImmediateParser(routes: [TestRoute.route1])]),
 			handler: handler.requiringSignature(for: .all),
 			middlewareCoordinator: DeepLinkMiddlewareCoordinator(middleware: [
-				SignedLinkMiddleware(keys: SigningKeyring(key: key), requiresExpiry: false),
+				SignedLinkMiddleware(keys: SigningKeyring(key: key), requiresExpiry: false, maximumLifetime: nil),
 				kind.middleware(to: #require(URL(string: "myapp://admin"))),
 			]),
 		)
@@ -133,7 +133,7 @@ struct RouteGuardTests {
 			routing: DefaultDeepLinkRouting(parsers: [ImmediateParser(routes: [TestRoute.route1])]),
 			handler: handler.requiringSignature(for: .all),
 			middlewareCoordinator: DeepLinkMiddlewareCoordinator(middleware: [
-				SignedLinkMiddleware(keys: SigningKeyring(key: key), requiresExpiry: false),
+				SignedLinkMiddleware(keys: SigningKeyring(key: key), requiresExpiry: false, maximumLifetime: nil),
 				PassthroughMiddleware(),
 			]),
 		)
@@ -145,7 +145,7 @@ struct RouteGuardTests {
 
 	@Test
 	func `signed link middleware clears a verified flag it did not set`() async throws {
-		let middleware = SignedLinkMiddleware(keys: SigningKeyring(key: key), requiredFor: .paths(["/nothing"]), requiresExpiry: false)
+		let middleware = SignedLinkMiddleware(keys: SigningKeyring(key: key), requiredFor: .paths(["/nothing"]), requiresExpiry: false, maximumLifetime: nil)
 		var context = DeepLinkContext()
 		context.signatureVerifiedURL = otherURL
 
@@ -212,7 +212,7 @@ struct RouteGuardTests {
 			routing: DefaultDeepLinkRouting(parsers: [ImmediateParser(routes: [TestRoute.route1])]),
 			handler: CollectingHandler<TestRoute>().confirming(.all) { _, _ in false },
 			middlewareCoordinator: DeepLinkMiddlewareCoordinator(middleware: [
-				SignedLinkMiddleware(keys: SigningKeyring(keys: ["k1": key]), requiresExpiry: false),
+				SignedLinkMiddleware(keys: SigningKeyring(keys: ["k1": key]), requiresExpiry: false, maximumLifetime: nil),
 			]),
 		)
 		let link = try SignedLinkBuilder(key: key, keyID: "k1").sign(#require(URL(string: "myapp://pay?amount=5")), nonce: "n-1")
@@ -253,7 +253,7 @@ private struct SignedPipeline {
 			routing: DefaultDeepLinkRouting(parsers: [ImmediateParser(routes: [TestRoute.route1])]),
 			handler: handler.requiringSignature(for: .routes { $0 == .route1 }),
 			middlewareCoordinator: DeepLinkMiddlewareCoordinator(middleware: [
-				SignedLinkMiddleware(keys: SigningKeyring(key: key), requiredFor: .paths(["/nothing"]), requiresExpiry: false),
+				SignedLinkMiddleware(keys: SigningKeyring(key: key), requiredFor: .paths(["/nothing"]), requiresExpiry: false, maximumLifetime: nil),
 			]),
 		)
 	}

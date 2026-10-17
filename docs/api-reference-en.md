@@ -89,7 +89,7 @@ public struct DeepLinkContext: Sendable, Hashable {
 }
 ```
 
-The context is a claim made by your entry point, not proof: any app can open a custom scheme. Use it to restrict sensitive flows (`.security(..., allowedSources: [.universalLink])`), never to trust a link. `openedURL(_:)` maps custom schemes to `.customScheme` and `http(s)` to `.unknown`, because an open-URL callback does not prove associated-domain verification; only browsing-web activities (`handle(activity:)`, `onDeepLink`) are `.universalLink`. Links replayed by `markReadyAndDrain(queue:)` and `resumePendingLinks(from:)` keep the context they arrived with (custom queues and stores that implement only the URL requirements replay with `.unknown`).
+The context is a claim made by your entry point, not proof: any app can open a custom scheme. Use it to restrict sensitive flows (`.security(..., allowedSources: [.universalLink])`), never to trust a link. `openedURL(_:)` maps custom schemes to `.customScheme` and `http(s)` to `.unknown`, because an open-URL callback does not prove associated-domain verification; only browsing-web activities (`handle(activity:)`, `onDeepLink`) are `.universalLink`. Links replayed by `markReadyAndDrain(queue:)` and by `resumePendingLinks(from:)` with an `InMemoryPendingLinkStore` keep the context they arrived with; `UserDefaultsPendingLinkStore` resumes them as `.unknown` with only their scene (anyone with access to the app container can edit what it stores), and custom queues and stores that implement only the URL requirements replay with `.unknown`.
 
 ## Core Types
 
@@ -179,6 +179,7 @@ public struct DeepLinkCoordinatorBuilder<Route: DeepLinkRoute>: Sendable {
         allowedHosts: Set<String> = [],
         allowedHostsByScheme: [String: Set<String>] = [:],
         allowedSources: Set<DeepLinkContext.Source>? = nil,
+        rejectDuplicateParameters: Bool = true,   // 2.0.1
         maxRequests: Int = 30,
         timeWindow: TimeInterval = 60,
         rateLimitPersistence: (any RateLimitPersistence)? = nil,
@@ -189,7 +190,7 @@ public struct DeepLinkCoordinatorBuilder<Route: DeepLinkRoute>: Sendable {
 }
 ```
 
-`secureDefaults` puts `SecurityMiddleware` (`.hardened`, `limits: .recommended`), `RateLimitMiddleware` and `ReplayProtectionMiddleware` in front of every other middleware, whatever the call order; calling it again replaces the preset, and combining it with `middlewareCoordinator(_:)` makes `build()` throw. It leaves out signed links, confirmation, authentication, readiness, transforms, analytics, `blockedPatterns` and duplicate-parameter rejection. In debug builds, `build()` logs a warning when no `SecurityMiddleware` is registered.
+`secureDefaults` puts `SecurityMiddleware` (`.hardened`, `limits: .recommended`), `RateLimitMiddleware` and `ReplayProtectionMiddleware` in front of every other middleware, whatever the call order; calling it again replaces the preset, and combining it with `middlewareCoordinator(_:)` makes `build()` throw. Since 2.0.1 it also rejects repeated query parameter names (`securityViolation("Duplicate query parameter")`); pass `rejectDuplicateParameters: false` if your links carry lists as repeated parameters. It leaves out signed links, confirmation, authentication, readiness, transforms, analytics and `blockedPatterns`. In debug builds, `build()` logs a warning when no `SecurityMiddleware` is registered.
 
 ### DeepLinkResult
 
@@ -254,8 +255,10 @@ public enum DeepLinkError: Error, Sendable, Equatable, LocalizedError {
     case blockedURL(URL)
     case confirmationDenied(URL)      // 2.0: user declined or did not answer
 
+    public var errorDescription: String? { get }        // 2.0.1: redactedDescription
     public var redactedDescription: String { get }
     public func redactedDescription(using redactor: URLRedactor) -> String
+    public var unredactedDescription: String { get }    // 2.0.1: full URLs and values, debugging only
 }
 ```
 
@@ -264,7 +267,7 @@ public enum DeepLinkError: Error, Sendable, Equatable, LocalizedError {
 ```swift
 public struct DeepLinkLogPrivacy: Sendable {
     public static let redacted: DeepLinkLogPrivacy        // default URLRedactor
-    public static let unredacted: DeepLinkLogPrivacy      // full URLs and localizedDescription
+    public static let unredacted: DeepLinkLogPrivacy      // full URLs and unredactedDescription
     public static func redacted(using redactor: URLRedactor) -> DeepLinkLogPrivacy
     public func redact(_ url: URL) -> URL
     public func describe(_ url: URL) -> String
@@ -285,7 +288,7 @@ LoggingProvider.console(privacy: .unredacted)
 .notification(errorDetail: .full)
 ```
 
-`errorDescription` embeds full URLs. `redactedDescription` escapes control and line-separator characters (`\n`), so it is always one log line. Use `redactedDescription` for logs, analytics and user-facing text: carried URLs and every `scheme://` URL embedded in a message, host or reason go through `URLRedactor`, the value in `invalidParameterValue` is always replaced, and underlying errors that are not `DeepLinkError` are described only by their type name.
+Since 2.0.1 `errorDescription`, and therefore `localizedDescription` and string interpolation of the error, is `redactedDescription`; `unredactedDescription` keeps the full URLs and values (nested `DeepLinkError`s unredacted too, other errors by `localizedDescription`) for debugging. Free text carried by `unsupportedScheme`, `unsupportedHost`, `missingRequiredParameter`, `missingRequiredConfiguration`, `securityViolation` and the `handlerError` message is redacted only where it embeds a `scheme://` URL, and the parameter name of `invalidParameterValue` is kept, so do not put secrets in those strings. `redactedDescription` escapes control and line-separator characters (`\n`), so it is always one log line: carried URLs and every `scheme://` URL embedded in a message, host or reason go through `URLRedactor`, the value in `invalidParameterValue` is always replaced, and underlying errors that are not `DeepLinkError` are described only by their type name.
 
 ### URLRedactor
 
@@ -435,16 +438,20 @@ Available where `CryptoKit` can be imported.
 public final class SignedLinkMiddleware: DeepLinkMiddleware {
     public convenience init(keys: any SigningKeyProvider, requiredFor matcher: DeepLinkMatcher = .all,
                 parameters: SignedLinkParameters = .default, requiresExpiry: Bool = true,
-                leeway: TimeInterval = 0, maximumLifetime: TimeInterval? = nil,
+                leeway: TimeInterval = 0,
+                maximumLifetime: TimeInterval? = SignedLinkMiddleware.defaultMaximumLifetime,  // 2.0.1: 7 days; nil = no cap
                 nonceStore: (any NonceStore)? = nil,
                 reusedNonce: ReusedNonceResponse = .reject,   // or .drop: stop silently
                 stripsSignatureParameters: Bool = true,
+                rejectDuplicateParameters: Bool = true,       // 2.0.1
                 dateProvider: @Sendable @escaping () -> Date = Date.init)
     public init(verifier: any SignedLinkVerifier, /* same parameters as above */)
     public static let missingSignatureReason, invalidSignatureReason, missingExpiryReason,
                       invalidExpiryReason, expiredReason, missingNonceReason, reusedNonceReason,
-                      lifetimeTooLongReason, weakKeyReason, signingFailedReason: String
+                      lifetimeTooLongReason, weakKeyReason, signingFailedReason,
+                      duplicateParameterReason: String
     public static let minimumKeyByteCount: Int  // 32
+    public static let defaultMaximumLifetime: TimeInterval  // 604800 (7 days)
 }
 
 public protocol SignedLinkVerifier: Sendable {
@@ -491,15 +498,33 @@ public actor UserDefaultsNonceStore: NonceStore {
 }
 
 public struct SignedLinkBuilder: Sendable {
-    public init(key: SymmetricKey, keyID: String? = nil, parameters: SignedLinkParameters = .default)  // HMAC-SHA256
-    public init(signer: any SignedLinkSigner, keyID: String? = nil, parameters: SignedLinkParameters = .default)
+    public init(key: SymmetricKey, keyID: String? = nil, parameters: SignedLinkParameters = .default,
+                rejectDuplicateParameters: Bool = true)  // HMAC-SHA256
+    public init(signer: any SignedLinkSigner, keyID: String? = nil, parameters: SignedLinkParameters = .default,
+                rejectDuplicateParameters: Bool = true)
     public func sign(_ url: URL, expiresAt: Date? = nil, nonce: String? = nil) throws(DeepLinkError) -> URL
 }
 
-public struct SignedLinkParameters: Sendable, Hashable {  // sig, exp, nonce, kid
-    public init(signature: String = "sig", expiry: String = "exp", nonce: String = "nonce", keyID: String = "kid")
+public struct SignedLinkParameters: Sendable, Hashable {
+    public static let `default`: SignedLinkParameters  // 2.0.1: dlsig, dlexp, dlnonce, dlkid
+    public static let legacy: SignedLinkParameters     // 2.0.0 names: sig, exp, nonce, kid
+    public init(signature: String = "dlsig", expiry: String = "dlexp", nonce: String = "dlnonce", keyID: String = "dlkid")
 }
 ```
+
+> **Parameter names (2.0.1).** The default names are `dlsig`, `dlexp`,
+> `dlnonce` and `dlkid`, so an app parameter that happens to be called `sig`
+> is no longer taken for a signature (any link carrying the configured
+> signature parameter is verified). Links minted by 2.0.0 use `sig`, `exp`,
+> `nonce` and `kid`: pass `parameters: .legacy` to `.signedLinks(...)` until
+> they have all expired (and to `SignedLinkBuilder` while your server still
+> mints them), then switch both sides to the default. The initializer's
+> defaults changed too, so `SignedLinkParameters(signature: "mysig")` now pairs
+> `mysig` with `dlexp`, `dlnonce` and `dlkid`; to change one 2.0.0 name, start
+> from `var names = SignedLinkParameters.legacy` and set that field. `URLRedactor`
+> redacts `dlsig`, `sig` and any name containing `nonce`; add a custom signature
+> name to `sensitiveKeys`. Below, `sig`, `exp`, `nonce` and `kid` stand for
+> whichever names you configure.
 
 **Canonical form** (what the HMAC covers; implement it identically on your server): seven lines joined by `\n`, no trailing newline:
 
@@ -509,15 +534,15 @@ DLSIG1
 <percent-encoded host, lower-cased>
 <port, or empty>
 <percent-encoded path>
-<query items except sig, "name=value" or "name", sorted by UTF-8 bytes, joined by "&">
+<query items except the signature, "name=value" or "name", sorted by UTF-8 bytes, joined by "&">
 <percent-encoded fragment, or empty>
 ```
 
-Path, query items and fragment first decode escapes of RFC 3986 unreserved characters (`A-Z a-z 0-9 - . _ ~`) and upper-case the remaining escapes. The signature is `base64url(HMAC-SHA256(key, canonical))`, or `base64url(Ed25519-sign(privateKey, canonical))` (RFC 8032) with `Ed25519PublicKeyring`, without padding, appended as the last `sig` parameter.
+Path, query items and fragment first decode escapes of RFC 3986 unreserved characters (`A-Z a-z 0-9 - . _ ~`) and upper-case the remaining escapes. The signature is `base64url(HMAC-SHA256(key, canonical))`, or `base64url(Ed25519-sign(privateKey, canonical))` (RFC 8032) with `Ed25519PublicKeyring`, without padding, appended as the last signature parameter (`dlsig` by default). Because the query is sorted, `?user=1&user=2` and `?user=2&user=1` share a canonical form while `DeepLinkURL.queryParameters` reads the last value, so since 2.0.1 both the builder (`invalidURL`) and the middleware (`duplicateParameterReason`) reject a link repeating a decoded parameter name; pass `rejectDuplicateParameters: false` on both only if every reader of repeated parameters reads all their values in order.
 
-**Keys.** An HMAC key both verifies and mints links, and anything in an app binary or on a device can be extracted, so a leaked key forges links for every install. Prefer Ed25519: the app embeds only public keys (`Ed25519PublicKeyring`) and the server keeps the private key (`Ed25519LinkSigner`). HMAC keys shorter than `minimumKeyByteCount` (32) bytes throw `securityViolation(weakKeyReason)` from both `SignedLinkBuilder.sign` and verification. Nonce stores are per install, so a link stays usable once on each device until it expires: keep lifetimes short and set `maximumLifetime` to reject links whose `exp` is further ahead (`lifetimeTooLongReason`; it requires an expiry). `kid`, `exp` and `nonce` are ordinary query items and therefore signed. Userinfo (`user:pass@`) is not part of the canonical form: keep `.security(...)` with `.hardened` (which rejects userinfo) in front. Links from notifications, Spotlight and quick actions are checked like any other, so payloads pointing at a signed path must carry the signed URL.
+**Keys.** An HMAC key both verifies and mints links, and anything in an app binary or on a device can be extracted, so a leaked key forges links for every install. Prefer Ed25519: the app embeds only public keys (`Ed25519PublicKeyring`) and the server keeps the private key (`Ed25519LinkSigner`). HMAC keys shorter than `minimumKeyByteCount` (32) bytes throw `securityViolation(weakKeyReason)` from both `SignedLinkBuilder.sign` and verification. Nonce stores are per install, so a link stays usable once on each device until it expires: keep lifetimes short; `maximumLifetime` (seven days by default since 2.0.1, `nil` for no cap) rejects links whose `exp` is further ahead (`lifetimeTooLongReason`). A lifetime cap requires an expiry, so `requiresExpiry: false` only takes effect together with `maximumLifetime: nil`. `DeepLinkDiagnostics.checkMiddleware(_:)` reports HMAC keyrings (`.signedLinksWithSymmetricKey`), a `nil` lifetime (`.signedLinksWithoutMaximumLifetime`) and a missing nonce store. `kid`, `exp` and `nonce` are ordinary query items and therefore signed. Userinfo (`user:pass@`) is not part of the canonical form: keep `.security(...)` with `.hardened` (which rejects userinfo) in front. Links from notifications, Spotlight and quick actions are checked like any other, so payloads pointing at a signed path must carry the signed URL.
 
-Checks run in order: one `sig` and at most one `kid`/`exp`/`nonce`; constant-time HMAC verification with the key returned for `kid` (an unknown key id fails like a bad signature); `exp` (whole seconds since 1970, valid while `now < exp + leeway`; `leeway` only extends validity after expiry and counts as `0` when negative, infinite or NaN), required when `requiresExpiry` is `true` or a nonce store is set; finally the nonce is consumed (only after the signature is verified, so forged links cannot burn nonces). Failures throw `DeepLinkError.securityViolation` with one of the fixed reasons. Links the matcher does not select pass unchanged. `InMemoryNonceStore` keeps nonces until their link expires and rejects new nonces when `maxEntries` live ones are stored, rather than evicting one that could then be replayed; it does not survive relaunch. `UserDefaultsNonceStore` persists spent nonces (versioned JSON, pruned by expiry on load and when full) so links stay single-use across launches; open reservations live in memory and are dropped on relaunch, so a link interrupted by termination can be retried (a link whose handler finished just before the app was killed, before the commit was written, could run once more within its expiry). It writes only when the spent set changes. Unreadable stored data is logged and starts an empty store; data from a newer format version is kept and the store fails closed (refuses every nonce) until it is cleared; a nonce whose spending cannot be written is refused. Checks are atomic within one process only: an app extension sharing the suite through an app group keeps its own copy, so use distinct keys per process or a server-side store. Inside `DeepLinkCoordinator` the nonce is reserved when the link passes and settled through `didFinish(_:outcome:)`: committed once a handler ran (even one that threw, outcome `.handlerFailed`), kept while a readiness queue holds the link (settled when it drains, released if the queue evicts or resets it), released when a later middleware or the router stopped or failed it before any handler ran, so the link can be retried or resumed after sign-in. Called directly, the middleware consumes at once. Place `.replayProtection(...)` before `.signedLinks(...)` so a duplicate delivery is dropped quietly, or pass `reusedNonce: .drop`.
+Checks run in order: one `sig` and at most one `kid`/`exp`/`nonce`; no other repeated parameter name (unless `rejectDuplicateParameters` is `false`); constant-time HMAC verification with the key returned for `kid` (an unknown key id fails like a bad signature); `exp` (whole seconds since 1970, valid while `now < exp + leeway`; `leeway` only extends validity after expiry and counts as `0` when negative, infinite or NaN), required when `requiresExpiry` is `true`, a nonce store or a maximum lifetime is set; finally the nonce is consumed (only after the signature is verified, so forged links cannot burn nonces). Failures throw `DeepLinkError.securityViolation` with one of the fixed reasons. Links the matcher does not select pass unchanged. `InMemoryNonceStore` keeps nonces until their link expires and rejects new nonces when `maxEntries` live ones are stored, rather than evicting one that could then be replayed; it does not survive relaunch. `UserDefaultsNonceStore` persists spent nonces (versioned JSON, pruned by expiry on load and when full) so links stay single-use across launches; open reservations live in memory and are dropped on relaunch, so a link interrupted by termination can be retried (a link whose handler finished just before the app was killed, before the commit was written, could run once more within its expiry). It writes only when the spent set changes. Unreadable stored data is logged and starts an empty store; data from a newer format version is kept and the store fails closed (refuses every nonce) until it is cleared; a nonce whose spending cannot be written is refused. Checks are atomic within one process only: an app extension sharing the suite through an app group keeps its own copy, so use distinct keys per process or a server-side store. Inside `DeepLinkCoordinator` the nonce is reserved when the link passes and settled through `didFinish(_:outcome:)`: committed once a handler ran (even one that threw, outcome `.handlerFailed`), kept while a readiness queue holds the link (settled when it drains, also through a second readiness gate, released if a queue evicts or resets it), released when a later middleware or the router stopped or failed it before any handler ran, so the link can be retried or resumed after sign-in. Called directly, the middleware consumes at once. Place `.replayProtection(...)` before `.signedLinks(...)` so a duplicate delivery is dropped quietly, or pass `reusedNonce: .drop`.
 
 ### ConfirmationMiddleware
 
@@ -561,8 +586,12 @@ public struct SignedRouteGuard<Route: DeepLinkRoute>: DeepLinkHandler {
 }
 
 public struct ConfirmingHandler<Route: DeepLinkRoute>: DeepLinkHandler {
+    public static var defaultTimeout: Duration { get }          // ConfirmationMiddleware.defaultTimeout (60 s)
+    public static var defaultMaxPendingPrompts: Int { get }     // ConfirmationMiddleware.defaultMaxPendingPrompts (2)
     public init(_ handler: any DeepLinkHandler<Route>, requiredFor matcher: RouteMatcher<Route>,
-                timeout: Duration? = nil, sleep: … = { try await Task.sleep(for: $0) },
+                timeout: Duration? = ConfirmationMiddleware.defaultTimeout,                         // 2.0.1 (was nil)
+                maxPendingPrompts: Int = ConfirmationMiddleware.defaultMaxPendingPrompts,         // 2.0.1
+                sleep: … = { try await Task.sleep(for: $0) },
                 confirm: @Sendable @escaping (Route, DeepLinkContext) async -> Bool)
 }
 
@@ -574,12 +603,13 @@ public struct AuthenticatedHandler<Route: DeepLinkRoute>: DeepLinkHandler {
 public extension DeepLinkHandler {
     func requiringSignature(for matcher: RouteMatcher<Route>) -> SignedRouteGuard<Route>
     func requiringAuthentication(for matcher: RouteMatcher<Route>, provider: any AuthenticationProvider) -> AuthenticatedHandler<Route>
-    func confirming(_ matcher: RouteMatcher<Route>, timeout: Duration? = nil,
+    func confirming(_ matcher: RouteMatcher<Route>, timeout: Duration? = ConfirmationMiddleware.defaultTimeout,
+                    maxPendingPrompts: Int = ConfirmationMiddleware.defaultMaxPendingPrompts,
                     confirm: @Sendable @escaping (Route, DeepLinkContext) async -> Bool) -> ConfirmingHandler<Route>
 }
 ```
 
-Route rules decide on the route the parsers produced, so they hold however the URL was spelled; they are the strongest protection. `SignedRouteGuard` throws `securityViolation(unsignedRouteReason)` for a protected route unless `context.isSignatureVerified`, which only `SignedLinkMiddleware` sets (it verifies every link carrying a signature, whatever its URL rule); keep that middleware in the chain: without it (or without CryptoKit, which it needs) the guard fails closed and rejects every protected route. `ConfirmingHandler` asks `confirm` with the route, so the prompt can describe the action; denial or timeout throws `confirmationDenied` with the URL the router received, signature parameters already stripped (`about:blank` outside a coordinator), and the timeout wins even if `confirm` ignores cancellation. `AuthenticatedHandler` checks `provider.isAuthenticated()` when a protected route runs and throws `unauthorizedAccess` with the routed URL (`about:blank` outside a coordinator); it does not save pending links, so keep `AuthenticationMiddleware` in front when links should resume after sign-in. Use URL rules (`DeepLinkMatcher`) in addition when you want to reject before parsing and other middleware run.
+Route rules decide on the route the parsers produced, so they hold however the URL was spelled; they are the strongest protection. `SignedRouteGuard` throws `securityViolation(unsignedRouteReason)` for a protected route unless `context.isSignatureVerified`, which only `SignedLinkMiddleware` sets (it verifies every link carrying a signature, whatever its URL rule); keep that middleware in the chain: without it (or without CryptoKit, which it needs) the guard fails closed and rejects every protected route. `ConfirmingHandler` asks `confirm` with the route, so the prompt can describe the action; denial or timeout throws `confirmationDenied` with the URL the router received, signature parameters already stripped (`about:blank` outside a coordinator), and the timeout wins even if `confirm` ignores cancellation. Since 2.0.1 it follows `ConfirmationMiddleware`'s rules: prompts are shown one at a time in arrival order, the timeout (60 seconds by default; `nil` waits forever) counts from arrival, and at most `maxPendingPrompts` routes (2 by default) wait or prompt at once, the rest failing with `securityViolation(ConfirmationMiddleware.tooManyPendingPromptsReason)` without a prompt; copies of the handler share one queue. A declined, timed-out or rejected route releases a signed link's nonce. `AuthenticatedHandler` checks `provider.isAuthenticated()` when a protected route runs and throws `unauthorizedAccess` with the routed URL (`about:blank` outside a coordinator); it does not save pending links, so keep `AuthenticationMiddleware` in front when links should resume after sign-in. Use URL rules (`DeepLinkMatcher`) in addition when you want to reject before parsing and other middleware run.
 
 ### DeepLinkMatcher
 
@@ -598,7 +628,7 @@ public struct DeepLinkMatcher: Sendable {
 }
 ```
 
-Selects the links a policy middleware applies to. Hosts compare case-insensitively after percent-decoding, ignoring a trailing dot; a hostless custom-scheme link (`myapp:///reset`, `myapp:reset`) is matched by its first path segment, and an undecodable host matches. `paths` matches a prefix on segment boundaries (`/reset` matches `/reset/abc`, not `/resetting`), case-insensitively, after percent-decoding (up to `URLCanonicalizer.maximumDecodingPasses` times), collapsing empty segments, treating `\` as a separator, dropping `;` parameters and invisible or control characters, and resolving `.`/`..`, so encoded spellings of a protected path stay protected. A path that cannot be decoded, or is still encoded after the last pass, matches every prefix (fail closed). For schemes other than `http(s)` the host is also matched as the first segment, so `.paths(["/reset"])` covers `myapp://reset` and `https://example.com/reset`; web hosts never count as path segments.
+Selects the links a policy middleware applies to. Hosts compare case-insensitively after percent-decoding, ignoring a trailing dot; a hostless custom-scheme link (`myapp:///reset`, `myapp:reset`) is matched by its first path segment, and an undecodable host matches. `paths` matches a prefix on segment boundaries (`/reset` matches `/reset/abc`, not `/resetting`), case-insensitively, after percent-decoding (up to `URLCanonicalizer.maximumDecodingPasses` times), collapsing empty segments, treating `\` as a separator, dropping `;` parameters and invisible or control characters, reading segments of fullwidth or ideographic full stops as dots (2.0.1), and resolving `.`/`..`, so encoded spellings of a protected path stay protected. A path that cannot be decoded, or is still encoded after the last pass, matches every prefix (fail closed). For schemes other than `http(s)` the host is also matched as the first segment, so `.paths(["/reset"])` covers `myapp://reset` and `https://example.com/reset`; web hosts never count as path segments.
 
 ### URLCanonicalizer
 
@@ -612,7 +642,7 @@ public struct URLCanonicalizer: Sendable {
 }
 ```
 
-`canonicalize(_:)` lower-cases the scheme and host and throws `DeepLinkError.securityViolation` for userinfo, control characters, invisible Unicode format and line/paragraph separator characters (bidi overrides, zero-width space, BOM, U+2028/U+2029; this also rejects the zero-width joiner in emoji sequences), `..` path segments (raw or percent-encoded, including `%252e%252e` and `..%5C`), and malformed or over-nested percent-encoding. The `..` check covers the path only, not the query or fragment. Each decoding pass decodes every valid `%HH` escape and keeps invalid ones literally, so a stray `%zz` cannot hide what follows. `matchableForms(of:)` returns the raw absolute string followed by each percent-decoding pass.
+`canonicalize(_:)` lower-cases the scheme and host and throws `DeepLinkError.securityViolation` for userinfo, control characters, invisible Unicode format and line/paragraph separator characters (bidi overrides, zero-width space, BOM, U+2028/U+2029; this also rejects the zero-width joiner in emoji sequences), `..` path segments (raw or percent-encoded, including `%252e%252e` and `..%5C`; since 2.0.1 read like `DeepLinkMatcher` reads paths, ignoring `;` parameters, so `/a/..;/admin` and `/.%2e;x/` are rejected), path segments made only of dots that include a fullwidth or ideographic full stop (`．`, `。`, `｡`, which normalizing servers fold into `.`), and malformed or over-nested percent-encoding. The `..` check covers the path only, not the query or fragment. Each decoding pass decodes every valid `%HH` escape and keeps invalid ones literally, so a stray `%zz` cannot hide what follows. `matchableForms(of:)` returns the raw absolute string followed by each percent-decoding pass.
 
 ### DeepLinkInputLimits
 
@@ -654,7 +684,7 @@ public extension DeepLinkCoordinator {
 }
 ```
 
-`AuthenticationMiddleware` saves the link as it entered the chain, with its context, and `resumePendingLinks(from:)` replays it with that context through the whole chain. `UserDefaultsPendingLinkStore` persists the context as versioned JSON (`source`, `sourceApplication`, `sceneID`; plain text in `UserDefaults`, like the URL) but never the signature-verified flag, so a resumed link is verified again; links saved by 1.x or with an unknown source load as `.unknown`.
+`AuthenticationMiddleware` saves the link as it entered the chain, with its context, and `resumePendingLinks(from:)` replays it with that context through the whole chain. `UserDefaultsPendingLinkStore` persists the context as versioned JSON (`source`, `sourceApplication`, `sceneID`; plain text in `UserDefaults`, like the URL) but never the signature-verified flag, so a resumed link is verified again. Since 2.0.1 it does not trust what it reads back: anyone with access to the app container can edit `UserDefaults`, so resumed links carry `.unknown` and no source application, keeping only `sceneID`. Source rules (`allowedSources`, `DeepLinkMatcher.sources(_:)`) therefore treat them as unknown; use `InMemoryPendingLinkStore` when such a rule must accept resumed links.
 
 `AuthenticationStrategy.standard` matches `protectedHosts` like `DeepLinkMatcher.hosts(_:)`: case-insensitively, after percent-decoding, ignoring a trailing dot, and reading the first path segment of a hostless custom-scheme link (`myapp:///account/x`, `myapp:/account`, `myapp:account/x`) as its host. `AuthenticationMiddleware(authProvider:requiredFor:pendingLinks:pendingSources:)` / `.authentication(provider:requiredFor:pendingLinks:pendingSources:)` takes any `DeepLinkMatcher` instead (for example `.paths(["/admin"])`). Route rules (`requiringAuthentication(for:provider:)`) are the strongest.
 
@@ -692,7 +722,7 @@ public final class DeepLinkReadinessQueue: ReadinessQueue, Sendable {
     public init(maxQueueSize: Int? = defaultMaxQueueSize, onEvict: (@Sendable (URL) -> Void)? = nil)  // size clamped to min 1; nil is unbounded
     public var isReady: Bool { get }
     public func enqueue(_ url: URL) -> URL?
-    public func markReady() -> [URL]       // idempotent; drains the queue
+    public func markReady() -> [URL]       // idempotent; drains the queue (prefer markReadyAndDrain)
     public var pendingCount: Int { get }
     public var pendingURLs: [URL] { get }  // snapshot without draining
     public func reset()                    // re-gates, discards pending
@@ -705,9 +735,15 @@ public final class DeepLinkReadinessQueue: ReadinessQueue, Sendable {
 > `onEvict` to observe the oldest links dropped to make room; it runs after the
 > queue lock is released, on the enqueuing thread.
 
-> Prefer `pendingURLs` over `markReady()` when you only need to inspect the queue.
-> Calling `markReady()` drains the queue — dropping the returned URLs loses them
-> permanently.
+> **Drain with `coordinator.markReadyAndDrain(queue:)`, not `markReady()`.**
+> `markReady()` returns the URLs as the readiness gate received them, after the
+> middleware before it ran (a signed link has already lost its signature
+> parameters), and leaves what that middleware holds unsettled (a signed link's
+> nonce stays reserved until it lapses). Feeding them to `handle(url:)` runs
+> the whole chain again on the rewritten URL: signed links fail as unsigned,
+> replay protection can drop them, the rate limit counts them twice and their
+> source is lost. Prefer `pendingURLs` when you only need to inspect the queue;
+> calling `markReady()` drains it, and dropping the returned URLs loses them.
 
 ### Coordinator helper
 
@@ -746,7 +782,7 @@ Value types (structs) and actors can now adopt `DeepLinkCoordinatorDelegate`; th
 .notification(showSuccess:showErrors:showInfo:presenter:errorDetail:)   // iOS, macOS, watchOS, visionOS only
 ```
 
-`errorDetail` (`DeepLinkNotificationErrorDetail`) controls failure text: `.full` (default, `localizedDescription`), `.redacted` / `.redacted(using:)` (`redactedDescription`, type name for foreign errors) or `.generic` (no error text). Notifications can appear on the lock screen, so prefer `.redacted` or `.generic`.
+`errorDetail` (`DeepLinkNotificationErrorDetail`) controls failure text: `.full` (`unredactedDescription` for framework errors, `localizedDescription` for others), `.redacted` (default) / `.redacted(using:)` (`redactedDescription`, type name for foreign errors) or `.generic` (no error text). Notifications can appear on the lock screen, so prefer `.redacted` or `.generic`.
 
 ### Notification Presenter
 
@@ -899,10 +935,12 @@ public enum DeepLinkDiagnosticWarning: Sendable, Hashable, CustomStringConvertib
     case unhandledProbe(URL)
     case shadowedParsers(probe: URL, handledBy: Int, shadowed: [Int])
     case signedLinksWithoutNonceStore   // .signedLinks(...) without nonceStore: links reusable until expiry
+    case signedLinksWithSymmetricKey    // 2.0.1: HMAC keyring; an extracted key forges links
+    case signedLinksWithoutMaximumLifetime  // 2.0.1: maximumLifetime: nil
 }
 ```
 
-Run it from a unit test or a `#if DEBUG` hook; it never changes link handling. `checkMiddleware(_:)` takes the chain you pass the builder and warns about every `SignedLinkMiddleware` without a `nonceStore` (its links can be opened again until they expire). **Limits:** entitlements cannot be read at runtime, so pass your `applinks:` values in `associatedDomains` (without them the associated-domain checks are skipped); only allowed hosts containing a `.` are treated as web domains; the `apple-app-site-association` file is not fetched or validated; parser checks cover only the probes you supply and call every parser for each probe, so parsers must be side-effect free. A wildcard `applinks:*.example.com` covers subdomains, not `example.com` itself. Pass third-party SDK callback schemes in `ignoredDeclaredSchemes` or `ignoredDeclaredSchemePrefixes` (for example `fb` for `fb<app id>`) so they are not reported as `declaredSchemeNotAllowed`.
+Run it from a unit test or a `#if DEBUG` hook; it never changes link handling. `checkMiddleware(_:)` takes the chain you pass the builder and warns, for every `SignedLinkMiddleware`, about HMAC keys (`.signedLinksWithSymmetricKey`: prefer `Ed25519PublicKeyring`), `maximumLifetime: nil` (`.signedLinksWithoutMaximumLifetime`) and a missing `nonceStore` (`.signedLinksWithoutNonceStore`: its links can be opened again until they expire), in that order. The two signed-link cases are new in 2.0.1, so a `switch` over the warnings needs a `default` branch or the new cases. **Limits:** entitlements cannot be read at runtime, so pass your `applinks:` values in `associatedDomains` (without them the associated-domain checks are skipped); only allowed hosts containing a `.` are treated as web domains; the `apple-app-site-association` file is not fetched or validated; parser checks cover only the probes you supply and call every parser for each probe, so parsers must be side-effect free. A wildcard `applinks:*.example.com` covers subdomains, not `example.com` itself. Pass third-party SDK callback schemes in `ignoredDeclaredSchemes` or `ignoredDeclaredSchemePrefixes` (for example `fb` for `fb<app id>`) so they are not reported as `declaredSchemeNotAllowed`.
 
 ## Testing Utilities (`DeepLinksTesting` module)
 

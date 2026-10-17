@@ -9,7 +9,8 @@ import Foundation
 public extension DeepLinkCoordinatorBuilder {
 	/// Puts the recommended first stages of the chain in front of every other
 	/// middleware: ``SecurityMiddleware`` (``SecurityStrategy/hardened`` with
-	/// ``DeepLinkInputLimits/recommended``), then ``RateLimitMiddleware``, then
+	/// ``DeepLinkInputLimits/recommended`` and, by default,
+	/// ``DeepLinkInputLimits/rejectDuplicateParameters``), then ``RateLimitMiddleware``, then
 	/// ``ReplayProtectionMiddleware``.
 	///
 	/// The three stages always run first, whatever the order of the builder
@@ -35,9 +36,8 @@ public extension DeepLinkCoordinatorBuilder {
 	///
 	/// Signed links, confirmation prompts, authentication, readiness, URL
 	/// transforms, logging and analytics depend on your app and are left out.
-	/// So are `blockedPatterns` and duplicate-parameter rejection
-	/// (``DeepLinkInputLimits/rejectDuplicateParameters``); register a
-	/// ``SecurityMiddleware`` yourself when you need them. Rate limiting is
+	/// So are `blockedPatterns`; register a ``SecurityMiddleware`` yourself
+	/// when you need them. Rate limiting is
 	/// app-wide, not per source or per link.
 	///
 	/// - Parameters:
@@ -48,6 +48,10 @@ public extension DeepLinkCoordinatorBuilder {
 	///   - allowedHostsByScheme: Hosts allowed per scheme; an entry replaces
 	///     `allowedHosts` for its scheme and an empty entry rejects the scheme.
 	///   - allowedSources: Accepted link sources; `nil` (default) accepts every source.
+	///   - rejectDuplicateParameters: Whether a link repeating a query parameter
+	///     name is rejected, so middleware, signatures and parsers never disagree
+	///     about its value. Defaults to `true`; pass `false` when your links
+	///     carry lists as repeated parameters (`?tag=a&tag=b`).
 	///   - maxRequests: Links accepted per `timeWindow` across the app. Defaults
 	///     to `30`, well above what a person can open and low enough to stop a
 	///     link flood; links rejected by the security check do not count.
@@ -65,6 +69,7 @@ public extension DeepLinkCoordinatorBuilder {
 		allowedHosts: Set<String> = [],
 		allowedHostsByScheme: [String: Set<String>] = [:],
 		allowedSources: Set<DeepLinkContext.Source>? = nil,
+		rejectDuplicateParameters: Bool = true,
 		maxRequests: Int = 30,
 		timeWindow: TimeInterval = 60,
 		rateLimitPersistence: (any RateLimitPersistence)? = nil,
@@ -79,7 +84,7 @@ public extension DeepLinkCoordinatorBuilder {
 				allowedHostsByScheme: allowedHostsByScheme,
 				allowedSources: allowedSources,
 				strategy: .hardened,
-				limits: .recommended,
+				limits: .recommended.rejectingDuplicateParameters(rejectDuplicateParameters),
 			),
 			RateLimitMiddleware(
 				maxRequests: maxRequests,
