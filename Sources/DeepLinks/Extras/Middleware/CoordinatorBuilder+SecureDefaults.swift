@@ -84,12 +84,7 @@ public extension DeepLinkCoordinatorBuilder {
 				allowedHostsByScheme: allowedHostsByScheme,
 				allowedSources: allowedSources,
 				strategy: .hardened,
-				limits: DeepLinkInputLimits(
-					maxURLLength: DeepLinkInputLimits.recommended.maxURLLength,
-					maxQueryParameterCount: DeepLinkInputLimits.recommended.maxQueryParameterCount,
-					maxParameterValueLength: DeepLinkInputLimits.recommended.maxParameterValueLength,
-					rejectDuplicateParameters: rejectDuplicateParameters,
-				),
+				limits: .recommended.rejectingDuplicateParameters(rejectDuplicateParameters),
 			),
 			RateLimitMiddleware(
 				maxRequests: maxRequests,
