@@ -396,6 +396,7 @@ struct SignedLinkMiddlewareTests {
 			keys: SigningKeyring(key: key),
 			requiredFor: .hosts(["example.com"]),
 			requiresExpiry: false,
+			maximumLifetime: nil,
 			dateProvider: clock.dateProvider,
 		)
 
@@ -414,6 +415,7 @@ private func makeSUT(
 	keys: any SigningKeyProvider = SigningKeyring(key: key),
 	requiredFor matcher: DeepLinkMatcher = .all,
 	requiresExpiry: Bool = false,
+	maximumLifetime: TimeInterval? = nil,
 	leeway: TimeInterval = 0,
 	nonceStore: (any NonceStore)? = nil,
 	stripsSignatureParameters: Bool = true,
@@ -424,6 +426,7 @@ private func makeSUT(
 		requiredFor: matcher,
 		requiresExpiry: requiresExpiry,
 		leeway: leeway,
+		maximumLifetime: maximumLifetime,
 		nonceStore: nonceStore,
 		stripsSignatureParameters: stripsSignatureParameters,
 		dateProvider: clock.dateProvider,

@@ -147,23 +147,32 @@ public struct DeepLinkDiagnostics: Sendable {
 public extension DeepLinkDiagnostics {
 	/// Checks a middleware chain for risky settings.
 	///
-	/// Warns with ``DeepLinkDiagnosticWarning/signedLinksWithoutNonceStore``
-	/// for every ``SignedLinkMiddleware`` without a ``NonceStore``. Pass the
-	/// same middleware you give the coordinator builder.
+	/// For every ``SignedLinkMiddleware``, warns with
+	/// ``DeepLinkDiagnosticWarning/signedLinksWithSymmetricKey`` when it
+	/// verifies with an HMAC key,
+	/// ``DeepLinkDiagnosticWarning/signedLinksWithoutMaximumLifetime`` when
+	/// `maximumLifetime` is `nil`, and
+	/// ``DeepLinkDiagnosticWarning/signedLinksWithoutNonceStore`` when it has
+	/// no ``NonceStore``, in that order. Pass the same middleware you give the
+	/// coordinator builder.
 	///
 	/// - Parameter middleware: The middleware chain, in order.
 	/// - Returns: The warnings found, in chain order.
 	func checkMiddleware(_ middleware: [any DeepLinkMiddleware]) -> [DeepLinkDiagnosticWarning] {
-		middleware.compactMap(Self.warning(for:))
+		middleware.flatMap(Self.warnings(for:))
 	}
 
-	private static func warning(for middleware: any DeepLinkMiddleware) -> DeepLinkDiagnosticWarning? {
+	private static func warnings(for middleware: any DeepLinkMiddleware) -> [DeepLinkDiagnosticWarning] {
 		#if canImport(CryptoKit)
-		if let signed = middleware as? SignedLinkMiddleware, !signed.hasNonceStore {
-			return .signedLinksWithoutNonceStore
-		}
+		guard let signed = middleware as? SignedLinkMiddleware else { return [] }
+		return [
+			signed.usesSymmetricKey ? .signedLinksWithSymmetricKey : nil,
+			signed.hasMaximumLifetime ? nil : .signedLinksWithoutMaximumLifetime,
+			signed.hasNonceStore ? nil : .signedLinksWithoutNonceStore,
+		].compactMap(\.self)
+		#else
+		return []
 		#endif
-		return nil
 	}
 }
 

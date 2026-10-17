@@ -12,7 +12,7 @@
 A modular deep link handling library for Swift with a composable middleware pipeline, type-safe routing, and full Swift 6 concurrency support.
 
 - **Hardened when you opt in, redacted by default** — `SecurityMiddleware` defaults to the `.hardened` strategy and `.recommended` input limits, and one call (`.secureDefaults(allowedSchemes:)`) installs it with rate limiting and replay protection. Nothing validates links until you register it; debug builds log a warning when you don't. Logs, analytics and error descriptions redact URLs by default
-- **Middleware pipeline** — security, rate limiting, signed links (HMAC-SHA256 with expiry, nonce and key rotation), replay protection, auth (with resume after sign-in), user confirmation, analytics, logging, URL transformation, readiness gating
+- **Middleware pipeline** — security, rate limiting, signed links (Ed25519 or HMAC-SHA256 with expiry, nonce and key rotation), replay protection, auth (with resume after sign-in), user confirmation, analytics, logging, URL transformation, readiness gating
 - **Provenance** — every link carries a `DeepLinkContext` (Universal Link, custom scheme, Handoff, notification, Spotlight, quick action, scene)
 - **Entry points** — `onOpenURL`, Universal Links, Handoff, notifications, Spotlight and Home Screen quick actions, routed per window in multi-scene apps
 - **Declarative parsing** — `PathPatternParser` templates such as `/products/:id` with typed captures
@@ -85,21 +85,33 @@ This coordinator accepts any scheme and host. Before shipping, add the security 
 
 ## Secure Setup
 
-`secureDefaults` puts the first three stages in front of the chain: `.security` (`.hardened` strategy, `.recommended` input limits), `.rateLimit` (30 links per minute) and `.replayProtection` (2 seconds). Add the stages your app needs after it, in the [recommended order](./docs/securing-deep-links-en.md#2-order-the-pipeline):
+`secureDefaults` puts the first three stages in front of the chain: `.security` (`.hardened` strategy, `.recommended` input limits, repeated query parameters rejected), `.rateLimit` (30 links per minute) and `.replayProtection` (2 seconds). Add the stages your app needs after it, in the [recommended order](./docs/securing-deep-links-en.md#2-order-the-pipeline):
 
 ```swift
+import CryptoKit
+import DeepLinks
+
 @MainActor // the delegate factories (.logging(), .analytics(provider:), .notification()) are main-actor isolated
-func makeCoordinator() throws -> DeepLinkCoordinator<AppRoute> {
-    try DeepLinkCoordinatorBuilder<AppRoute>()
-        .parsers(ProfileParser(), ProductParser())
-        .handler(AppHandler())
-        // security (hardened + limits) → rate limit → replay
+func makeCoordinator(linkPublicKey: Curve25519.Signing.PublicKey) throws -> DeepLinkCoordinator<AppRoute> {
+    let needsSignature: @Sendable (AppRoute) -> Bool = {
+        if case .resetPassword = $0 { true } else { false }
+    }
+
+    return try DeepLinkCoordinatorBuilder<AppRoute>()
+        .parsers(ProfileParser(), ResetPasswordParser())
+        .handler(AppHandler().requiringSignature(for: .routes(where: needsSignature)))
+        // security (hardened + limits + duplicate rejection) → rate limit → replay
         .secureDefaults(
             allowedSchemes: ["myapp", "https"],
             allowedHostsByScheme: ["https": ["example.com"]]
         )
         .middleware(
-            .signedLinks(keys: signingKeys, requiredFor: .paths(["/reset"]), nonceStore: UserDefaultsNonceStore()),
+            .signedLinks(
+                verifier: Ed25519PublicKeyring(keys: ["2026-10": linkPublicKey]),
+                requiredFor: .paths(["/reset"]),
+                maximumLifetime: 15 * 60,
+                nonceStore: UserDefaultsNonceStore()
+            ),
             .authentication(provider: authProvider, protectedHosts: ["account"], pendingLinks: pendingLinks),
             .readiness(queue: readinessQueue),
             .confirmation(provider: confirmationProvider, requiredFor: .paths(["/pay"])),
@@ -110,9 +122,13 @@ func makeCoordinator() throws -> DeepLinkCoordinator<AppRoute> {
 }
 ```
 
+The app ships only the Ed25519 **public** key; your server signs links with the private key (`SignedLinkBuilder(signer: Ed25519LinkSigner(privateKey:), keyID: "2026-10")`). `maximumLifetime` rejects links that expire further ahead than you mint them (seven days when you leave it out), and `requiringSignature(for:)` refuses the sensitive route unless `.signedLinks` verified the link, however the URL was spelled.
+
+> **HMAC keys.** `.signedLinks(keys: SigningKeyring(...))` verifies HMAC-SHA256 signatures, but the same key mints links: anyone who extracts it from one device can forge links for every install. Use it only when the key is delivered at runtime (Keychain, configuration service) and prefer Ed25519 otherwise. `DeepLinkDiagnostics().checkMiddleware(_:)` warns about HMAC keyrings, a `nil` `maximumLifetime` and a missing nonce store.
+
 After sign-in, call `await coordinator.resumePendingLinks(from: pendingLinks)`: each saved link runs the whole chain again, so a link resumed within the 2-second replay window is dropped. Once the app can navigate, call `await coordinator.markReadyAndDrain(queue: readinessQueue)`: queued links resume right after `.readiness`, so confirmation and analytics see them and the stages before it are not run twice.
 
-What the preset does not do: sign, confirm, authenticate or gate links, reject duplicate query parameters, or apply `blockedPatterns`; register those stages yourself. Its rate limit is app-wide and, by default, kept in `UserDefaults`, which survives relaunches but which anyone with access to the app container can edit: treat it as an abuse brake, not a security boundary (pass `rateLimitPersistence:` to change where it is kept). The [security guide](./docs/securing-deep-links-en.md) explains each stage.
+What the preset does not do: sign, confirm, authenticate or gate links, or apply `blockedPatterns`; register those stages yourself. Pass `rejectDuplicateParameters: false` if your links carry lists as repeated parameters (`?tag=a&tag=b`). Its rate limit is app-wide and, by default, kept in `UserDefaults`, which survives relaunches but which anyone with access to the app container can edit: treat it as an abuse brake, not a security boundary (pass `rateLimitPersistence:` to change where it is kept). The [security guide](./docs/securing-deep-links-en.md) explains each stage.
 
 Integrate with SwiftUI using the built-in modifier — one line handles both custom schemes (`onOpenURL`) and Universal Links (`NSUserActivity`):
 
@@ -166,7 +182,7 @@ See [Securing your deep links](./docs/securing-deep-links-en.md) for why this or
 |-----------|---------|
 | **Security** | Validate schemes, hosts, block patterns |
 | **Rate Limit** | Prevent abuse (sliding window, fixed window, token bucket) |
-| **Signed Links** | Require an HMAC-SHA256 signature, expiry and single-use nonce on sensitive links |
+| **Signed Links** | Require an Ed25519 (or HMAC-SHA256) signature, a capped expiry and a single-use nonce on sensitive links |
 | **Replay Protection** | Drop the same link arriving again within a window |
 | **Authentication** | Gate protected routes on auth state; optionally save them to resume after sign-in |
 | **Confirmation** | Ask the user before destructive or financial links continue |

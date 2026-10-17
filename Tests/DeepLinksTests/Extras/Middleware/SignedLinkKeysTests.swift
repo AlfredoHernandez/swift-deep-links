@@ -53,7 +53,7 @@ struct SignedLinkKeysTests {
 
 	@Test
 	func `Ed25519 keyring rejects HMAC links and unknown key ids`() async throws {
-		let sut = SignedLinkMiddleware(verifier: Ed25519PublicKeyring(keys: ["2026": Self.publicKey]), requiresExpiry: false)
+		let sut = SignedLinkMiddleware(verifier: Ed25519PublicKeyring(keys: ["2026": Self.publicKey]), requiresExpiry: false, maximumLifetime: nil)
 		let hmacSigned = try SignedLinkBuilder(key: SymmetricKey(size: .bits256), keyID: "2026").sign(#require(URL(string: "myapp://reset")))
 		let otherKeyID = try SignedLinkBuilder(signer: Ed25519LinkSigner(privateKey: Self.privateKey), keyID: "old").sign(#require(URL(string: "myapp://reset")))
 
@@ -77,7 +77,7 @@ struct SignedLinkKeysTests {
 
 	@Test
 	func `middleware refuses to verify with HMAC keys shorter than 256 bits`() async throws {
-		let sut = SignedLinkMiddleware(keys: SigningKeyring(key: SymmetricKey(data: Data(repeating: 1, count: 31))), requiresExpiry: false)
+		let sut = SignedLinkMiddleware(keys: SigningKeyring(key: SymmetricKey(data: Data(repeating: 1, count: 31))), requiresExpiry: false, maximumLifetime: nil)
 		let link = try #require(URL(string: "myapp://reset?sig=AAAA"))
 
 		await #expect(throws: DeepLinkError.securityViolation(SignedLinkMiddleware.weakKeyReason)) {

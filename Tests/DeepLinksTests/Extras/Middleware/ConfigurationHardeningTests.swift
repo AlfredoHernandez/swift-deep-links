@@ -64,11 +64,11 @@ extension ConfigurationHardeningTests {
 
 	@Test
 	func `diagnostics warn about signed links without a nonce store`() {
-		let keys = SigningKeyring(key: SymmetricKey(size: .bits256))
+		let keys = Ed25519PublicKeyring(key: Curve25519.Signing.PrivateKey().publicKey)
 		let sut = DeepLinkDiagnostics(declaredURLSchemes: [])
 
-		let warnings = sut.checkMiddleware([.signedLinks(keys: keys), .logging()])
-		let withStore = sut.checkMiddleware([.signedLinks(keys: keys, nonceStore: InMemoryNonceStore())])
+		let warnings = sut.checkMiddleware([.signedLinks(verifier: keys), .logging()])
+		let withStore = sut.checkMiddleware([.signedLinks(verifier: keys, nonceStore: InMemoryNonceStore())])
 
 		#expect(warnings == [.signedLinksWithoutNonceStore])
 		#expect(withStore.isEmpty)

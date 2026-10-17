@@ -17,7 +17,7 @@ struct SignedLinkDuplicateParameterTests {
 		let swapped = url(signed.absoluteString.replacingOccurrences(of: "user=1&user=2", with: "user=2&user=1"))
 
 		await #expect(throws: DeepLinkError.securityViolation(SignedLinkMiddleware.duplicateParameterReason)) {
-			try await SignedLinkMiddleware(keys: SigningKeyring(key: key), requiresExpiry: false)
+			try await SignedLinkMiddleware(keys: SigningKeyring(key: key), requiresExpiry: false, maximumLifetime: nil)
 				.intercept(DeepLinkRequest(url: swapped))
 		}
 	}
@@ -32,7 +32,7 @@ struct SignedLinkDuplicateParameterTests {
 		let signed = try SignedLinkBuilder(key: key, rejectDuplicateParameters: false).sign(url(link))
 
 		await #expect(throws: DeepLinkError.securityViolation(SignedLinkMiddleware.duplicateParameterReason)) {
-			try await SignedLinkMiddleware(keys: SigningKeyring(key: key), requiresExpiry: false)
+			try await SignedLinkMiddleware(keys: SigningKeyring(key: key), requiresExpiry: false, maximumLifetime: nil)
 				.intercept(DeepLinkRequest(url: signed))
 		}
 	}
@@ -41,7 +41,7 @@ struct SignedLinkDuplicateParameterTests {
 	func `a verifier that opts out accepts a signed link repeating a parameter`() async throws {
 		let signed = try SignedLinkBuilder(key: key, rejectDuplicateParameters: false)
 			.sign(url("https://example.com/reset?tag=a&tag=b"))
-		let sut = SignedLinkMiddleware(keys: SigningKeyring(key: key), requiresExpiry: false, rejectDuplicateParameters: false)
+		let sut = SignedLinkMiddleware(keys: SigningKeyring(key: key), requiresExpiry: false, maximumLifetime: nil, rejectDuplicateParameters: false)
 
 		#expect(try await sut.intercept(DeepLinkRequest(url: signed))?.url == url("https://example.com/reset?tag=a&tag=b"))
 	}
@@ -50,7 +50,7 @@ struct SignedLinkDuplicateParameterTests {
 	func `distinct parameter names still verify`() async throws {
 		let signed = try SignedLinkBuilder(key: key).sign(url("https://example.com/reset?user=1&team=2"))
 
-		let result = try await SignedLinkMiddleware(keys: SigningKeyring(key: key), requiresExpiry: false)
+		let result = try await SignedLinkMiddleware(keys: SigningKeyring(key: key), requiresExpiry: false, maximumLifetime: nil)
 			.intercept(DeepLinkRequest(url: signed))
 
 		#expect(result?.url == url("https://example.com/reset?user=1&team=2"))

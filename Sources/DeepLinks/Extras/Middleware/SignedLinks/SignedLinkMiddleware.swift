@@ -146,6 +146,8 @@ public final class SignedLinkMiddleware: DeepLinkMiddleware {
 	public static let signingFailedReason = SecurityViolationMessage.signingFailed
 	/// The shortest HMAC-SHA256 key accepted, in bytes (256 bits).
 	public static let minimumKeyByteCount = 32
+	/// The default `maximumLifetime`: seven days, in seconds.
+	public static let defaultMaximumLifetime: TimeInterval = 7 * 24 * 60 * 60
 
 	private let verifier: any SignedLinkVerifier
 	private let matcher: DeepLinkMatcher
@@ -172,8 +174,10 @@ public final class SignedLinkMiddleware: DeepLinkMiddleware {
 	///     negative, infinite and NaN values count as `0`.
 	///   - maximumLifetime: The furthest ahead, in seconds, a link's expiry may be;
 	///     a later expiry is rejected with ``lifetimeTooLongReason``, so a leaked
-	///     key or a long-lived link cannot be used indefinitely. Requires an expiry.
-	///     Defaults to `nil` (no cap).
+	///     key or a long-lived link cannot be used indefinitely. Requires an expiry,
+	///     so `requiresExpiry: false` only takes effect with `maximumLifetime: nil`.
+	///     Defaults to ``defaultMaximumLifetime`` (seven days); pass `nil`
+	///     explicitly for no cap, which ``DeepLinkDiagnostics/checkMiddleware(_:)`` reports.
 	///   - nonceStore: Makes each link single-use and requires a nonce and an expiry. Defaults to `nil`,
 	///     which lets a signed link be opened again until it expires; pass a store
 	///     for anything with side effects. ``DeepLinkDiagnostics/checkMiddleware(_:)`` warns when it is `nil`.
@@ -193,7 +197,7 @@ public final class SignedLinkMiddleware: DeepLinkMiddleware {
 		parameters: SignedLinkParameters = .default,
 		requiresExpiry: Bool = true,
 		leeway: TimeInterval = 0,
-		maximumLifetime: TimeInterval? = nil,
+		maximumLifetime: TimeInterval? = SignedLinkMiddleware.defaultMaximumLifetime,
 		nonceStore: (any NonceStore)? = nil,
 		reusedNonce: ReusedNonceResponse = .reject,
 		stripsSignatureParameters: Bool = true,
@@ -226,7 +230,7 @@ public final class SignedLinkMiddleware: DeepLinkMiddleware {
 		parameters: SignedLinkParameters = .default,
 		requiresExpiry: Bool = true,
 		leeway: TimeInterval = 0,
-		maximumLifetime: TimeInterval? = nil,
+		maximumLifetime: TimeInterval? = SignedLinkMiddleware.defaultMaximumLifetime,
 		nonceStore: (any NonceStore)? = nil,
 		reusedNonce: ReusedNonceResponse = .reject,
 		stripsSignatureParameters: Bool = true,
@@ -249,6 +253,17 @@ public final class SignedLinkMiddleware: DeepLinkMiddleware {
 	/// Whether links are single-use; ``DeepLinkDiagnostics/checkMiddleware(_:)`` warns when not.
 	var hasNonceStore: Bool {
 		nonceStore != nil
+	}
+
+	/// Whether links are checked with a shared HMAC key, which can also mint
+	/// links once extracted from a device; ``DeepLinkDiagnostics/checkMiddleware(_:)`` warns when so.
+	var usesSymmetricKey: Bool {
+		verifier is HMACSignedLinkVerifier
+	}
+
+	/// Whether expiries are capped; ``DeepLinkDiagnostics/checkMiddleware(_:)`` warns when not.
+	var hasMaximumLifetime: Bool {
+		maximumLifetime != nil
 	}
 
 	/// Verifies the links the matcher selects, and any link that carries a
