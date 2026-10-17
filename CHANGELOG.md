@@ -62,7 +62,10 @@ stricter; each item says how to keep the 2.0.0 behavior.
 - **Distinctive signed-link parameter names (L5).** `SignedLinkParameters.default`
   (and `SignedLinkParameters()`) are now `dlsig`, `dlexp`, `dlnonce` and
   `dlkid`, so an app parameter that happens to be called `sig` is no longer
-  verified (and rejected) as a signature. `SignedLinkParameters.legacy` keeps
+  verified (and rejected) as a signature. The initializer's defaults changed
+  too: `SignedLinkParameters(signature: "mysig")` now pairs `mysig` with
+  `dlexp`, `dlnonce` and `dlkid`; start from `SignedLinkParameters.legacy` and
+  set one field to keep the other 2.0.0 names. `SignedLinkParameters.legacy` keeps
   the 2.0.0 names: pass `parameters: .legacy` to `.signedLinks(...)` until
   every link minted by 2.0.0 has expired, and to `SignedLinkBuilder` while
   your server still mints them, then drop it on both sides. `URLRedactor`

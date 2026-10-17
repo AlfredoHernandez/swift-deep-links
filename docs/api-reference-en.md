@@ -288,7 +288,7 @@ LoggingProvider.console(privacy: .unredacted)
 .notification(errorDetail: .full)
 ```
 
-Since 2.0.1 `errorDescription`, and therefore `localizedDescription` and string interpolation of the error, is `redactedDescription`; `unredactedDescription` keeps the full URLs and values (nested `DeepLinkError`s unredacted too, other errors by `localizedDescription`) for debugging. `redactedDescription` escapes control and line-separator characters (`\n`), so it is always one log line: carried URLs and every `scheme://` URL embedded in a message, host or reason go through `URLRedactor`, the value in `invalidParameterValue` is always replaced, and underlying errors that are not `DeepLinkError` are described only by their type name.
+Since 2.0.1 `errorDescription`, and therefore `localizedDescription` and string interpolation of the error, is `redactedDescription`; `unredactedDescription` keeps the full URLs and values (nested `DeepLinkError`s unredacted too, other errors by `localizedDescription`) for debugging. Free text carried by `unsupportedScheme`, `unsupportedHost`, `missingRequiredParameter`, `missingRequiredConfiguration` and `securityViolation` is redacted only where it embeds a `scheme://` URL, so do not put secrets in those strings. `redactedDescription` escapes control and line-separator characters (`\n`), so it is always one log line: carried URLs and every `scheme://` URL embedded in a message, host or reason go through `URLRedactor`, the value in `invalidParameterValue` is always replaced, and underlying errors that are not `DeepLinkError` are described only by their type name.
 
 ### URLRedactor
 
@@ -518,8 +518,13 @@ public struct SignedLinkParameters: Sendable, Hashable {
 > signature parameter is verified). Links minted by 2.0.0 use `sig`, `exp`,
 > `nonce` and `kid`: pass `parameters: .legacy` to `.signedLinks(...)` until
 > they have all expired (and to `SignedLinkBuilder` while your server still
-> mints them), then switch both sides to the default. Below, `sig`, `exp`,
-> `nonce` and `kid` stand for whichever names you configure.
+> mints them), then switch both sides to the default. The initializer's
+> defaults changed too, so `SignedLinkParameters(signature: "mysig")` now pairs
+> `mysig` with `dlexp`, `dlnonce` and `dlkid`; to change one 2.0.0 name, start
+> from `var names = SignedLinkParameters.legacy` and set that field. `URLRedactor`
+> redacts `dlsig`, `sig` and any name containing `nonce`; add a custom signature
+> name to `sensitiveKeys`. Below, `sig`, `exp`, `nonce` and `kid` stand for
+> whichever names you configure.
 
 **Canonical form** (what the HMAC covers; implement it identically on your server): seven lines joined by `\n`, no trailing newline:
 
@@ -533,7 +538,7 @@ DLSIG1
 <percent-encoded fragment, or empty>
 ```
 
-Path, query items and fragment first decode escapes of RFC 3986 unreserved characters (`A-Z a-z 0-9 - . _ ~`) and upper-case the remaining escapes. The signature is `base64url(HMAC-SHA256(key, canonical))`, or `base64url(Ed25519-sign(privateKey, canonical))` (RFC 8032) with `Ed25519PublicKeyring`, without padding, appended as the last `sig` parameter. Because the query is sorted, `?user=1&user=2` and `?user=2&user=1` share a canonical form while `DeepLinkURL.queryParameters` reads the last value, so since 2.0.1 both the builder (`invalidURL`) and the middleware (`duplicateParameterReason`) reject a link repeating a decoded parameter name; pass `rejectDuplicateParameters: false` on both only if every reader of repeated parameters reads all their values in order.
+Path, query items and fragment first decode escapes of RFC 3986 unreserved characters (`A-Z a-z 0-9 - . _ ~`) and upper-case the remaining escapes. The signature is `base64url(HMAC-SHA256(key, canonical))`, or `base64url(Ed25519-sign(privateKey, canonical))` (RFC 8032) with `Ed25519PublicKeyring`, without padding, appended as the last signature parameter (`dlsig` by default). Because the query is sorted, `?user=1&user=2` and `?user=2&user=1` share a canonical form while `DeepLinkURL.queryParameters` reads the last value, so since 2.0.1 both the builder (`invalidURL`) and the middleware (`duplicateParameterReason`) reject a link repeating a decoded parameter name; pass `rejectDuplicateParameters: false` on both only if every reader of repeated parameters reads all their values in order.
 
 **Keys.** An HMAC key both verifies and mints links, and anything in an app binary or on a device can be extracted, so a leaked key forges links for every install. Prefer Ed25519: the app embeds only public keys (`Ed25519PublicKeyring`) and the server keeps the private key (`Ed25519LinkSigner`). HMAC keys shorter than `minimumKeyByteCount` (32) bytes throw `securityViolation(weakKeyReason)` from both `SignedLinkBuilder.sign` and verification. Nonce stores are per install, so a link stays usable once on each device until it expires: keep lifetimes short; `maximumLifetime` (seven days by default since 2.0.1, `nil` for no cap) rejects links whose `exp` is further ahead (`lifetimeTooLongReason`). A lifetime cap requires an expiry, so `requiresExpiry: false` only takes effect together with `maximumLifetime: nil`. `DeepLinkDiagnostics.checkMiddleware(_:)` reports HMAC keyrings (`.signedLinksWithSymmetricKey`), a `nil` lifetime (`.signedLinksWithoutMaximumLifetime`) and a missing nonce store. `kid`, `exp` and `nonce` are ordinary query items and therefore signed. Userinfo (`user:pass@`) is not part of the canonical form: keep `.security(...)` with `.hardened` (which rejects userinfo) in front. Links from notifications, Spotlight and quick actions are checked like any other, so payloads pointing at a signed path must carry the signed URL.
 
