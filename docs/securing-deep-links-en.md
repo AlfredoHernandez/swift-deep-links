@@ -264,7 +264,8 @@ URL afterwards clears it, so run URL transformations **before**
 
 Since 2.0, framework logs, analytics, error descriptions and notifications
 redact tokens, codes, emails, JWTs and userinfo. Use
-`error.redactedDescription` in your own logs, keep `.unredacted` / `.full` to
+`error.redactedDescription` (or `localizedDescription`, redacted too since
+2.0.1) in your own logs, `error.unredactedDescription` only while debugging, keep `.unredacted` / `.full` to
 debug builds, and keep secrets out of path segments, which are not redacted by
 default. If a link format puts one there, redact it explicitly:
 

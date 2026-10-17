@@ -38,7 +38,7 @@ The middleware throws `DeepLinkError.securityViolation` (or `blockedURL`) and th
 
 ### Are URLs redacted in logs and analytics?
 
-Yes, by default. The coordinator, routing, logging and analytics middleware, delegates and notification errors replace sensitive query and fragment values (tokens, codes, emails, JWTs) and userinfo with `REDACTED`. Plain path segments are kept unless you configure `URLRedactor(pathRedaction:)`. Use `.unredacted` (or `.full` for notifications) only while debugging, and `error.redactedDescription` when you log errors yourself.
+Yes, by default. The coordinator, routing, logging and analytics middleware, delegates and notification errors replace sensitive query and fragment values (tokens, codes, emails, JWTs) and userinfo with `REDACTED`. Plain path segments are kept unless you configure `URLRedactor(pathRedaction:)`. Use `.unredacted` (or `.full` for notifications) only while debugging, and `error.redactedDescription` when you log errors yourself. Since 2.0.1 `localizedDescription` is redacted too; `error.unredactedDescription` keeps the full text for debugging.
 
 ## Implementation Questions
 

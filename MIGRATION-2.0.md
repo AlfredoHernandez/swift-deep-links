@@ -202,8 +202,9 @@ default:
 `handlerError` by message and whether an underlying error exists. Unwrap the
 payloads to compare them in depth.
 
-**Descriptions.** `errorDescription` still embeds full URLs. Use
-`redactedDescription` for logs, analytics and UI:
+**Descriptions.** In 2.0.0 `errorDescription` still embeds full URLs; since
+2.0.1 it returns `redactedDescription`, and `unredactedDescription` keeps the
+full text for debugging. Use `redactedDescription` for logs, analytics and UI:
 
 ```swift
 // 1.x

@@ -254,8 +254,10 @@ public enum DeepLinkError: Error, Sendable, Equatable, LocalizedError {
     case blockedURL(URL)
     case confirmationDenied(URL)      // 2.0: user declined or did not answer
 
+    public var errorDescription: String? { get }        // 2.0.1: redactedDescription
     public var redactedDescription: String { get }
     public func redactedDescription(using redactor: URLRedactor) -> String
+    public var unredactedDescription: String { get }    // 2.0.1: full URLs and values, debugging only
 }
 ```
 
@@ -264,7 +266,7 @@ public enum DeepLinkError: Error, Sendable, Equatable, LocalizedError {
 ```swift
 public struct DeepLinkLogPrivacy: Sendable {
     public static let redacted: DeepLinkLogPrivacy        // default URLRedactor
-    public static let unredacted: DeepLinkLogPrivacy      // full URLs and localizedDescription
+    public static let unredacted: DeepLinkLogPrivacy      // full URLs and unredactedDescription
     public static func redacted(using redactor: URLRedactor) -> DeepLinkLogPrivacy
     public func redact(_ url: URL) -> URL
     public func describe(_ url: URL) -> String
@@ -285,7 +287,7 @@ LoggingProvider.console(privacy: .unredacted)
 .notification(errorDetail: .full)
 ```
 
-`errorDescription` embeds full URLs. `redactedDescription` escapes control and line-separator characters (`\n`), so it is always one log line. Use `redactedDescription` for logs, analytics and user-facing text: carried URLs and every `scheme://` URL embedded in a message, host or reason go through `URLRedactor`, the value in `invalidParameterValue` is always replaced, and underlying errors that are not `DeepLinkError` are described only by their type name.
+Since 2.0.1 `errorDescription`, and therefore `localizedDescription` and string interpolation of the error, is `redactedDescription`; `unredactedDescription` keeps the full URLs and values (nested `DeepLinkError`s unredacted too, other errors by `localizedDescription`) for debugging. `redactedDescription` escapes control and line-separator characters (`\n`), so it is always one log line: carried URLs and every `scheme://` URL embedded in a message, host or reason go through `URLRedactor`, the value in `invalidParameterValue` is always replaced, and underlying errors that are not `DeepLinkError` are described only by their type name.
 
 ### URLRedactor
 
@@ -752,7 +754,7 @@ Value types (structs) and actors can now adopt `DeepLinkCoordinatorDelegate`; th
 .notification(showSuccess:showErrors:showInfo:presenter:errorDetail:)   // iOS, macOS, watchOS, visionOS only
 ```
 
-`errorDetail` (`DeepLinkNotificationErrorDetail`) controls failure text: `.full` (default, `localizedDescription`), `.redacted` / `.redacted(using:)` (`redactedDescription`, type name for foreign errors) or `.generic` (no error text). Notifications can appear on the lock screen, so prefer `.redacted` or `.generic`.
+`errorDetail` (`DeepLinkNotificationErrorDetail`) controls failure text: `.full` (`unredactedDescription` for framework errors, `localizedDescription` for others), `.redacted` (default) / `.redacted(using:)` (`redactedDescription`, type name for foreign errors) or `.generic` (no error text). Notifications can appear on the lock screen, so prefer `.redacted` or `.generic`.
 
 ### Notification Presenter
 

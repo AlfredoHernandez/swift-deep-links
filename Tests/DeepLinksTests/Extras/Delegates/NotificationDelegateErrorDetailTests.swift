@@ -18,7 +18,7 @@ struct NotificationDelegateErrorDetailTests {
 	func `full detail keeps the existing message`() async throws {
 		let body = try await failureBody(errorDetail: .full)
 
-		#expect(body == "Failed to process link: \(Self.error.localizedDescription)")
+		#expect(body == "Failed to process link: \(Self.error.unredactedDescription)")
 	}
 
 	@Test
