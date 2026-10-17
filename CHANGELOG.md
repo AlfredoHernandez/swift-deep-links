@@ -4,6 +4,94 @@ All notable changes to `swift-deep-links` are tracked here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [2.0.1] - Unreleased
+
+Fixes from an independent security audit of 2.0.0. Several defaults become
+stricter; each item says how to keep the 2.0.0 behavior.
+
+### Security
+
+- **Signed links reject repeated parameters (M1).** The canonical form sorts
+  the query, so `?user=1&user=2` and `?user=2&user=1` shared a signature while
+  `DeepLinkURL` reads the last value. `SignedLinkMiddleware` now rejects a link
+  repeating a decoded parameter name (`duplicateParameterReason`, mapped to
+  `SecurityViolationReason.duplicateParameter`) and `SignedLinkBuilder.sign`
+  throws `invalidURL` for one. Opt out with `rejectDuplicateParameters: false`
+  on both (also on `.signedLinks(...)`).
+- **Nonces survive two readiness gates (M2).** A link queued by a second
+  `ReadinessMiddleware` after draining from the first replaced the first
+  gate's deferral, so the nonce `SignedLinkMiddleware` reserved before the
+  first gate was never committed and the link could be reused after the
+  reservation lapsed or the app relaunched. Deferrals are now chained: the
+  last gate settles every earlier one with the link's final outcome (and an
+  eviction or reset releases them all).
+- **Signed links are capped at seven days by default (M3).**
+  `SignedLinkMiddleware` and `.signedLinks(...)` default `maximumLifetime` to
+  `SignedLinkMiddleware.defaultMaximumLifetime` (7 days); pass
+  `maximumLifetime: nil` for no cap. A lifetime cap requires an expiry, so
+  `requiresExpiry: false` now only takes effect with `maximumLifetime: nil`.
+- **Diagnostics flag weak signed-link setups (M3).**
+  `DeepLinkDiagnostics.checkMiddleware(_:)` adds
+  `DeepLinkDiagnosticWarning.signedLinksWithSymmetricKey` (HMAC keyring: an
+  extracted key forges links) and `.signedLinksWithoutMaximumLifetime`, and
+  reports every weakness of one middleware instead of only the first. Exhaustive
+  `switch` statements over the warning need the new cases.
+- **The canonicalizer reads paths like the matcher (L3).** `URLCanonicalizer`
+  (and so `.hardened` security) ignores `;` parameters before its `..` check,
+  rejecting `/a/..;/admin` and `/.%2e;x/`, and rejects path segments made only
+  of dots that include a fullwidth or ideographic full stop (`．．`, `.．`,
+  `。`). `DeepLinkMatcher.paths(_:)` reads such segments as dots, so they stay
+  protected. `URLFuzzCorpus` gains three traversal cases (36 in total).
+- **Persisted pending links are not trusted (L4).** `UserDefaultsPendingLinkStore`
+  resumes links with `.unknown` and no source application, keeping only the
+  scene identifier, whatever source the stored data claims: anyone with access
+  to the app container can edit it. Use `InMemoryPendingLinkStore` when a
+  source rule must accept resumed links.
+- **Error descriptions are redacted by default (L8).**
+  `DeepLinkError.errorDescription`, and therefore `localizedDescription`,
+  return `redactedDescription`. The new `unredactedDescription` keeps the full
+  text for debugging; `DeepLinkLogPrivacy.unredacted` and
+  `DeepLinkNotificationErrorDetail.full` use it.
+
+### Changed
+
+- **`secureDefaults` rejects duplicate query parameters (M1).** Its
+  `SecurityMiddleware` enables `DeepLinkInputLimits.rejectDuplicateParameters`;
+  pass `rejectDuplicateParameters: false` if your links carry lists as
+  repeated parameters.
+- **Distinctive signed-link parameter names (L5).** `SignedLinkParameters.default`
+  (and `SignedLinkParameters()`) are now `dlsig`, `dlexp`, `dlnonce` and
+  `dlkid`, so an app parameter that happens to be called `sig` is no longer
+  verified (and rejected) as a signature. `SignedLinkParameters.legacy` keeps
+  the 2.0.0 names: pass `parameters: .legacy` to `.signedLinks(...)` until
+  every link minted by 2.0.0 has expired, and to `SignedLinkBuilder` while
+  your server still mints them, then drop it on both sides. `URLRedactor`
+  redacts `dlsig` by default.
+- **Route confirmations are bounded (L1).** `ConfirmingHandler` and
+  `confirming(_:)` default `timeout` to `ConfirmationMiddleware.defaultTimeout`
+  (60 seconds; was `nil`), show prompts one at a time in arrival order, and
+  admit at most `maxPendingPrompts` routes (default 2) waiting or prompting;
+  the rest fail with
+  `securityViolation(ConfirmationMiddleware.tooManyPendingPromptsReason)`
+  without a prompt. Pass `timeout: nil` to wait indefinitely.
+- README "Secure Setup" uses `Ed25519PublicKeyring`, `maximumLifetime` and
+  `requiringSignature(for:)`, with a note on HMAC keys.
+
+### Fixed
+
+- **Readiness examples drained queues unsafely (L2).** The examples on
+  `DeepLinkReadinessQueue`, `ReadinessMiddleware`, `.readiness(queue:)`, the
+  migration guide fed `markReady()` URLs back into
+  `handle(url:)`; they now drain with
+  `coordinator.markReadyAndDrain(queue:)`. `markReady()` keeps returning the
+  URLs as the readiness gate received them (already rewritten by the
+  middleware before it, signature parameters stripped) and is documented as
+  unsafe to feed back into `handle(url:)`; returning the arrival URLs instead
+  would break `process(_:startingAfter:)` callers and leave nonces unsettled.
+- The `secureDefaults` documentation no longer says duplicate-parameter
+  rejection is left out, and the API reference describes the signed-link
+  canonical form with the configured parameter names.
+
 ## [2.0.0] - 2026-10-15
 
 Every change since `1.1.0`, described as it behaves in 2.0.0. Upgrading?
@@ -736,6 +824,7 @@ Every removal is a breaking change.
 
 Initial release.
 
+[2.0.1]: https://github.com/AlfredoHernandez/swift-deep-links/compare/2.0.0...HEAD
 [2.0.0]: https://github.com/AlfredoHernandez/swift-deep-links/compare/1.1.0...2.0.0
 [1.1.0]: https://github.com/AlfredoHernandez/swift-deep-links/compare/1.0.1...1.1.0
 [1.0.1]: https://github.com/AlfredoHernandez/swift-deep-links/compare/1.0.0...1.0.1
