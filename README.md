@@ -279,7 +279,9 @@ The package targets Apple platforms only: it uses `os` (`Logger`, `OSAllocatedUn
 
 ## License
 
-Copyright © 2026 Jesús Alfredo Hernández Alarcón. All rights reserved.
+swift-deep-links is released under the MIT License. See [LICENSE](LICENSE).
+
+Copyright © 2026 Jesús Alfredo Hernández Alarcón.
 
 ## Author
 

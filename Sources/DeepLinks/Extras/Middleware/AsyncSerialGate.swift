@@ -1,5 +1,5 @@
 //
-//  Copyright © 2026 Jesús Alfredo Hernández Alarcón. All rights reserved.
+//  Copyright © 2026 Jesús Alfredo Hernández Alarcón. Licensed under the MIT License.
 //
 
 /// Runs async operations one at a time, in arrival order.
