@@ -1,5 +1,5 @@
 //
-//  Copyright © 2026 Jesús Alfredo Hernández Alarcón. All rights reserved.
+//  Copyright © 2026 Jesús Alfredo Hernández Alarcón. Licensed under the MIT License.
 //
 
 // `UserNotifications` is available on iOS, macOS, watchOS, and visionOS but tvOS

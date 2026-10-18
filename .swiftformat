@@ -7,7 +7,7 @@
 --wraparguments before-first
 --wrapparameters before-first
 --ifdef no-indent
---header "//\n//  Copyright © {year} Jesús Alfredo Hernández Alarcón. All rights reserved.\n//"
+--header "//\n//  Copyright © {year} Jesús Alfredo Hernández Alarcón. Licensed under the MIT License.\n//"
 --elseposition same-line
 --importgrouping testable-first
 --someany true
